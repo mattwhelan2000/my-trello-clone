@@ -17,6 +17,7 @@ interface DescriptionProps {
 export const Description = ({ data, boardId }: DescriptionProps) => {
     const queryClient = useQueryClient();
     const [isEditing, setIsEditing] = useState(false);
+    const [descContent, setDescContent] = useState(data.description || "");
     const formRef = useRef<ElementRef<"form">>(null);
     const textareaRef = useRef<ElementRef<"textarea">>(null);
 
@@ -31,6 +32,8 @@ export const Description = ({ data, boardId }: DescriptionProps) => {
 
     const enableEditing = () => {
         setIsEditing(true);
+        // Reset to canonical data when we start editing (in case they cancelled last time)
+        setDescContent(data.description || "");
         setTimeout(() => {
             // @ts-ignore
             textareaRef.current?.focus();
@@ -48,16 +51,15 @@ export const Description = ({ data, boardId }: DescriptionProps) => {
     };
 
     useEventListener("keydown", onKeyDown);
-    useOnClickOutside(formRef as React.RefObject<HTMLElement>, disableEditing);
+    // Removed useOnClickOutside as it intercepts native editor clicks like link inserting and pasting
 
     const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        const description = formData.get("description") as string;
 
-        if (description === data.description) return disableEditing();
+        // Use our controlled state variable
+        if (descContent === data.description) return disableEditing();
 
-        execute({ id: data.id, boardId, description });
+        execute({ id: data.id, boardId, description: descContent });
     };
 
     return (
@@ -70,11 +72,8 @@ export const Description = ({ data, boardId }: DescriptionProps) => {
                     <form action="" ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-y-2">
                         <div data-color-mode="light">
                             <MDEditor
-                                value={data.description || ""}
-                                onChange={(val) => {
-                                    // Normally we would bind this to a state variable, but for quick form data, we inject it manually
-                                    // For now, let's keep the Form approach and put a hidden input if MDEditor doesn't submit standard form names.
-                                }}
+                                value={descContent}
+                                onChange={(val) => setDescContent(val || "")}
                                 preview="edit"
                                 height={200}
                                 textareaProps={{

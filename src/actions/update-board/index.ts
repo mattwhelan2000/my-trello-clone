@@ -7,14 +7,15 @@ import { UpdateBoardSchema } from "./schema";
 
 export const updateBoard = actionClient
     .schema(UpdateBoardSchema)
-    .action(async ({ parsedInput: { id, bgImage, bgColor } }) => {
+    .action(async ({ parsedInput: { id, title, bgImage, bgColor } }) => {
         try {
             const board = await db.board.update({
                 where: { id },
-                data: { bgImage, bgColor },
+                data: { title, bgImage, bgColor },
             });
 
             revalidatePath(`/board/${board.id}`);
+            revalidatePath(`/`); // Revalidate dashboard list as well
             return board;
         } catch (error) {
             return { error: "Failed to update board background." };

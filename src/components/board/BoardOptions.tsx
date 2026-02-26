@@ -12,9 +12,20 @@ interface BoardOptionsProps {
 }
 
 const COLORS = [
-    "#ef4444", "#f97316", "#f59e0b", "#84cc16", "#22c55e",
-    "#06b6d4", "#3b82f6", "#6366f1", "#a855f7", "#ec4899",
-    "#000000", "#ffffff", "#475569", "#78716c"
+    "#334155", // Slate 700
+    "#475569", // Slate 600
+    "#1e293b", // Slate 800
+    "#27272a", // Zinc 800
+    "#18181b", // Zinc 900
+    "#52525b", // Zinc 600
+    "#262626", // Neutral 800
+    "#171717", // Neutral 900
+    "#525252", // Neutral 600
+    "#1c1917", // Stone 900
+    "#292524", // Stone 800
+    "#57534e", // Stone 600
+    "#4338ca", // Darker blue/indigo
+    "#0f172a"  // Very dark slate
 ];
 
 export const BoardOptions = ({ boardId }: BoardOptionsProps) => {

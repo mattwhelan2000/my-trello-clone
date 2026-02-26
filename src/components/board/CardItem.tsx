@@ -8,6 +8,8 @@ import { useAction } from "@/hooks/use-action";
 import { deleteCard } from "@/actions/delete-card";
 import { copyCard } from "@/actions/copy-card";
 import { pasteCard } from "@/actions/paste-card";
+import { AlignLeft, CheckSquare, Clock, Paperclip } from "lucide-react";
+import { format } from "date-fns";
 
 export const CardItem = ({ data, index, boardId }: { data: any; index: number; boardId: string }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,6 +81,31 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
         || data.attachments?.find((a: any) => a.type === "IMAGE");
     const renderableImageUrl = coverImageAttachment ? getRenderableImageUrl(coverImageAttachment.url) : null;
 
+    // --- Metadata Calculations ---
+    const hasDescription = !!data.description;
+    const hasAttachments = data.attachments?.length > (coverImageAttachment ? 1 : 0);
+    const hasChecklists = data.checklists && data.checklists.length > 0;
+
+    let checklistTotal = 0;
+    let checklistCompleted = 0;
+    if (hasChecklists) {
+        data.checklists.forEach((list: any) => {
+            checklistTotal += list.items.length;
+            checklistCompleted += list.items.filter((item: any) => item.isCompleted).length;
+        });
+    }
+    const isChecklistComplete = checklistTotal > 0 && checklistCompleted === checklistTotal;
+    const hasLabels = data.labels && data.labels.length > 0;
+
+    // Check if the due date is past due or due soon
+    let isPastDue = false;
+    let formattedDueDate = "";
+    if (data.dueDate) {
+        const date = new Date(data.dueDate);
+        formattedDueDate = format(date, "MMM d");
+        if (date < new Date()) isPastDue = true;
+    }
+
     if (isDragging) {
         return (
             <div
@@ -101,15 +128,68 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 role="button"
                 onClick={() => setIsModalOpen(true)}
                 onContextMenu={handleContextMenu}
-                className="group border-2 border-transparent hover:border-neutral-500 text-sm bg-black text-white rounded-md shadow-sm flex flex-col overflow-hidden relative"
+                className="group border-2 border-transparent hover:border-neutral-500 text-sm bg-[#111111] hover:bg-[#1a1a1a] text-white rounded-md shadow-sm flex flex-col overflow-hidden relative transition-colors"
             >
                 {renderableImageUrl && (
-                    <div className="w-full relative flex items-center justify-center bg-neutral-200">
-                        <img src={renderableImageUrl} alt="Card Cover" className="w-full h-auto object-cover" />
+                    <div className="w-full relative flex items-center justify-center bg-black border-b border-neutral-800">
+                        <img src={renderableImageUrl} alt="Card Cover" className="w-full h-auto max-h-[260px] object-cover" />
                     </div>
                 )}
-                <div className={`py-2 px-3 truncate w-full ${!renderableImageUrl ? "min-h-[36px]" : ""}`}>
-                    {data.title}
+
+                <div className={`py-2 px-3 w-full flex flex-col gap-y-1.5 ${!renderableImageUrl ? "min-h-[36px]" : ""}`}>
+
+                    {/* LABELS */}
+                    {hasLabels && (
+                        <div className="flex flex-wrap gap-1 mb-1">
+                            {data.labels.map((label: any) => (
+                                <div
+                                    key={label.id}
+                                    className="h-2 w-8 rounded-full"
+                                    style={{ backgroundColor: label.color, opacity: 0.9 }}
+                                    title={label.title}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* TITLE */}
+                    <div className="truncate w-full font-medium">
+                        {data.title}
+                    </div>
+
+                    {/* METADATA FOOTER */}
+                    {(hasDescription || hasChecklists || hasAttachments || data.dueDate) && (
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1 text-neutral-400">
+
+                            {data.dueDate && (
+                                <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isPastDue ? 'bg-red-900/40 text-red-400' : 'bg-neutral-800'}`}>
+                                    <Clock className="h-3 w-3" />
+                                    <span>{formattedDueDate}</span>
+                                </div>
+                            )}
+
+                            {hasDescription && (
+                                <div className="flex items-center" title="This card has a description.">
+                                    <AlignLeft className="h-3.5 w-3.5" />
+                                </div>
+                            )}
+
+                            {hasChecklists && checklistTotal > 0 && (
+                                <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isChecklistComplete ? 'bg-green-900/40 text-green-400' : ''}`} title="Checklist items">
+                                    <CheckSquare className="h-3 w-3" />
+                                    <span>{checklistCompleted}/{checklistTotal}</span>
+                                </div>
+                            )}
+
+                            {hasAttachments && (
+                                <div className="flex items-center gap-x-1 text-xs" title="Attachments">
+                                    <Paperclip className="h-3 w-3" />
+                                    <span>{data.attachments.length - (coverImageAttachment ? 1 : 0)}</span>
+                                </div>
+                            )}
+
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -117,15 +197,15 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 <>
                     <div className="fixed inset-0 z-[60]" onClick={handleMenuClose} onContextMenu={handleMenuClose} />
                     <div
-                        className="fixed z-[70] bg-white border border-neutral-200 shadow-xl rounded-md py-1.5 w-48 text-sm text-neutral-800"
+                        className="fixed z-[70] bg-[#1a1a1a] border border-neutral-800 shadow-xl rounded-md py-1.5 w-48 text-sm text-neutral-200"
                         style={{ top: contextMenu.y, left: contextMenu.x }}
                     >
-                        <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b mb-1 uppercase tracking-wider">Card Actions</span>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 transition text-red-600 font-medium">Delete Card</button>
-                        <button onClick={(e) => { e.stopPropagation(); onDuplicateCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 transition">Duplicate Card</button>
-                        <div className="border-t my-1"></div>
-                        <button onClick={(e) => { e.stopPropagation(); onCopyCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 transition">Copy Card</button>
-                        <button onClick={(e) => { e.stopPropagation(); onPasteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 transition">Paste Card</button>
+                        <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b border-neutral-800 mb-1 uppercase tracking-wider">Card Actions</span>
+                        <button onClick={(e) => { e.stopPropagation(); onDeleteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-red-500 font-medium">Delete Card</button>
+                        <button onClick={(e) => { e.stopPropagation(); onDuplicateCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Duplicate Card</button>
+                        <div className="border-t border-neutral-800 my-1"></div>
+                        <button onClick={(e) => { e.stopPropagation(); onCopyCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Copy Card</button>
+                        <button onClick={(e) => { e.stopPropagation(); onPasteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste Card</button>
                     </div>
                 </>
             )}
