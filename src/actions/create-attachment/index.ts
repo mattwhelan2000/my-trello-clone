@@ -1,0 +1,43 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
+import { actionClient } from "@/lib/create-safe-action";
+import { CreateAttachmentSchema } from "./schema";
+
+export const createAttachment = actionClient
+    .schema(CreateAttachmentSchema)
+    .action(async ({ parsedInput: { id, url, type, boardId } }) => {
+        try {
+            let title = url;
+            let thumbnailUrl = null;
+
+            if (type === "LINK") {
+                try {
+                    const res = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        title = data.data?.title || title;
+                        thumbnailUrl = data.data?.image?.url || null;
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch link metadata", e);
+                }
+            }
+
+            const attachment = await db.attachment.create({
+                data: {
+                    cardId: id,
+                    url,
+                    type,
+                    title,
+                    thumbnailUrl,
+                },
+            });
+
+            revalidatePath(`/board/${boardId}`);
+            return attachment;
+        } catch (error) {
+            return { error: "Failed to create attachment." };
+        }
+    });

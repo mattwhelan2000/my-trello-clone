@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  members   String[] // List of user IDs
+  boards    Board[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Board {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title       String
+  bgImage     String?
+  bgColor     String?
+  lists       List[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
+}
+
+model List {
+  id        String   @id @default(uuid())
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  title     String
+  order     Int
+  color     String?
+  cards     Card[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([boardId])
+}
+
+model Card {
+  id          String      @id @default(uuid())
+  listId      String
+  list        List        @relation(fields: [listId], references: [id], onDelete: Cascade)
+  title       String
+  description String?     @db.Text
+  order       Int
+  dueDate     DateTime?
+  labels      Label[]
+  checklists  Checklist[]
+  attachments Attachment[]
+  activities  Activity[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([listId])
+}
+
+model Attachment {
+  id           String   @id @default(uuid())
+  cardId       String
+  card         Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  url          String   @db.Text
+  type         String   // "IMAGE" or "LINK"
+  title        String?  @db.Text
+  thumbnailUrl String?  @db.Text
+  isCover      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([cardId])
+}
+
+model Label {
+  id        String   @id @default(uuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  title     String
+  color     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cardId])
+}
+
+model Checklist {
+  id        String          @id @default(uuid())
+  cardId    String
+  card      Card            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  title     String
+  items     ChecklistItem[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([cardId])
+}
+
+model ChecklistItem {
+  id          String    @id @default(uuid())
+  checklistId String
+  checklist   Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  title       String
+  isCompleted Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([checklistId])
+}
+
+model Activity {
+  id        String   @id @default(uuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  userId    String // Storing a mock or clerk user id
+  action    String
+  createdAt DateTime @default(now())
+
+  @@index([cardId])
+}
