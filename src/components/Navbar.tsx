@@ -17,12 +17,14 @@ export const Navbar = () => {
                         </div>
                     </Link>
                 </div>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition h-auto rounded-sm md:block">
-                    <span className="md:hidden">
-                        <Plus className="h-4 w-4" />
-                    </span>
-                    <span className="hidden md:block">Create</span>
-                </button>
+                <Link href="/">
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition h-auto md:block">
+                        <span className="md:hidden">
+                            <Plus className="h-4 w-4" />
+                        </span>
+                        <span className="hidden md:block">Create</span>
+                    </button>
+                </Link>
             </div>
             <div className="ml-auto flex items-center gap-x-2">
                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold cursor-pointer">

@@ -4,7 +4,7 @@ const PlatformLayout = ({ children }: { children: React.ReactNode }) => {
     return (
         <div className="h-full">
             <Navbar />
-            <main className="pt-40 md:pt-40 px-4 max-w-6xl mx-auto md:px-6"> {/* Generic container, we'll override this in board layout */}
+            <main className="pt-14 md:pt-14 h-full">
                 {children}
             </main>
         </div>
