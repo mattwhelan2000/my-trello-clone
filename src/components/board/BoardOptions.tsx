@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Image as ImageIcon, Palette, X } from "lucide-react";
+import { Settings, Image as ImageIcon, Palette, X, Download } from "lucide-react";
 import { useAction } from "@/hooks/use-action";
+import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
+import { exportBoard } from "@/actions/export-board";
 
 interface BoardOptionsProps {
     boardId: string;
@@ -25,6 +27,26 @@ export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
         },
         onError: (error) => {
             console.error(error);
+        }
+    });
+
+    const { execute: executeExport, isExecuting: isExporting } = useSafeAction(exportBoard, {
+        onSuccess: ({ data }) => {
+            if (data && !("error" in data) && data.title) {
+                const jsonString = JSON.stringify(data, null, 2);
+                const blob = new Blob([jsonString], { type: "application/json" });
+                const href = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = href;
+                link.download = `board-${data.title.replace(/\s+/g, '-').toLowerCase()}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setIsOpen(false);
+            }
+        },
+        onError: (error) => {
+            console.error("Export failed", error);
         }
     });
 
@@ -74,18 +96,29 @@ export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
 
                     <div>
                         <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><ImageIcon className="h-3 w-3" /> Image URL</h4>
-                        <form onSubmit={onImageSubmit} className="flex flex-col gap-y-2">
+                        <form onSubmit={onImageSubmit} className="flex flex-col gap-y-2 mb-4">
                             <input
                                 value={imageUrl}
                                 onChange={(e) => setImageUrl(e.target.value)}
                                 placeholder="Paste image URL here..."
                                 className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-blue-600 w-full"
-                                disabled={isLoading}
+                                disabled={isLoading || isExporting}
                             />
-                            <button type="submit" disabled={isLoading} className="bg-blue-600 text-white w-full rounded-sm text-sm font-medium py-1.5 hover:bg-blue-700 transition">
+                            <button type="submit" disabled={isLoading || isExporting} className="bg-blue-600 text-white w-full rounded-sm text-sm font-medium py-1.5 hover:bg-blue-700 transition">
                                 Set Image
                             </button>
                         </form>
+                    </div>
+
+                    <div className="pt-2 border-t">
+                        <button
+                            onClick={() => executeExport({ id: boardId })}
+                            disabled={isLoading || isExporting}
+                            className="bg-neutral-200 text-neutral-700 w-full rounded-sm text-sm font-medium py-1.5 hover:bg-neutral-300 transition flex items-center justify-center gap-x-2"
+                        >
+                            <Download className="h-4 w-4" />
+                            {isExporting ? "Exporting..." : "Export Board as JSON"}
+                        </button>
                     </div>
                 </div>
             )}

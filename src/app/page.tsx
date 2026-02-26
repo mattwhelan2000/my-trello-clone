@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import Link from "next/link";
 import { CreateBoardForm } from "@/components/board/CreateBoardForm";
+import { ImportBoardButton } from "@/components/board/ImportBoardButton";
 import { LayoutDashboard } from "lucide-react";
 
 export default async function HomePage() {
@@ -34,6 +35,11 @@ export default async function HomePage() {
         <div className="aspect-video bg-neutral-100/50 rounded-sm w-full h-full p-4 flex flex-col items-center justify-center transition border border-dashed border-neutral-300">
           <p className="text-sm font-semibold text-neutral-600 mb-3 text-center">Create a new board</p>
           <CreateBoardForm />
+        </div>
+
+        {/* Import Board Tile */}
+        <div className="aspect-video bg-neutral-100/50 rounded-sm w-full h-full p-4 flex flex-col items-center justify-center transition border border-dashed border-neutral-300">
+          <ImportBoardButton />
         </div>
       </div>
     </div>
