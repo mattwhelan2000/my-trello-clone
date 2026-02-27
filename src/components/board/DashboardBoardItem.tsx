@@ -50,7 +50,7 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
 
     return (
         <div
-            className="group relative aspect-video bg-no-repeat bg-center bg-cover bg-blue-600 rounded-sm h-full w-full overflow-hidden shadow-sm"
+            className="group relative h-[340px] bg-no-repeat bg-center bg-cover bg-blue-600 rounded-sm w-full overflow-hidden shadow-sm"
             style={{ backgroundImage: `url(${board.bgImage})`, backgroundColor: board.bgColor || "white" }}
         >
             <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition" />
