@@ -49,13 +49,15 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
     };
 
     return (
-        <div
-            className="group relative h-[340px] bg-no-repeat bg-center bg-cover bg-blue-600 rounded-sm w-full overflow-hidden shadow-sm"
-            style={{ backgroundImage: `url(${board.bgImage})`, backgroundColor: board.bgColor || "white" }}
-        >
-            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition" />
+        <div className="group relative h-64 w-full shadow-sm rounded-sm">
+            <div
+                className="absolute inset-0 bg-no-repeat bg-center bg-cover bg-blue-600 rounded-sm overflow-hidden"
+                style={{ backgroundImage: `url(${board.bgImage})`, backgroundColor: board.bgColor || "white" }}
+            >
+                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition" />
+            </div>
 
-            <Link href={`/board/${board.id}`} className="absolute inset-0 z-0">
+            <Link href={`/board/${board.id}`} className="absolute inset-0 z-[1]">
                 <span className="sr-only">Go to {board.title}</span>
             </Link>
 
