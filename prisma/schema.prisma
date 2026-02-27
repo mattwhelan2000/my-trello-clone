@@ -38,6 +38,7 @@ model List {
   title     String
   order     Int
   color     String?
+  fontColor String?
   cards     Card[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -53,6 +54,8 @@ model Card {
   description String?     @db.Text
   order       Int
   dueDate     DateTime?
+  color       String?
+  fontColor   String?
   labels      Label[]
   checklists  Checklist[]
   attachments Attachment[]

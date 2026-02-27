@@ -58,6 +58,7 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: data.id,
+        disabled: isModalOpen,
         data: {
             type: "Card",
             card: data,
@@ -106,116 +107,126 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
         if (date < new Date()) isPastDue = true;
     }
 
-    if (isDragging) {
-        return (
-            <div
-                ref={setNodeRef}
-                style={style}
-                className="opacity-30 border-2 border-neutral-500 truncate py-2 px-3 text-sm bg-black text-white rounded-md shadow-sm"
-            >
-                {data.title}
-            </div>
-        );
-    }
-
     return (
-        <>
-            <div
-                ref={setNodeRef}
-                style={style}
-                {...attributes}
-                {...listeners}
-                role="button"
-                onClick={() => setIsModalOpen(true)}
-                onContextMenu={handleContextMenu}
-                className="group border-2 border-transparent hover:border-neutral-500 text-sm bg-[#111111] hover:bg-[#1a1a1a] text-white rounded-md shadow-sm flex flex-col overflow-hidden relative transition-colors"
-            >
-                {renderableImageUrl && (
-                    <div className="w-full relative flex items-center justify-center bg-black border-b border-neutral-800">
-                        <img src={renderableImageUrl} alt="Card Cover" className="w-full h-auto max-h-[260px] object-cover" />
+        <div
+            ref={setNodeRef}
+            style={{
+                ...style,
+                backgroundColor: data.color || "black",
+                color: data.fontColor || "white"
+            }}
+            className="opacity-30 border-2 border-neutral-500 truncate py-2 px-3 text-sm rounded-md shadow-sm"
+        >
+            {data.title}
+        </div>
+    );
+}
+
+return (
+    <>
+        <div
+            ref={setNodeRef}
+            style={{
+                ...style,
+                backgroundColor: data.color || "#111111",
+                color: data.fontColor || "white"
+            }}
+            {...attributes}
+            {...listeners}
+            role="button"
+            onClick={() => setIsModalOpen(true)}
+            onContextMenu={handleContextMenu}
+            className="group border-2 border-transparent hover:border-neutral-500 text-sm hover:brightness-110 rounded-md shadow-sm flex flex-col overflow-hidden relative transition-all"
+        >
+            {renderableImageUrl && (
+                <div className="w-full relative flex items-center justify-center bg-black border-b border-neutral-800">
+                    <img src={renderableImageUrl} alt="Card Cover" className="w-full h-auto max-h-[260px] object-cover" />
+                </div>
+            )}
+
+            <div className={`py-2 px-3 w-full flex flex-col gap-y-1.5 ${!renderableImageUrl ? "min-h-[36px]" : ""}`}>
+
+                {/* LABELS */}
+                {hasLabels && (
+                    <div className="flex flex-wrap gap-1 mb-1">
+                        {data.labels.map((label: any) => (
+                            <div
+                                key={label.id}
+                                className="h-2 w-8 rounded-full"
+                                style={{ backgroundColor: label.color, opacity: 0.9 }}
+                                title={label.title}
+                            />
+                        ))}
                     </div>
                 )}
 
-                <div className={`py-2 px-3 w-full flex flex-col gap-y-1.5 ${!renderableImageUrl ? "min-h-[36px]" : ""}`}>
-
-                    {/* LABELS */}
-                    {hasLabels && (
-                        <div className="flex flex-wrap gap-1 mb-1">
-                            {data.labels.map((label: any) => (
-                                <div
-                                    key={label.id}
-                                    className="h-2 w-8 rounded-full"
-                                    style={{ backgroundColor: label.color, opacity: 0.9 }}
-                                    title={label.title}
-                                />
-                            ))}
-                        </div>
-                    )}
-
-                    {/* TITLE */}
-                    <div className="truncate w-full font-medium">
-                        {data.title}
-                    </div>
-
-                    {/* METADATA FOOTER */}
-                    {(hasDescription || hasChecklists || hasAttachments || data.dueDate) && (
-                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1 text-neutral-400">
-
-                            {data.dueDate && (
-                                <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isPastDue ? 'bg-red-900/40 text-red-400' : 'bg-neutral-800'}`}>
-                                    <Clock className="h-3 w-3" />
-                                    <span>{formattedDueDate}</span>
-                                </div>
-                            )}
-
-                            {hasDescription && (
-                                <div className="flex items-center" title="This card has a description.">
-                                    <AlignLeft className="h-3.5 w-3.5" />
-                                </div>
-                            )}
-
-                            {hasChecklists && checklistTotal > 0 && (
-                                <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isChecklistComplete ? 'bg-green-900/40 text-green-400' : ''}`} title="Checklist items">
-                                    <CheckSquare className="h-3 w-3" />
-                                    <span>{checklistCompleted}/{checklistTotal}</span>
-                                </div>
-                            )}
-
-                            {hasAttachments && (
-                                <div className="flex items-center gap-x-1 text-xs" title="Attachments">
-                                    <Paperclip className="h-3 w-3" />
-                                    <span>{data.attachments.length - (coverImageAttachment ? 1 : 0)}</span>
-                                </div>
-                            )}
-
-                        </div>
-                    )}
+                {/* TITLE */}
+                <div className="truncate w-full font-medium" style={{ color: data.fontColor || "white" }}>
+                    {data.title}
                 </div>
-            </div>
 
-            {contextMenu && (
-                <>
-                    <div className="fixed inset-0 z-[60]" onClick={handleMenuClose} onContextMenu={handleMenuClose} />
+                {/* METADATA FOOTER */}
+                {(hasDescription || hasChecklists || hasAttachments || data.dueDate) && (
                     <div
-                        className="fixed z-[70] bg-[#1a1a1a] border border-neutral-800 shadow-xl rounded-md py-1.5 w-48 text-sm text-neutral-200"
-                        style={{ top: contextMenu.y, left: contextMenu.x }}
+                        className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1 opacity-75"
+                        style={{ color: data.fontColor || "inherit" }}
                     >
-                        <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b border-neutral-800 mb-1 uppercase tracking-wider">Card Actions</span>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-red-500 font-medium">Delete Card</button>
-                        <button onClick={(e) => { e.stopPropagation(); onDuplicateCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Duplicate Card</button>
-                        <div className="border-t border-neutral-800 my-1"></div>
-                        <button onClick={(e) => { e.stopPropagation(); onCopyCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Copy Card</button>
-                        <button onClick={(e) => { e.stopPropagation(); onPasteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste Card</button>
-                    </div>
-                </>
-            )}
 
-            <CardModal
-                data={data}
-                boardId={boardId}
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-            />
-        </>
-    );
-};
+                        {data.dueDate && (
+                            <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isPastDue ? 'bg-red-900/40 text-red-400' : 'bg-neutral-800'}`}>
+                                <Clock className="h-3 w-3" />
+                                <span>{formattedDueDate}</span>
+                            </div>
+                        )}
+
+                        {hasDescription && (
+                            <div className="flex items-center" title="This card has a description.">
+                                <AlignLeft className="h-3.5 w-3.5" />
+                            </div>
+                        )}
+
+                        {hasChecklists && checklistTotal > 0 && (
+                            <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isChecklistComplete ? 'bg-green-900/40 text-green-400' : ''}`} title="Checklist items">
+                                <CheckSquare className="h-3 w-3" />
+                                <span>{checklistCompleted}/{checklistTotal}</span>
+                            </div>
+                        )}
+
+                        {hasAttachments && (
+                            <div className="flex items-center gap-x-1 text-xs" title="Attachments">
+                                <Paperclip className="h-3 w-3" />
+                                <span>{data.attachments.length - (coverImageAttachment ? 1 : 0)}</span>
+                            </div>
+                        )}
+
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {contextMenu && (
+            <>
+                <div className="fixed inset-0 z-[60]" onClick={handleMenuClose} onContextMenu={handleMenuClose} />
+                <div
+                    className="fixed z-[70] bg-[#1a1a1a] border border-neutral-800 shadow-xl rounded-md py-1.5 w-48 text-sm text-neutral-200"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                >
+                    <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b border-neutral-800 mb-1 uppercase tracking-wider">Card Actions</span>
+                    <button onClick={(e) => { e.stopPropagation(); onDeleteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-red-500 font-medium">Delete Card</button>
+                    <button onClick={(e) => { e.stopPropagation(); onDuplicateCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Duplicate Card</button>
+                    <div className="border-t border-neutral-800 my-1"></div>
+                    <button onClick={(e) => { e.stopPropagation(); onCopyCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Copy Card</button>
+                    <button onClick={(e) => { e.stopPropagation(); onPasteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste Card</button>
+                </div>
+            </>
+        )}
+
+        <CardModal
+            data={data}
+            boardId={boardId}
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+        />
+    </>
+);
+

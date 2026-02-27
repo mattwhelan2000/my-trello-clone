@@ -26,11 +26,18 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
     const cardInputRef = useRef<ElementRef<"textarea">>(null);
     const [isHovered, setIsHovered] = useState(false);
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+    const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const LIST_COLORS = [
         "#f87171", "#fb923c", "#fbbf24", "#a3e635", "#4ade80",
-        "#22d3ee", "#60a5fa", "#818cf8", "#c084fc", "#f472b6"
+        "#22d3ee", "#60a5fa", "#818cf8", "#c084fc", "#f472b6",
+        "#1e293b", "#334155", "#0f172a", "#18181b", "#27272a"
+    ];
+
+    const TEXT_COLORS = [
+        "#ffffff", "#f8fafc", "#f1f5f9", "#e2e8f0", "#cbd5e1",
+        "#000000", "#0f172a", "#1e293b", "#334155", "#475569"
     ];
 
     const { execute: executeUpdateList, isLoading } = useAction(updateList, {
@@ -135,9 +142,12 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
         executeUpdateList({ title: newTitle, id: data.id, boardId: data.boardId });
     };
 
-    const onColorSelect = (color: string) => {
+    const onBgColorSelect = (color: string) => {
         executeUpdateList({ title: data.title, id: data.id, boardId: data.boardId, color });
-        setIsColorPickerOpen(false);
+    };
+
+    const onTextColorSelect = (color: string) => {
+        executeUpdateList({ title: data.title, id: data.id, boardId: data.boardId, fontColor: color });
     };
 
     const onCardSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -229,7 +239,8 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
                                 name="title"
                                 id="title"
                                 defaultValue={title}
-                                className="text-sm px-[7px] py-1 h-7 font-medium border-transparent hover:border-input focus:border-input transition truncate bg-transparent focus:bg-white w-full"
+                                className="text-sm px-[7px] py-1 h-7 font-medium border-transparent hover:border-input focus:border-input transition truncate bg-transparent focus:bg-white focus:text-black w-full"
+                                style={{ color: data.fontColor ? data.fontColor : 'inherit' }}
                                 placeholder="Enter list title..."
                             />
                             <button type="submit" hidden disabled={isLoading} />
@@ -237,7 +248,8 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
                     ) : (
                         <div
                             onClick={enableEditing}
-                            className={`w-full text-sm px-2.5 py-1 h-7 font-medium border-transparent cursor-pointer ${data.color ? 'text-white drop-shadow-md' : 'text-black'}`}
+                            className={`w-full text-sm px-2.5 py-1 h-7 font-medium border-transparent cursor-pointer`}
+                            style={{ color: data.fontColor ? data.fontColor : (data.color ? 'white' : 'black') }}
                         >
                             {title}
                         </div>
@@ -252,29 +264,61 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
                 </div>
 
                 {isColorPickerOpen && (
-                    <div className="absolute top-10 right-2 w-48 bg-white rounded-md shadow-lg border p-3 z-10 cursor-default">
-                        <div className="flex items-center justify-between mb-3 border-b pb-1 cursor-default">
-                            <span className="font-semibold text-xs text-neutral-600">List Color</span>
+                    <div className="absolute top-10 right-2 w-56 bg-white rounded-md shadow-lg border p-3 z-10 cursor-default">
+                        <div className="flex items-center justify-between mb-2 cursor-default">
+                            <span className="font-semibold text-xs text-neutral-600">Appearance</span>
                             <button onClick={() => setIsColorPickerOpen(false)} className="text-neutral-500 hover:bg-neutral-100 p-0.5 rounded-sm">
                                 <X className="h-3 w-3" />
                             </button>
                         </div>
-                        <div className="grid grid-cols-5 gap-1.5 cursor-default">
-                            {LIST_COLORS.map((color) => (
-                                <button
-                                    key={color}
-                                    onClick={(e) => { e.stopPropagation(); onColorSelect(color); }}
-                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10"
-                                    style={{ backgroundColor: color }}
-                                />
-                            ))}
+                        <div className="flex items-center gap-x-2 mb-3 border-b text-xs pb-1 font-medium">
                             <button
-                                onClick={(e) => { e.stopPropagation(); onColorSelect(""); }}
-                                className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
-                            >
-                                none
-                            </button>
+                                onClick={(e) => { e.stopPropagation(); setColorPickerTab("bg"); }}
+                                className={`px-2 py-0.5 rounded-sm ${colorPickerTab === "bg" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
+                            >Background</button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setColorPickerTab("text"); }}
+                                className={`px-2 py-0.5 rounded-sm ${colorPickerTab === "text" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
+                            >Text</button>
                         </div>
+
+                        {colorPickerTab === "bg" && (
+                            <div className="grid grid-cols-5 gap-1.5 cursor-default">
+                                {LIST_COLORS.map((color) => (
+                                    <button
+                                        key={color}
+                                        onClick={(e) => { e.stopPropagation(); onBgColorSelect(color); }}
+                                        className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10"
+                                        style={{ backgroundColor: color }}
+                                    />
+                                ))}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onBgColorSelect(""); }}
+                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
+                                >
+                                    none
+                                </button>
+                            </div>
+                        )}
+
+                        {colorPickerTab === "text" && (
+                            <div className="grid grid-cols-5 gap-1.5 cursor-default">
+                                {TEXT_COLORS.map((color) => (
+                                    <button
+                                        key={color}
+                                        onClick={(e) => { e.stopPropagation(); onTextColorSelect(color); }}
+                                        className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/20"
+                                        style={{ backgroundColor: color }}
+                                    />
+                                ))}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onTextColorSelect(""); }}
+                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
+                                >
+                                    auto
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 

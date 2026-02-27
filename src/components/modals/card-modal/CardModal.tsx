@@ -22,6 +22,8 @@ interface CardModalProps {
 export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) => {
     const [title, setTitle] = useState(data?.title || "");
     const [isAddingImage, setIsAddingImage] = useState(false);
+    const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+    const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
     const inputRef = useRef<ElementRef<"input">>(null);
     const imageInputRef = useRef<ElementRef<"input">>(null);
 
@@ -103,6 +105,25 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
             return url.replace("dl=0", "raw=1");
         }
         return url;
+    };
+
+    const CARD_COLORS = [
+        "#f87171", "#fb923c", "#fbbf24", "#a3e635", "#4ade80",
+        "#22d3ee", "#60a5fa", "#818cf8", "#c084fc", "#f472b6",
+        "#1e293b", "#334155", "#0f172a", "#18181b", "#27272a"
+    ];
+
+    const TEXT_COLORS = [
+        "#ffffff", "#f8fafc", "#f1f5f9", "#e2e8f0", "#cbd5e1",
+        "#000000", "#0f172a", "#1e293b", "#334155", "#475569"
+    ];
+
+    const onBgColorSelect = (color: string) => {
+        executeUpdateCard({ title: data.title, id: data.id, boardId, color });
+    };
+
+    const onTextColorSelect = (color: string) => {
+        executeUpdateCard({ title: data.title, id: data.id, boardId, fontColor: color });
     };
 
     if (!data) return null;
@@ -227,6 +248,72 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                     {/* Sidebar */}
                     <div className="space-y-4 pt-1">
                         <h4 className="text-xs font-semibold text-neutral-600 mb-2">Add to card</h4>
+
+                        {/* Appearance / Colors */}
+                        <div className="relative">
+                            <button onClick={() => setIsColorPickerOpen(!isColorPickerOpen)} className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2">
+                                <Layout className="h-4 w-4" /> Appearance
+                            </button>
+                            {isColorPickerOpen && (
+                                <div className="absolute top-8 right-0 z-10 w-56 bg-white rounded-md shadow-lg border p-3 cursor-default">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="font-semibold text-xs text-neutral-600">Card Appearance</span>
+                                        <button onClick={() => setIsColorPickerOpen(false)} className="text-neutral-500 hover:bg-neutral-100 p-0.5 rounded-sm">
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                    <div className="flex items-center gap-x-2 mb-3 border-b text-xs pb-1 font-medium">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setColorPickerTab("bg"); }}
+                                            className={`px-2 py-0.5 rounded-sm ${colorPickerTab === "bg" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
+                                        >Background</button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setColorPickerTab("text"); }}
+                                            className={`px-2 py-0.5 rounded-sm ${colorPickerTab === "text" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
+                                        >Text</button>
+                                    </div>
+
+                                    {colorPickerTab === "bg" && (
+                                        <div className="grid grid-cols-5 gap-1.5">
+                                            {CARD_COLORS.map((color) => (
+                                                <button
+                                                    key={color}
+                                                    onClick={() => onBgColorSelect(color)}
+                                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10"
+                                                    style={{ backgroundColor: color }}
+                                                />
+                                            ))}
+                                            <button
+                                                onClick={() => onBgColorSelect("")}
+                                                className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
+                                            >
+                                                none
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {colorPickerTab === "text" && (
+                                        <div className="grid grid-cols-5 gap-1.5">
+                                            {TEXT_COLORS.map((color) => (
+                                                <button
+                                                    key={color}
+                                                    onClick={() => onTextColorSelect(color)}
+                                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/20"
+                                                    style={{ backgroundColor: color }}
+                                                />
+                                            ))}
+                                            <button
+                                                onClick={() => onTextColorSelect("")}
+                                                className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
+                                            >
+                                                auto
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         <button className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"><Clock className="h-4 w-4" /> Dates</button>
                         <button onClick={onAddChecklist} className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"><CheckSquare className="h-4 w-4" /> Checklist</button>
 

@@ -7,11 +7,16 @@ import { UpdateListSchema } from "./schema";
 
 export const updateList = actionClient
     .schema(UpdateListSchema)
-    .action(async ({ parsedInput: { id, title, boardId, color } }) => {
+    .action(async ({ parsedInput: { id, title, boardId, color, fontColor } }) => {
         try {
+            const updateData: any = {};
+            if (title !== undefined) updateData.title = title;
+            if (color !== undefined) updateData.color = color;
+            if (fontColor !== undefined) updateData.fontColor = fontColor;
+
             const list = await db.list.update({
                 where: { id, boardId },
-                data: { title, color },
+                data: updateData,
             });
 
             revalidatePath(`/board/${boardId}`);
