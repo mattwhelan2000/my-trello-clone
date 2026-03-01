@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useEventListener } from "usehooks-ts";
 
 export const BoardCanvas = ({
@@ -12,22 +12,26 @@ export const BoardCanvas = ({
 }) => {
     const [isMounted, setIsMounted] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const [startX, setStartX] = useState(0);
-    const [startY, setStartY] = useState(0);
-    const [scrollLeft, setScrollLeft] = useState(0);
-    const [scrollTop, setScrollTop] = useState(0);
+
+    // Use refs instead of state for drag tracking to avoid re-renders on every mouse move
+    const isDraggingRef = useRef(false);
+    const startXRef = useRef(0);
+    const startYRef = useRef(0);
+    const scrollLeftRef = useRef(0);
+    const scrollTopRef = useRef(0);
+    const rafRef = useRef<number | null>(null);
+
+    // Only this one uses state because it affects the rendered cursor class
+    const [cursorStyle, setCursorStyle] = useState<"grab" | "grabbing">("grab");
 
     useEffect(() => {
         setIsMounted(true);
     }, []);
 
     const onKeyDown = (e: KeyboardEvent) => {
-        // Prevent triggering shortcuts if modifying text inputs
         if (["INPUT", "TEXTAREA", "FORM"].includes((e.target as HTMLElement).tagName)) {
             return;
         }
-
         if (e.key === "n") {
             console.log("Triggered 'New' shortcut");
         } else if (e.key === "c") {
@@ -47,36 +51,51 @@ export const BoardCanvas = ({
             return;
         }
 
-        setIsDragging(true);
+        isDraggingRef.current = true;
+        setCursorStyle("grabbing");
         if (!scrollContainerRef.current) return;
-        setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
-        setStartY(e.pageY);
-        setScrollLeft(scrollContainerRef.current.scrollLeft);
-        setScrollTop(window.scrollY);
+        startXRef.current = e.pageX - scrollContainerRef.current.offsetLeft;
+        startYRef.current = e.pageY;
+        scrollLeftRef.current = scrollContainerRef.current.scrollLeft;
+        scrollTopRef.current = window.scrollY;
     };
 
     const handleMouseLeave = () => {
-        setIsDragging(false);
+        isDraggingRef.current = false;
+        setCursorStyle("grab");
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
 
     const handleMouseUp = () => {
-        setIsDragging(false);
+        isDraggingRef.current = false;
+        setCursorStyle("grab");
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDragging || !scrollContainerRef.current) return;
+        if (!isDraggingRef.current || !scrollContainerRef.current) return;
         e.preventDefault();
-        const x = e.pageX - scrollContainerRef.current.offsetLeft;
-        const walkX = (x - startX) * 2;
-        const walkY = (e.pageY - startY) * 2;
-        scrollContainerRef.current.scrollLeft = scrollLeft - walkX;
-        window.scrollTo(0, scrollTop - walkY);
+
+        // Cancel any pending animation frame to avoid stacking
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+        const pageX = e.pageX;
+        const pageY = e.pageY;
+
+        rafRef.current = requestAnimationFrame(() => {
+            if (!scrollContainerRef.current) return;
+            const x = pageX - scrollContainerRef.current.offsetLeft;
+            const walkX = (x - startXRef.current) * 1.5;
+            const walkY = (pageY - startYRef.current) * 1.5;
+            scrollContainerRef.current.scrollLeft = scrollLeftRef.current - walkX;
+            window.scrollTo({ top: scrollTopRef.current - walkY, behavior: "instant" as ScrollBehavior });
+        });
     };
 
     return (
         <div
             ref={scrollContainerRef}
-            className={`flex flex-row overflow-x-auto overflow-y-auto ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`flex flex-row overflow-x-auto overflow-y-auto ${cursorStyle === "grabbing" ? 'cursor-grabbing' : 'cursor-grab'}`}
             style={{ minHeight: 'calc(100vh - 6rem)' }}
             onMouseDown={handleMouseDown}
             onMouseLeave={handleMouseLeave}
