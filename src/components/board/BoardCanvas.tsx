@@ -19,11 +19,38 @@ export const BoardCanvas = ({
     const scrollLeftRef = useRef(0);
     const rafRef = useRef<number | null>(null);
 
-    const [cursorStyle, setCursorStyle] = useState<"grab" | "grabbing">("grab");
+    const [cursorStyle, setCursorStyle] = useState<"grab" | "grabbing" | "default">("grab");
+
+    // Track if a modal is open reactively
+    const [isModalVisible, setIsModalVisible] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
     }, []);
+
+    // Watch for modal appearing/disappearing in the DOM
+    useEffect(() => {
+        const checkModal = () => {
+            const hasModal = !!document.querySelector('.fixed.inset-0.z-50');
+            setIsModalVisible(hasModal);
+        };
+
+        const observer = new MutationObserver(checkModal);
+        observer.observe(document.body, { childList: true, subtree: true });
+        checkModal(); // initial check
+
+        return () => observer.disconnect();
+    }, []);
+
+    // Update cursor when modal state changes
+    useEffect(() => {
+        if (isModalVisible) {
+            setCursorStyle("default");
+            isDraggingRef.current = false;
+        } else {
+            setCursorStyle("grab");
+        }
+    }, [isModalVisible]);
 
     const onKeyDown = (e: KeyboardEvent) => {
         if (["INPUT", "TEXTAREA", "FORM"].includes((e.target as HTMLElement).tagName)) {
@@ -42,14 +69,9 @@ export const BoardCanvas = ({
 
     if (!isMounted) return null;
 
-    const isModalOpen = () => {
-        // Check if any modal overlay is present in the DOM
-        return !!document.querySelector('.fixed.inset-0.z-50');
-    };
-
     const handleMouseDown = (e: React.MouseEvent) => {
         // Don't start drag if a modal is open
-        if (isModalOpen()) return;
+        if (isModalVisible) return;
 
         const target = e.target as HTMLElement;
         if (target.closest('[role="button"]') || target.closest('button') || target.closest('input') || target.closest('textarea')) {
@@ -65,18 +87,18 @@ export const BoardCanvas = ({
 
     const handleMouseLeave = () => {
         isDraggingRef.current = false;
-        setCursorStyle("grab");
+        if (!isModalVisible) setCursorStyle("grab");
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
 
     const handleMouseUp = () => {
         isDraggingRef.current = false;
-        setCursorStyle("grab");
+        if (!isModalVisible) setCursorStyle("grab");
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDraggingRef.current || !scrollContainerRef.current) return;
+        if (!isDraggingRef.current || !scrollContainerRef.current || isModalVisible) return;
         e.preventDefault();
 
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -91,10 +113,16 @@ export const BoardCanvas = ({
         });
     };
 
+    const getCursorClass = () => {
+        if (cursorStyle === "grabbing") return "cursor-grabbing";
+        if (cursorStyle === "grab") return "cursor-grab";
+        return "cursor-default";
+    };
+
     return (
         <div
             ref={scrollContainerRef}
-            className={`flex flex-row overflow-x-auto overflow-y-auto ${cursorStyle === "grabbing" ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`flex flex-row overflow-x-auto overflow-y-auto ${getCursorClass()}`}
             style={{ minHeight: 'calc(100vh - 6rem)' }}
             onMouseDown={handleMouseDown}
             onMouseLeave={handleMouseLeave}
