@@ -43,7 +43,7 @@ export const BoardCanvas = ({
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('[role="button"]') || target.closest('button') || target.closest('input') || target.closest('textarea') || target.closest('li') || target.closest('ol')) {
+        if (target.closest('[role="button"]') || target.closest('button') || target.closest('input') || target.closest('textarea')) {
             return;
         }
 
