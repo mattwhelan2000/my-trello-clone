@@ -50,9 +50,9 @@ export const BoardCanvas = ({
         setIsDragging(true);
         if (!scrollContainerRef.current) return;
         setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
-        setStartY(e.pageY - scrollContainerRef.current.offsetTop);
+        setStartY(e.pageY);
         setScrollLeft(scrollContainerRef.current.scrollLeft);
-        setScrollTop(scrollContainerRef.current.scrollTop);
+        setScrollTop(window.scrollY);
     };
 
     const handleMouseLeave = () => {
@@ -67,11 +67,10 @@ export const BoardCanvas = ({
         if (!isDragging || !scrollContainerRef.current) return;
         e.preventDefault();
         const x = e.pageX - scrollContainerRef.current.offsetLeft;
-        const y = e.pageY - scrollContainerRef.current.offsetTop;
         const walkX = (x - startX) * 2;
-        const walkY = (y - startY) * 2;
+        const walkY = (e.pageY - startY) * 2;
         scrollContainerRef.current.scrollLeft = scrollLeft - walkX;
-        scrollContainerRef.current.scrollTop = scrollTop - walkY;
+        window.scrollTo(0, scrollTop - walkY);
     };
 
     return (
