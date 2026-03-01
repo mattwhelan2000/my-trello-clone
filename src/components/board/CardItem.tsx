@@ -219,9 +219,10 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                             )}
 
                             {hasChecklists && checklistTotal > 0 && (
-                                <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isChecklistComplete ? 'bg-green-900/40 text-green-400' : ''}`} title="Checklist items">
+                                <div className={`flex items-center gap-x-1.5 text-xs px-1.5 py-0.5 rounded-sm ${isChecklistComplete ? 'bg-green-900/40 text-green-400' : ''}`} title="Checklist items">
                                     <CheckSquare className="h-3 w-3" />
                                     <span>{checklistCompleted}/{checklistTotal}</span>
+                                    <span className="opacity-70">({Math.round((checklistCompleted / checklistTotal) * 100)}%)</span>
                                 </div>
                             )}
 
