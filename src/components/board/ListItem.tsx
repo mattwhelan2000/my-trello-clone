@@ -8,6 +8,7 @@ import { useState, useRef, ElementRef, KeyboardEventHandler } from "react";
 import { useEventListener, useOnClickOutside } from "usehooks-ts";
 import { Palette, X } from "lucide-react";
 import { useAction } from "@/hooks/use-action";
+import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateList } from "@/actions/update-list";
 import { createCard } from "@/actions/create-card";
 import { deleteList } from "@/actions/delete-list";
@@ -40,9 +41,8 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
         "#000000", "#0f172a", "#1e293b", "#334155", "#475569"
     ];
 
-    const { execute: executeUpdateList, isLoading } = useAction(updateList, {
-        onSuccess: (responseData: any) => {
-            setTitle(responseData.title || title);
+    const { execute: executeUpdateList, isExecuting: isLoading } = useSafeAction(updateList, {
+        onSuccess: () => {
             disableEditing();
         },
         onError: (error) => {
@@ -224,8 +224,8 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
                 {...listeners}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className="w-full rounded-md text-black shadow-md pb-2 cursor-grab relative transition-colors flex flex-col max-h-[calc(100vh-8rem)]"
-                style={{ backgroundColor: data.color ? data.color : '#f1f2f4' }}
+                className="w-full rounded-md text-black shadow-md pb-2 cursor-grab relative transition-colors flex flex-col"
+                style={{ backgroundColor: data.color ? data.color : '#f1f2f4', maxHeight: '600px' }}
             >
                 {/* List Header */}
                 <div
