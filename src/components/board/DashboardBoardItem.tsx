@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MoreHorizontal, X, Palette, Image as ImageIcon, Type } from "lucide-react";
+import { MoreHorizontal, X, Palette, Image as ImageIcon, Type, Trash2 } from "lucide-react";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
+import { deleteBoard } from "@/actions/delete-board";
 import { Board } from "@prisma/client";
 
 interface DashboardBoardItemProps {
@@ -21,10 +22,20 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
     const [title, setTitle] = useState(board.title);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const { execute, isExecuting } = useSafeAction(updateBoard, {
         onSuccess: () => {
             // Success handles through revalidatePath in the action
+        },
+        onError: (error) => {
+            console.error(error);
+        }
+    });
+
+    const { execute: executeDelete, isExecuting: isDeleting } = useSafeAction(deleteBoard, {
+        onSuccess: () => {
+            // Board deleted, page will revalidate
         },
         onError: (error) => {
             console.error(error);
@@ -172,6 +183,37 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
                                         Set Image
                                     </button>
                                 </form>
+                            </div>
+
+                            {/* Delete Board */}
+                            <div className="mt-4 pt-3 border-t">
+                                {!showDeleteConfirm ? (
+                                    <button
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                        className="flex items-center gap-x-2 text-red-600 hover:bg-red-50 w-full text-left text-sm px-2 py-1.5 rounded-sm transition"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" /> Delete Board
+                                    </button>
+                                ) : (
+                                    <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                                        <p className="text-xs font-semibold text-red-700 mb-2">Are you sure? This will permanently delete this board and all its lists and cards.</p>
+                                        <div className="flex gap-x-2">
+                                            <button
+                                                onClick={() => executeDelete({ id: board.id })}
+                                                disabled={isDeleting}
+                                                className="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded-sm hover:bg-red-700 transition flex-1"
+                                            >
+                                                {isDeleting ? "Deleting..." : "Yes, Delete"}
+                                            </button>
+                                            <button
+                                                onClick={() => setShowDeleteConfirm(false)}
+                                                className="bg-neutral-200 text-neutral-700 text-xs font-medium px-3 py-1.5 rounded-sm hover:bg-neutral-300 transition flex-1"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
