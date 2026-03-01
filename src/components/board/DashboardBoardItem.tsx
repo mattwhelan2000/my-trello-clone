@@ -66,11 +66,11 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
                 <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition z-10" />
             </div>
 
-            <Link href={`/board/${board.id}`} className="absolute inset-0 z-[1]">
+            <Link href={`/board/${board.id}`} className="absolute inset-0 z-20">
                 <span className="sr-only">Go to {board.title}</span>
             </Link>
 
-            <div className="relative z-10 flex items-start justify-between p-2">
+            <div className="relative z-30 flex items-start justify-between p-2">
                 <p className="font-bold text-white shadow-sm break-words px-1 mt-1 truncate pointer-events-none">
                     {board.title}
                 </p>
