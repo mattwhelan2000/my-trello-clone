@@ -345,7 +345,7 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
                     items={data.cards.map((c: any) => c.id)}
                     strategy={verticalListSortingStrategy}
                 >
-                    <ol className="mx-1 px-1 py-0.5 flex flex-col gap-y-2 mt-2 min-h-[2px] flex-1 overflow-y-auto">
+                    <ol className="mx-1 px-1 py-2 flex flex-col gap-y-2 mt-2 min-h-[2px] flex-1 overflow-y-scroll">
                         {data.cards.map((card: any, idx: number) => (
                             <CardItem index={idx} key={card.id} data={card} boardId={data.boardId} />
                         ))}
