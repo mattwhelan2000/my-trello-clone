@@ -51,10 +51,19 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
     return (
         <div className="group relative h-64 w-full shadow-sm rounded-sm">
             <div
-                className="absolute inset-0 bg-no-repeat bg-center bg-cover bg-blue-600 rounded-sm overflow-hidden"
-                style={{ backgroundImage: `url(${board.bgImage})`, backgroundColor: board.bgColor || "white" }}
+                className="absolute inset-0 rounded-sm overflow-hidden"
+                style={{ backgroundColor: board.bgColor || "white" }}
             >
-                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition" />
+                {board.bgImage && (
+                    <img
+                        src={board.bgImage}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="absolute inset-0 w-full h-full object-cover"
+                    />
+                )}
+                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition z-10" />
             </div>
 
             <Link href={`/board/${board.id}`} className="absolute inset-0 z-[1]">
@@ -138,7 +147,15 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
                                 </h4>
                                 <form onSubmit={onImageSubmit} className="flex flex-col gap-y-2">
                                     {board.bgImage && (
-                                        <div className="w-full h-12 bg-cover bg-center rounded-sm border" style={{ backgroundImage: `url(${board.bgImage})` }}></div>
+                                        <div className="w-full h-12 rounded-sm border overflow-hidden relative" style={{ backgroundColor: board.bgColor || "white" }}>
+                                            <img
+                                                src={board.bgImage}
+                                                alt=""
+                                                referrerPolicy="no-referrer"
+                                                crossOrigin="anonymous"
+                                                className="absolute inset-0 w-full h-full object-cover"
+                                            />
+                                        </div>
                                     )}
                                     <input
                                         value={imageUrl}

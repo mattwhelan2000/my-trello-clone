@@ -37,12 +37,23 @@ export default async function BoardIdLayout({
 
     return (
         <div
-            className="relative h-screen bg-no-repeat bg-cover bg-center"
-            style={{ backgroundImage: `url(${board.bgImage})`, backgroundColor: board.bgColor || "white" }}
+            className="relative h-screen"
+            style={{ backgroundColor: board.bgColor || "white" }}
         >
-            <div className="absolute inset-0 bg-black/10" />
-            <BoardOptions boardId={board.id} />
-            <main className="relative pt-24 h-full">{children}</main>
+            {board.bgImage && (
+                <img
+                    src={board.bgImage}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="absolute inset-0 w-full h-full object-cover"
+                />
+            )}
+            <div className="absolute inset-0 bg-black/10 z-0" />
+            <div className="relative z-10 h-full">
+                <BoardOptions boardId={board.id} />
+                <main className="relative pt-24 h-full">{children}</main>
+            </div>
         </div>
     );
 }

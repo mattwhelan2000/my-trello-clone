@@ -6,4 +6,5 @@ export const UpdateCardSchema = z.object({
     boardId: z.string(),
     color: z.string().optional(),
     fontColor: z.string().optional(),
+    dueDate: z.coerce.date().nullable().optional(),
 });

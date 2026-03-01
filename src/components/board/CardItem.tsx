@@ -11,6 +11,31 @@ import { pasteCard } from "@/actions/paste-card";
 import { AlignLeft, CheckSquare, Clock, Paperclip } from "lucide-react";
 import { format } from "date-fns";
 
+const renderTitleWithLinks = (titleText: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    if (!urlRegex.test(titleText)) return titleText;
+
+    const parts = titleText.split(urlRegex);
+    return parts.map((part, i) => {
+        if (part.match(urlRegex)) {
+            return (
+                <a
+                    key={i}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline text-blue-500 hover:text-blue-400"
+                    onDoubleClick={(e) => e.stopPropagation()} // Prevent double-clicking the link from opening the modal
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {part.length > 40 ? part.substring(0, 40) + '...' : part}
+                </a>
+            );
+        }
+        return <span key={i}>{part}</span>;
+    });
+};
+
 export const CardItem = ({ data, index, boardId }: { data: any; index: number; boardId: string }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -78,9 +103,9 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
         return url;
     };
 
-    const coverImageAttachment = data.attachments?.find((a: any) => a.type === "IMAGE" && a.isCover)
-        || data.attachments?.find((a: any) => a.type === "IMAGE");
-    const renderableImageUrl = coverImageAttachment ? getRenderableImageUrl(coverImageAttachment.url) : null;
+    const coverImageAttachment = data.attachments?.find((a: any) => a.isCover)
+        || data.attachments?.find((a: any) => a.type === "IMAGE" || a.thumbnailUrl);
+    const renderableImageUrl = coverImageAttachment ? getRenderableImageUrl(coverImageAttachment.type === "IMAGE" ? coverImageAttachment.url : coverImageAttachment.thumbnailUrl) : null;
 
     // --- Metadata Calculations ---
     const hasDescription = !!data.description;
@@ -135,7 +160,7 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 {...attributes}
                 {...listeners}
                 role="button"
-                onClick={() => setIsModalOpen(true)}
+                onDoubleClick={() => setIsModalOpen(true)}
                 onContextMenu={handleContextMenu}
                 className="group border-2 border-transparent hover:border-neutral-500 text-sm hover:brightness-110 rounded-md shadow-sm flex flex-col overflow-hidden relative transition-all"
             >
@@ -162,9 +187,16 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                     )}
 
                     {/* TITLE */}
-                    <div className="truncate w-full font-medium" style={{ color: data.fontColor || "white" }}>
-                        {data.title}
+                    <div className="w-full font-medium break-words" style={{ color: data.fontColor || "white" }}>
+                        {renderTitleWithLinks(data.title)}
                     </div>
+
+                    {/* DESCRIPTION */}
+                    {hasDescription && (
+                        <div className="text-[11px] w-full break-words opacity-80 mt-0.5" style={{ color: data.fontColor || "white" }}>
+                            {data.description.length > 100 ? data.description.substring(0, 100) + '...' : data.description}
+                        </div>
+                    )}
 
                     {/* METADATA FOOTER */}
                     {(hasDescription || hasChecklists || hasAttachments || data.dueDate) && (

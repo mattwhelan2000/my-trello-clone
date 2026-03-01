@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { actionClient } from "@/lib/create-safe-action";
 import { ImportBoardSchema } from "./schema";
 
+import { formatImageUrl } from "@/lib/format-image-url";
+
 export const importBoard = actionClient
     .schema(ImportBoardSchema)
     .action(async ({ parsedInput: boardData }) => {
@@ -27,7 +29,7 @@ export const importBoard = actionClient
                     title: boardData.title,
                     workspaceId: workspace.id,
                     bgColor: boardData.bgColor,
-                    bgImage: boardData.bgImage,
+                    bgImage: formatImageUrl(boardData.bgImage),
                     lists: {
                         create: boardData.lists.map(list => ({
                             title: list.title,

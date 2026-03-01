@@ -36,6 +36,7 @@ export const Modal = ({ isOpen, onClose, children }: ModalProps) => {
             />
             <div
                 ref={modalRef}
+                onClick={(e) => e.stopPropagation()}
                 className="relative bg-[#f4f5f7] rounded-xl w-full max-w-3xl mb-20 shadow-xl"
             >
                 <button

@@ -2,12 +2,15 @@
 
 import { Modal } from "@/components/modals/Modal";
 import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X } from "lucide-react";
-import { useState, useRef, ElementRef } from "react";
+import { useState, useRef, ElementRef, useEffect } from "react";
 import { useAction } from "@/hooks/use-action";
 import { updateCard } from "@/actions/update-card";
 import { createAttachment } from "@/actions/create-attachment";
 import { createChecklist } from "@/actions/create-checklist";
 import { updateAttachmentCover } from "@/actions/update-attachment-cover";
+import { deleteAttachment } from "@/actions/delete-attachment";
+import { createLabel } from "@/actions/create-label";
+import { deleteLabel } from "@/actions/delete-label";
 import { Description } from "./description";
 import { Checklist } from "./checklist";
 import Image from "next/image";
@@ -23,6 +26,9 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
     const [title, setTitle] = useState(data?.title || "");
     const [isAddingImage, setIsAddingImage] = useState(false);
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+    const [isLabelPickerOpen, setIsLabelPickerOpen] = useState(false);
+    const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+    const [newLabelTitle, setNewLabelTitle] = useState("");
     const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
     const inputRef = useRef<ElementRef<"input">>(null);
     const imageInputRef = useRef<ElementRef<"input">>(null);
@@ -65,6 +71,24 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
         }
     });
 
+    const { execute: executeDeleteAttachment } = useAction(deleteAttachment, {
+        onSuccess: () => { },
+        onError: (error) => console.error(error)
+    });
+
+    const { execute: executeCreateLabel } = useAction(createLabel, {
+        onSuccess: () => {
+            setIsLabelPickerOpen(false);
+            setNewLabelTitle("");
+        },
+        onError: (error) => console.error(error)
+    });
+
+    const { execute: executeDeleteLabel } = useAction(deleteLabel, {
+        onSuccess: () => { },
+        onError: (error) => console.error(error)
+    });
+
     const onAddChecklist = () => {
         executeCreateChecklist({ title: "Checklist", cardId: data.id, boardId });
     };
@@ -76,7 +100,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
 
         if (!url.trim()) return;
 
-        const isImage = url.match(/\.(jpeg|jpg|gif|png|webp)$/i) || url.includes("dropbox.com");
+        const isImage = url.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/i) || url.includes("dropbox.com");
         const type = isImage ? "IMAGE" : "LINK";
 
         executeCreateAttachment({ id: data.id, boardId, url: url.trim(), type });
@@ -118,11 +142,23 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
         "#000000", "#0f172a", "#1e293b", "#334155", "#475569"
     ];
 
+    const [optimisticColor, setOptimisticColor] = useState(data.color);
+    const [optimisticFontColor, setOptimisticFontColor] = useState(data.fontColor);
+    const [optimisticDueDate, setOptimisticDueDate] = useState(data.dueDate);
+
+    useEffect(() => {
+        setOptimisticColor(data.color);
+        setOptimisticFontColor(data.fontColor);
+        setOptimisticDueDate(data.dueDate);
+    }, [data.color, data.fontColor, data.dueDate]);
+
     const onBgColorSelect = (color: string) => {
+        setOptimisticColor(color);
         executeUpdateCard({ title: data.title, id: data.id, boardId, color });
     };
 
     const onTextColorSelect = (color: string) => {
+        setOptimisticFontColor(color);
         executeUpdateCard({ title: data.title, id: data.id, boardId, fontColor: color });
     };
 
@@ -133,6 +169,9 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
 
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
+            {!imageAttachments.length && optimisticColor && (
+                <div className="w-full h-24 rounded-t-xl" style={{ backgroundColor: optimisticColor }} />
+            )}
             {imageAttachments.length > 0 && (
                 <div className="flex flex-col gap-y-4 pt-4 px-4 bg-neutral-100/50 pb-4 first:rounded-t-lg">
                     {imageAttachments.map((attachment: any) => {
@@ -140,12 +179,14 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                         if (!renderableImageUrl) return null;
                         return (
                             <div key={attachment.id} className="w-full flex flex-col gap-y-2">
-                                <div className="w-full relative bg-neutral-200 flex items-center justify-center overflow-hidden shadow-sm rounded-md">
-                                    <img
-                                        src={renderableImageUrl}
-                                        alt="Card Attachment"
-                                        className="w-full h-auto object-cover max-h-[300px]"
-                                    />
+                                <div className="w-full relative bg-neutral-200 flex items-center justify-center overflow-hidden shadow-sm rounded-md group">
+                                    <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="w-full h-full flex justify-center">
+                                        <img
+                                            src={renderableImageUrl}
+                                            alt="Card Attachment"
+                                            className="w-full h-auto object-cover max-h-[300px]"
+                                        />
+                                    </a>
                                     {attachment.isCover && (
                                         <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-sm flex items-center gap-x-1 backdrop-blur-sm">
                                             <Layout className="w-3 h-3" /> Cover
@@ -165,6 +206,12 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                                             <CheckSquare className="w-3 h-3" /> Current Cover
                                         </button>
                                     )}
+                                    <button
+                                        onClick={() => executeDeleteAttachment({ id: attachment.id, boardId })}
+                                        className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 ml-auto"
+                                    >
+                                        <X className="w-3 h-3" /> Delete
+                                    </button>
                                 </div>
                             </div>
                         )
@@ -172,6 +219,26 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                 </div>
             )}
             <div className={`p-6 ${imageAttachments.length > 0 ? 'pt-4 border-t' : ''}`}>
+                {/* Labels Header */}
+                {data.labels && data.labels.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2 ml-10">
+                        {data.labels.map((label: any) => (
+                            <div key={label.id} className="relative group">
+                                <span className="px-3 py-1 rounded-sm text-xs font-semibold text-white/90" style={{ backgroundColor: label.color }}>
+                                    {label.title}
+                                </span>
+                                <button
+                                    onClick={(e) => { e.preventDefault(); executeDeleteLabel({ id: label.id, boardId }); }}
+                                    className="absolute -top-2 -right-2 bg-neutral-800 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition shadow-sm h-4 w-4 flex items-center justify-center"
+                                    title="Remove label"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {/* Header */}
                 <div className="flex items-start gap-x-3 w-full mb-8">
                     <Layout className="h-6 w-6 text-neutral-700 mt-1" />
@@ -182,6 +249,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                                 name="title"
                                 defaultValue={title}
                                 onBlur={onBlur}
+                                style={{ color: optimisticFontColor || undefined }}
                                 className="font-semibold text-xl text-neutral-700 px-1 border-transparent hover:border-input focus:border-input transition bg-transparent focus:bg-white w-[95%]"
                             />
                         </form>
@@ -209,19 +277,53 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                                     </div>
                                     <div className="flex flex-col gap-y-3">
                                         {linkAttachments.map((link: any) => (
-                                            <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full">
-                                                <div className="h-16 w-24 bg-neutral-200 rounded-sm overflow-hidden flex-shrink-0 flex items-center justify-center relative">
-                                                    {link.thumbnailUrl ? (
-                                                        <img src={link.thumbnailUrl} alt="Thumbnail" className="object-cover w-full h-full" />
-                                                    ) : (
-                                                        <span className="text-xs font-semibold text-neutral-500">LINK</span>
-                                                    )}
-                                                </div>
-                                                <div className="flex flex-col min-w-0 pr-2 pb-1">
-                                                    <span className="font-semibold text-sm text-neutral-700 truncate">{link.title || link.url}</span>
-                                                    <span className="text-xs text-neutral-500 truncate mt-1">Website URL</span>
-                                                </div>
-                                            </a>
+                                            <div key={link.id} className="flex flex-col gap-y-1 w-full">
+                                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full">
+                                                    <div className="h-16 w-24 bg-neutral-200 rounded-sm overflow-hidden flex-shrink-0 flex items-center justify-center relative">
+                                                        {link.thumbnailUrl ? (
+                                                            <img src={link.thumbnailUrl} alt="Thumbnail" className="object-cover w-full h-full" />
+                                                        ) : (
+                                                            <span className="text-xs font-semibold text-neutral-500">LINK</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0 pr-2 pb-1">
+                                                        <span className="font-semibold text-sm text-neutral-700 truncate">{link.title || link.url}</span>
+                                                        <span className="text-xs text-neutral-500 truncate mt-1">Website URL</span>
+                                                    </div>
+                                                </a>
+                                                {link.thumbnailUrl && (
+                                                    <div className="flex items-center gap-x-2 px-1 mt-1">
+                                                        {!link.isCover ? (
+                                                            <button
+                                                                onClick={() => executeUpdateAttachmentCover({ id: link.id, cardId: data.id, boardId })}
+                                                                className="text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1"
+                                                            >
+                                                                <Layout className="w-3 h-3" /> Make Cover
+                                                            </button>
+                                                        ) : (
+                                                            <button className="text-xs font-medium text-white bg-blue-600 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 cursor-default">
+                                                                <CheckSquare className="w-3 h-3" /> Current Cover
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
+                                                            className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 ml-auto"
+                                                        >
+                                                            <X className="w-3 h-3" /> Delete
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {!link.thumbnailUrl && (
+                                                    <div className="flex items-center gap-x-2 px-1 mt-1 justify-end">
+                                                        <button
+                                                            onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
+                                                            className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 ml-auto"
+                                                        >
+                                                            <X className="w-3 h-3" /> Delete
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
@@ -251,11 +353,20 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
 
                         {/* Appearance / Colors */}
                         <div className="relative">
-                            <button onClick={() => setIsColorPickerOpen(!isColorPickerOpen)} className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    console.log("Appearance button clicked, current state:", isColorPickerOpen);
+                                    setIsColorPickerOpen(!isColorPickerOpen);
+                                }}
+                                className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"
+                            >
                                 <Layout className="h-4 w-4" /> Appearance
                             </button>
                             {isColorPickerOpen && (
-                                <div className="absolute top-8 right-0 z-10 w-56 bg-white rounded-md shadow-lg border p-3 cursor-default">
+                                <div className="absolute left-0 top-full mt-1 z-[100] w-56 bg-white rounded-md shadow-xl border-2 border-neutral-200 p-3 cursor-default" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="font-semibold text-xs text-neutral-600">Card Appearance</span>
                                         <button onClick={() => setIsColorPickerOpen(false)} className="text-neutral-500 hover:bg-neutral-100 p-0.5 rounded-sm">
@@ -314,7 +425,101 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                             )}
                         </div>
 
-                        <button className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"><Clock className="h-4 w-4" /> Dates</button>
+                        {/* Labels Pickers */}
+                        <div className="relative">
+                            <button onClick={() => setIsLabelPickerOpen(!isLabelPickerOpen)} className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2">
+                                <Layout className="h-4 w-4" /> Labels
+                            </button>
+                            {isLabelPickerOpen && (
+                                <div className="absolute top-8 right-0 z-10 w-64 bg-white rounded-md shadow-lg border p-3 cursor-default">
+                                    <div className="flex items-center justify-between mb-3 border-b pb-2">
+                                        <span className="font-semibold text-sm text-neutral-600">Labels</span>
+                                        <button onClick={() => setIsLabelPickerOpen(false)} className="text-neutral-500 hover:bg-neutral-100 p-0.5 rounded-sm">
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-col gap-y-3">
+                                        <input
+                                            value={newLabelTitle}
+                                            onChange={(e) => setNewLabelTitle(e.target.value)}
+                                            placeholder="Label title..."
+                                            className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-blue-600 w-full"
+                                        />
+                                        <div>
+                                            <div className="text-xs font-semibold mt-1 mb-2 text-neutral-600 w-full text-center">Select a color</div>
+                                            <div className="grid grid-cols-5 gap-1.5 mb-1">
+                                                {CARD_COLORS.map((color) => (
+                                                    <button
+                                                        key={color}
+                                                        onClick={() => {
+                                                            executeCreateLabel({ cardId: data.id, boardId, title: newLabelTitle || "Label", color });
+                                                        }}
+                                                        className="h-8 w-full rounded-sm hover:scale-105 transition shadow-sm border border-black/10"
+                                                        style={{ backgroundColor: color }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Date Picker */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    console.log("Dates button clicked, current state:", isDatePickerOpen);
+                                    setIsDatePickerOpen(!isDatePickerOpen);
+                                }}
+                                className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"
+                            >
+                                <Clock className="h-4 w-4" /> Dates
+                            </button>
+                            {isDatePickerOpen && (
+                                <div className="absolute left-0 top-full mt-1 z-[100] w-64 bg-white rounded-md shadow-xl border-2 border-neutral-200 p-3 cursor-default" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-between mb-3 border-b pb-2">
+                                        <span className="font-semibold text-sm text-neutral-600">Due Date</span>
+                                        <button type="button" onClick={() => setIsDatePickerOpen(false)} className="text-neutral-500 hover:bg-neutral-100 p-0.5 rounded-sm">
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-col gap-y-3">
+                                        <label className="text-xs font-medium text-neutral-500">Select a date</label>
+                                        <input
+                                            type="date"
+                                            defaultValue={optimisticDueDate ? new Date(optimisticDueDate).toISOString().split('T')[0] : ""}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const newDate = val ? new Date(val).toISOString() : null;
+                                                setOptimisticDueDate(newDate);
+                                                executeUpdateCard({ id: data.id, title: data.title, boardId, dueDate: newDate });
+                                            }}
+                                            className="text-sm px-2 py-2 border rounded-md outline-none focus:ring-2 focus:ring-blue-600 w-full bg-white"
+                                        />
+                                        {optimisticDueDate && (
+                                            <div className="text-xs text-neutral-600 bg-blue-50 px-2 py-1.5 rounded-sm">
+                                                Currently set: {new Date(optimisticDueDate).toLocaleDateString()}
+                                            </div>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setOptimisticDueDate(null);
+                                                executeUpdateCard({ id: data.id, title: data.title, boardId, dueDate: null });
+                                                setIsDatePickerOpen(false);
+                                            }}
+                                            className="text-xs bg-neutral-200 hover:bg-neutral-300 text-neutral-700 w-full py-2 rounded-sm transition font-medium"
+                                        >
+                                            Remove Due Date
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <button onClick={onAddChecklist} className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"><CheckSquare className="h-4 w-4" /> Checklist</button>
 
                         {/* URL Attachment */}

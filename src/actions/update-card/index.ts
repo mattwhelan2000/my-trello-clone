@@ -7,11 +7,16 @@ import { UpdateCardSchema } from "./schema";
 
 export const updateCard = actionClient
     .schema(UpdateCardSchema)
-    .action(async ({ parsedInput: { id, title, boardId } }) => {
+    .action(async ({ parsedInput: { id, title, boardId, color, fontColor, dueDate } }) => {
         try {
             const card = await db.card.update({
                 where: { id },
-                data: { title },
+                data: {
+                    title,
+                    ... (color !== undefined && { color }),
+                    ... (fontColor !== undefined && { fontColor }),
+                    ... (dueDate !== undefined && { dueDate }),
+                },
             });
 
             revalidatePath(`/board/${boardId}`);
