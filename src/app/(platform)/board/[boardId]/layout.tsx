@@ -37,7 +37,7 @@ export default async function BoardIdLayout({
 
     return (
         <div
-            className="relative h-screen"
+            className="relative min-h-screen"
             style={{ backgroundColor: board.bgColor || "white" }}
         >
             {board.bgImage && (
@@ -47,12 +47,13 @@ export default async function BoardIdLayout({
                     referrerPolicy="no-referrer"
                     crossOrigin="anonymous"
                     className="absolute inset-0 w-full h-full object-cover"
+                    style={{ position: 'fixed' }}
                 />
             )}
-            <div className="absolute inset-0 bg-black/10 z-0" />
-            <div className="relative z-10 h-full">
+            <div className="fixed inset-0 bg-black/10 z-0" />
+            <div className="relative z-10 min-h-screen">
                 <BoardOptions boardId={board.id} />
-                <main className="relative pt-24 h-full">{children}</main>
+                <main className="relative pt-24 min-h-[calc(100vh-6rem)]">{children}</main>
             </div>
         </div>
     );

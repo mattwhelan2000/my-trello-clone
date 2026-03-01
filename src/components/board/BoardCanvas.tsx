@@ -14,7 +14,9 @@ export const BoardCanvas = ({
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [startX, setStartX] = useState(0);
+    const [startY, setStartY] = useState(0);
     const [scrollLeft, setScrollLeft] = useState(0);
+    const [scrollTop, setScrollTop] = useState(0);
 
     useEffect(() => {
         setIsMounted(true);
@@ -27,32 +29,30 @@ export const BoardCanvas = ({
         }
 
         if (e.key === "n") {
-            // New shortcut logic here
             console.log("Triggered 'New' shortcut");
         } else if (e.key === "c") {
-            // Archive/Close
             console.log("Triggered 'Archive' shortcut");
         } else if (e.key === " ") {
-            // Space binding
             console.log("Triggered 'Space' shortcut");
         }
     };
 
     useEventListener("keydown", onKeyDown);
 
-    if (!isMounted) return null; // Prevent hydration errors for DnD
+    if (!isMounted) return null;
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        // Prevent drag scrolling if we're clicking on a card or list header
         const target = e.target as HTMLElement;
-        if (target.closest('[role="button"]') || target.closest('button') || target.closest('input') || target.closest('textarea')) {
+        if (target.closest('[role="button"]') || target.closest('button') || target.closest('input') || target.closest('textarea') || target.closest('li') || target.closest('ol')) {
             return;
         }
 
         setIsDragging(true);
         if (!scrollContainerRef.current) return;
         setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
+        setStartY(e.pageY - scrollContainerRef.current.offsetTop);
         setScrollLeft(scrollContainerRef.current.scrollLeft);
+        setScrollTop(scrollContainerRef.current.scrollTop);
     };
 
     const handleMouseLeave = () => {
@@ -67,14 +67,18 @@ export const BoardCanvas = ({
         if (!isDragging || !scrollContainerRef.current) return;
         e.preventDefault();
         const x = e.pageX - scrollContainerRef.current.offsetLeft;
-        const walk = (x - startX) * 2; // The multiplier dictates scroll speed
-        scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+        const y = e.pageY - scrollContainerRef.current.offsetTop;
+        const walkX = (x - startX) * 2;
+        const walkY = (y - startY) * 2;
+        scrollContainerRef.current.scrollLeft = scrollLeft - walkX;
+        scrollContainerRef.current.scrollTop = scrollTop - walkY;
     };
 
     return (
         <div
             ref={scrollContainerRef}
-            className={`flex flex-row h-full overflow-x-auto overflow-y-hidden ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            className={`flex flex-row overflow-x-auto overflow-y-auto ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+            style={{ minHeight: 'calc(100vh - 6rem)' }}
             onMouseDown={handleMouseDown}
             onMouseLeave={handleMouseLeave}
             onMouseUp={handleMouseUp}
