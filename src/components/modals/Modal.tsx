@@ -1,7 +1,8 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
     isOpen: boolean;
@@ -11,6 +12,11 @@ interface ModalProps {
 
 export const Modal = ({ isOpen, onClose, children }: ModalProps) => {
     const modalRef = useRef<HTMLDivElement>(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -28,10 +34,10 @@ export const Modal = ({ isOpen, onClose, children }: ModalProps) => {
         };
     }, [isOpen, onClose]);
 
-    if (!isOpen) return null;
+    if (!isOpen || !mounted) return null;
 
-    return (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center pt-20 overflow-y-auto">
+    return createPortal(
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center pt-20 overflow-y-auto" style={{ pointerEvents: 'auto' }}>
             <div
                 className="fixed inset-0"
                 onClick={onClose}
@@ -49,6 +55,7 @@ export const Modal = ({ isOpen, onClose, children }: ModalProps) => {
                 </button>
                 {children}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
