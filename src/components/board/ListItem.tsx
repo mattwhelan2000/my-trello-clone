@@ -16,7 +16,7 @@ import { copyList } from "@/actions/copy-list";
 import { pasteList } from "@/actions/paste-list";
 import { pasteCard } from "@/actions/paste-card";
 
-export const ListItem = ({ data, index }: { data: any; index: number }) => {
+export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: number; searchQuery?: string }) => {
     const [title, setTitle] = useState(data.title);
     const [isEditing, setIsEditing] = useState(false);
     const formRef = useRef<ElementRef<"form">>(null);
@@ -347,9 +347,16 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
                     strategy={verticalListSortingStrategy}
                 >
                     <ol className="mx-1 px-1 py-2 flex flex-col gap-y-2 mt-2 min-h-[2px] flex-1 overflow-y-scroll">
-                        {data.cards.map((card: any, idx: number) => (
-                            <CardItem index={idx} key={card.id} data={card} boardId={data.boardId} />
-                        ))}
+                        {data.cards.map((card: any, idx: number) => {
+                            const matchesSearch = !searchQuery.trim() ||
+                                card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                (card.description && card.description.toLowerCase().includes(searchQuery.toLowerCase()));
+                            return (
+                                <div key={card.id} style={{ display: matchesSearch ? 'block' : 'none' }}>
+                                    <CardItem index={idx} data={card} boardId={data.boardId} />
+                                </div>
+                            );
+                        })}
                     </ol>
                 </SortableContext>
                 {/* Add Card Button or Form */}

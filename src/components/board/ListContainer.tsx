@@ -245,16 +245,7 @@ export const ListContainer = ({
                 </div>
                 <ol className="flex gap-x-3 h-full">
                     {orderedData.map((list, index) => {
-                        // Filter cards by search query
-                        const filteredList = searchQuery.trim()
-                            ? {
-                                ...list, cards: list.cards.filter((card: any) =>
-                                    card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                    (card.description && card.description.toLowerCase().includes(searchQuery.toLowerCase()))
-                                )
-                            }
-                            : list;
-                        return <ListItem key={list.id} index={index} data={filteredList} />;
+                        return <ListItem key={list.id} index={index} data={list} searchQuery={searchQuery} />;
                     })}
 
                     {/* Add New List Button/Form */}
