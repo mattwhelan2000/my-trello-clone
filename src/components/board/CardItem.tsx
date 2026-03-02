@@ -103,7 +103,10 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
         return url;
     };
 
-    const coverImageAttachment = data.attachments?.find((a: any) => a.isCover)
+    const coverIframeAttachment = data.attachments?.find((a: any) => a.isCover && a.type === "IFRAME");
+    const renderableIframeUrl = coverIframeAttachment ? coverIframeAttachment.url : null;
+
+    const coverImageAttachment = data.attachments?.find((a: any) => a.isCover && a.type !== "IFRAME")
         || data.attachments?.find((a: any) => a.type === "IMAGE" || a.thumbnailUrl);
     const renderableImageUrl = coverImageAttachment ? getRenderableImageUrl(coverImageAttachment.type === "IMAGE" ? coverImageAttachment.url : coverImageAttachment.thumbnailUrl) : null;
 
@@ -168,13 +171,19 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 onContextMenu={handleContextMenu}
                 className="group border-2 border-transparent hover:border-neutral-500 text-sm hover:brightness-110 rounded-md shadow-sm flex flex-col relative transition-all"
             >
-                {renderableImageUrl && (
+                {renderableImageUrl && !renderableIframeUrl && (
                     <div className="w-full relative flex items-center justify-center bg-black border-b border-neutral-800 overflow-hidden rounded-t-md">
                         <img src={renderableImageUrl} alt="Card Cover" className="w-full h-auto max-h-[260px] object-cover" />
                     </div>
                 )}
 
-                <div className={`py-2 px-3 w-full flex flex-col gap-y-1.5 ${!renderableImageUrl ? "min-h-[36px]" : ""}`}>
+                {renderableIframeUrl && (
+                    <div className="w-full relative flex items-center justify-center bg-neutral-200 border-b border-neutral-300 overflow-hidden rounded-t-md pointer-events-none">
+                        <iframe src={renderableIframeUrl} className="w-full h-[180px] border-0" allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                    </div>
+                )}
+
+                <div className={`py-2 px-3 w-full flex flex-col gap-y-1.5 ${!renderableImageUrl && !renderableIframeUrl ? "min-h-[36px]" : ""}`}>
 
                     {/* LABELS */}
                     {hasLabels && (

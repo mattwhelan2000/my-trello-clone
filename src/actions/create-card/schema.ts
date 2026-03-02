@@ -5,4 +5,5 @@ export const CreateCardSchema = z.object({
     boardId: z.string(),
     listId: z.string(),
     imageUrl: z.string().optional(),
+    iframeUrl: z.string().optional(),
 });

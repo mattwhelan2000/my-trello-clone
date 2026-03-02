@@ -120,6 +120,13 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
         const text = clipboardData.getData("text");
         if (text) {
             try {
+                // Check if it's an iframe embed
+                const iframeMatch = text.match(/<iframe.*?src=["'](.*?)["']/);
+                if (iframeMatch && iframeMatch[1]) {
+                    executeCreateCard({ title: "Embedded Map", boardId: data.boardId, listId: data.id, iframeUrl: iframeMatch[1] });
+                    return;
+                }
+
                 // Check if it's a URL
                 new URL(text);
                 executeCreateCard({ title: "Pasted Image", boardId: data.boardId, listId: data.id, imageUrl: text });

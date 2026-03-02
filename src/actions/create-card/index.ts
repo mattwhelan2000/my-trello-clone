@@ -179,7 +179,7 @@ function getUrlAttachmentInfo(url: string): {
 
 export const createCard = actionClient
     .schema(CreateCardSchema)
-    .action(async ({ parsedInput: { title, boardId, listId, imageUrl } }) => {
+    .action(async ({ parsedInput: { title, boardId, listId, imageUrl, iframeUrl } }) => {
         try {
             const list = await db.list.findUnique({
                 where: { id: listId, boardId },
@@ -203,8 +203,19 @@ export const createCard = actionClient
                 order: newOrder,
             };
 
+            // If an explicit iframeUrl was provided, handle it
+            if (iframeUrl) {
+                cardData.attachments = {
+                    create: {
+                        url: iframeUrl,
+                        type: "IFRAME",
+                        title: "Embed",
+                        isCover: true,
+                    }
+                };
+            }
             // If an explicit imageUrl was provided (paste flow), handle it as before
-            if (imageUrl) {
+            else if (imageUrl) {
                 const isImage = imageUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) || imageUrl.includes("dropbox.com");
                 const type = isImage ? "IMAGE" : "LINK";
                 let fetchedTitle = imageUrl;
