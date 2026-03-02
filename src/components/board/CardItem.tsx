@@ -2,7 +2,8 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { CardModal } from "@/components/modals/card-modal/CardModal";
 import { useAction } from "@/hooks/use-action";
 import { deleteCard } from "@/actions/delete-card";
@@ -39,6 +40,11 @@ const renderTitleWithLinks = (titleText: string) => {
 export const CardItem = ({ data, index, boardId }: { data: any; index: number; boardId: string }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const { execute: executeDeleteCard } = useAction(deleteCard);
     const { execute: executeCopyCard } = useAction(copyCard);
@@ -251,8 +257,8 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 </div>
             </div>
 
-            {contextMenu && (
-                <>
+            {contextMenu && mounted && createPortal(
+                <div style={{ pointerEvents: 'auto' }}>
                     <div className="fixed inset-0 z-[60]" onClick={handleMenuClose} onContextMenu={handleMenuClose} />
                     <div
                         className="fixed z-[70] bg-[#1a1a1a] border border-neutral-800 shadow-xl rounded-md py-1.5 w-48 text-sm text-neutral-200"
@@ -265,7 +271,8 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                         <button onClick={(e) => { e.stopPropagation(); onCopyCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Copy Card</button>
                         <button onClick={(e) => { e.stopPropagation(); onPasteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste Card</button>
                     </div>
-                </>
+                </div>,
+                document.body
             )}
 
             <CardModal
