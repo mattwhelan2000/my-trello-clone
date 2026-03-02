@@ -197,10 +197,12 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                             {data.labels.map((label: any) => (
                                 <div
                                     key={label.id}
-                                    className="h-2 w-8 rounded-full"
-                                    style={{ backgroundColor: label.color, opacity: 0.9 }}
+                                    className="h-4 px-2 rounded-[4px] text-[10px] font-semibold text-white/90 truncate max-w-full flex items-center"
+                                    style={{ backgroundColor: label.color }}
                                     title={label.title}
-                                />
+                                >
+                                    {label.title}
+                                </div>
                             ))}
                         </div>
                     )}

@@ -21,6 +21,10 @@ export default async function BoardIdPage({
                 },
                 include: {
                     attachments: true,
+                    labels: true,
+                    activities: {
+                        orderBy: { createdAt: "desc" }
+                    },
                     checklists: {
                         include: {
                             items: {
