@@ -304,12 +304,22 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
                                 <div className="mt-3 pt-2 border-t flex items-center gap-x-2">
                                     <label className="text-[10px] text-neutral-500 font-medium">Custom:</label>
                                     <input
+                                        id="bg-color-picker"
                                         type="color"
                                         defaultValue={data.color || "#3b82f6"}
-                                        onChange={(e) => onBgColorSelect(e.target.value)}
                                         onClick={(e) => e.stopPropagation()}
                                         className="h-7 w-10 rounded cursor-pointer border-0 p-0 bg-transparent"
                                     />
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const input = document.getElementById('bg-color-picker') as HTMLInputElement;
+                                            if (input) onBgColorSelect(input.value);
+                                        }}
+                                        className="text-[10px] font-medium bg-blue-600 text-white px-2 py-1 rounded-sm hover:bg-blue-700 transition"
+                                    >
+                                        Apply
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -335,12 +345,22 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
                                 <div className="mt-3 pt-2 border-t flex items-center gap-x-2">
                                     <label className="text-[10px] text-neutral-500 font-medium">Custom:</label>
                                     <input
+                                        id="text-color-picker"
                                         type="color"
                                         defaultValue={data.fontColor || "#ffffff"}
-                                        onChange={(e) => onTextColorSelect(e.target.value)}
                                         onClick={(e) => e.stopPropagation()}
                                         className="h-7 w-10 rounded cursor-pointer border-0 p-0 bg-transparent"
                                     />
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const input = document.getElementById('text-color-picker') as HTMLInputElement;
+                                            if (input) onTextColorSelect(input.value);
+                                        }}
+                                        className="text-[10px] font-medium bg-blue-600 text-white px-2 py-1 rounded-sm hover:bg-blue-700 transition"
+                                    >
+                                        Apply
+                                    </button>
                                 </div>
                             </div>
                         )}
