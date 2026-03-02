@@ -36,6 +36,8 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [isMovePickerOpen, setIsMovePickerOpen] = useState(false);
     const [newLabelTitle, setNewLabelTitle] = useState("");
+    const [selectedLabelColor, setSelectedLabelColor] = useState("");
+    const [boardLabels, setBoardLabels] = useState<{ id: string; title: string; color: string }[]>([]);
     const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
     const [commentText, setCommentText] = useState("");
     const [fetchedLists, setFetchedLists] = useState<{ id: string; title: string }[]>(propLists);
@@ -52,6 +54,16 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                 .catch(() => { });
         }
     }, [isOpen, boardId, fetchedLists.length]);
+
+    // Fetch existing board labels when label picker opens
+    useEffect(() => {
+        if (isLabelPickerOpen) {
+            fetch(`/api/boards/${boardId}/labels`)
+                .then(res => res.ok ? res.json() : [])
+                .then(data => setBoardLabels(data))
+                .catch(() => { });
+        }
+    }, [isLabelPickerOpen, boardId]);
 
     const { execute: executeUpdateCard } = useAction(updateCard, {
         onSuccess: (responseData: any) => {
@@ -100,6 +112,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onSuccess: () => {
             setIsLabelPickerOpen(false);
             setNewLabelTitle("");
+            setSelectedLabelColor("");
         },
         onError: (error) => console.error(error)
     });
@@ -512,34 +525,71 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                 <Layout className="h-4 w-4" /> Labels
                             </button>
                             {isLabelPickerOpen && (
-                                <div className="absolute top-8 right-0 z-10 w-64 bg-white rounded-md shadow-lg border p-3 cursor-default">
+                                <div className="absolute top-8 right-0 z-10 w-64 bg-white rounded-md shadow-lg border p-3 cursor-default" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center justify-between mb-3 border-b pb-2">
                                         <span className="font-semibold text-sm text-neutral-600">Labels</span>
                                         <button onClick={() => setIsLabelPickerOpen(false)} className="text-neutral-500 hover:bg-neutral-100 p-0.5 rounded-sm">
                                             <X className="h-4 w-4" />
                                         </button>
                                     </div>
-                                    <div className="flex flex-col gap-y-3">
-                                        <input
-                                            value={newLabelTitle}
-                                            onChange={(e) => setNewLabelTitle(e.target.value)}
-                                            placeholder="Label title..."
-                                            className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-blue-600 w-full"
-                                        />
-                                        <div>
-                                            <div className="text-xs font-semibold mt-1 mb-2 text-neutral-600 w-full text-center">Select a color</div>
-                                            <div className="grid grid-cols-5 gap-1.5 mb-1">
-                                                {CARD_COLORS.map((color) => (
-                                                    <button
-                                                        key={color}
-                                                        onClick={() => {
-                                                            executeCreateLabel({ cardId: data.id, boardId, title: newLabelTitle || "Label", color });
-                                                        }}
-                                                        className="h-8 w-full rounded-sm hover:scale-105 transition shadow-sm border border-black/10"
-                                                        style={{ backgroundColor: color }}
-                                                    />
-                                                ))}
+                                    <div className="flex flex-col gap-y-4">
+
+                                        {/* Board Labels (Reuse) */}
+                                        {boardLabels.length > 0 && (
+                                            <div>
+                                                <div className="text-xs font-semibold mb-2 text-neutral-600 w-full text-left">Existing labels</div>
+                                                <div className="flex flex-col gap-y-1">
+                                                    {boardLabels.map((label) => {
+                                                        const isAlreadyOnCard = data.labels?.some((l: any) => l.title === label.title && l.color === label.color);
+                                                        if (isAlreadyOnCard) return null;
+
+                                                        return (
+                                                            <button
+                                                                key={`${label.title}-${label.color}`}
+                                                                onClick={() => executeCreateLabel({ cardId: data.id, boardId, title: label.title, color: label.color })}
+                                                                className="w-full text-left px-3 py-1.5 rounded-sm text-sm font-medium text-white shadow-sm hover:opacity-90 transition"
+                                                                style={{ backgroundColor: label.color }}
+                                                            >
+                                                                {label.title}
+                                                            </button>
+                                                        )
+                                                    })}
+                                                </div>
                                             </div>
+                                        )}
+
+                                        {/* Create New Label */}
+                                        <div className="border-t pt-3">
+                                            <div className="text-xs font-semibold mb-2 text-neutral-600 w-full text-left">Create a new label</div>
+                                            <input
+                                                value={newLabelTitle}
+                                                onChange={(e) => setNewLabelTitle(e.target.value)}
+                                                placeholder="Label title..."
+                                                className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-blue-600 w-full mb-3"
+                                            />
+                                            <div>
+                                                <div className="text-xs font-semibold mb-2 text-neutral-600 w-full text-left">Select a color</div>
+                                                <div className="grid grid-cols-5 gap-1.5 mb-3">
+                                                    {CARD_COLORS.map((color) => (
+                                                        <button
+                                                            key={color}
+                                                            onClick={() => setSelectedLabelColor(color)}
+                                                            className={`h-8 w-full rounded-sm transition shadow-sm border ${selectedLabelColor === color ? 'border-2 border-blue-600 scale-105' : 'border-black/10 hover:scale-105'}`}
+                                                            style={{ backgroundColor: color }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    if (!selectedLabelColor) return;
+                                                    executeCreateLabel({ cardId: data.id, boardId, title: newLabelTitle || "Label", color: selectedLabelColor });
+                                                }}
+                                                disabled={!selectedLabelColor}
+                                                className="w-full bg-blue-600 text-white rounded-md text-sm font-medium py-1.5 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Apply New Label
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
