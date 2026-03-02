@@ -490,7 +490,8 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                                             defaultValue={optimisticDueDate ? new Date(optimisticDueDate).toISOString().split('T')[0] : ""}
                                             onChange={(e) => {
                                                 const val = e.target.value;
-                                                const newDate = val ? new Date(val).toISOString() : null;
+                                                // Use noon to avoid timezone offset shifting to previous day
+                                                const newDate = val ? new Date(val + 'T12:00:00').toISOString() : null;
                                                 setOptimisticDueDate(newDate);
                                                 executeUpdateCard({ id: data.id, title: data.title, boardId, dueDate: newDate });
                                             }}
@@ -498,7 +499,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                                         />
                                         {optimisticDueDate && (
                                             <div className="text-xs text-neutral-600 bg-blue-50 px-2 py-1.5 rounded-sm">
-                                                Currently set: {new Date(optimisticDueDate).toLocaleDateString()}
+                                                Currently set: {(() => { const d = new Date(optimisticDueDate); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${d.getUTCFullYear()}`; })()}
                                             </div>
                                         )}
                                         <button

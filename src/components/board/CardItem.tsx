@@ -128,8 +128,10 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
     let formattedDueDate = "";
     if (data.dueDate) {
         const date = new Date(data.dueDate);
-        formattedDueDate = format(date, "MMM d");
-        if (date < new Date()) isPastDue = true;
+        // Use UTC values to avoid timezone offset showing previous day
+        const utcDate = new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+        formattedDueDate = format(utcDate, "MMM d");
+        if (utcDate < new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())) isPastDue = true;
     }
 
     if (isDragging) {
