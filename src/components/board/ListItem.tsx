@@ -284,40 +284,64 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
                         </div>
 
                         {colorPickerTab === "bg" && (
-                            <div className="grid grid-cols-5 gap-1.5 cursor-default">
-                                {LIST_COLORS.map((color) => (
+                            <div>
+                                <div className="grid grid-cols-5 gap-1.5 cursor-default">
+                                    {LIST_COLORS.map((color) => (
+                                        <button
+                                            key={color}
+                                            onClick={(e) => { e.stopPropagation(); onBgColorSelect(color); }}
+                                            className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10"
+                                            style={{ backgroundColor: color }}
+                                        />
+                                    ))}
                                     <button
-                                        key={color}
-                                        onClick={(e) => { e.stopPropagation(); onBgColorSelect(color); }}
-                                        className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10"
-                                        style={{ backgroundColor: color }}
+                                        onClick={(e) => { e.stopPropagation(); onBgColorSelect(""); }}
+                                        className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
+                                    >
+                                        none
+                                    </button>
+                                </div>
+                                <div className="mt-3 pt-2 border-t flex items-center gap-x-2">
+                                    <label className="text-[10px] text-neutral-500 font-medium">Custom:</label>
+                                    <input
+                                        type="color"
+                                        defaultValue={data.color || "#3b82f6"}
+                                        onChange={(e) => onBgColorSelect(e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="h-7 w-10 rounded cursor-pointer border-0 p-0 bg-transparent"
                                     />
-                                ))}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onBgColorSelect(""); }}
-                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
-                                >
-                                    none
-                                </button>
+                                </div>
                             </div>
                         )}
 
                         {colorPickerTab === "text" && (
-                            <div className="grid grid-cols-5 gap-1.5 cursor-default">
-                                {TEXT_COLORS.map((color) => (
+                            <div>
+                                <div className="grid grid-cols-5 gap-1.5 cursor-default">
+                                    {TEXT_COLORS.map((color) => (
+                                        <button
+                                            key={color}
+                                            onClick={(e) => { e.stopPropagation(); onTextColorSelect(color); }}
+                                            className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/20"
+                                            style={{ backgroundColor: color }}
+                                        />
+                                    ))}
                                     <button
-                                        key={color}
-                                        onClick={(e) => { e.stopPropagation(); onTextColorSelect(color); }}
-                                        className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/20"
-                                        style={{ backgroundColor: color }}
+                                        onClick={(e) => { e.stopPropagation(); onTextColorSelect(""); }}
+                                        className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
+                                    >
+                                        auto
+                                    </button>
+                                </div>
+                                <div className="mt-3 pt-2 border-t flex items-center gap-x-2">
+                                    <label className="text-[10px] text-neutral-500 font-medium">Custom:</label>
+                                    <input
+                                        type="color"
+                                        defaultValue={data.fontColor || "#ffffff"}
+                                        onChange={(e) => onTextColorSelect(e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="h-7 w-10 rounded cursor-pointer border-0 p-0 bg-transparent"
                                     />
-                                ))}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onTextColorSelect(""); }}
-                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
-                                >
-                                    auto
-                                </button>
+                                </div>
                             </div>
                         )}
                     </div>

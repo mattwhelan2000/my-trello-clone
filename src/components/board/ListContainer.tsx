@@ -233,15 +233,18 @@ export const ListContainer = ({
                 strategy={horizontalListSortingStrategy}
             >
                 {/* Search Bar */}
-                <div className="fixed top-[52px] right-4 z-30">
-                    <input
-                        ref={searchInputRef}
-                        type="text"
-                        placeholder='Search cards... (press "/")'
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="text-sm px-3 py-1.5 rounded-md bg-white/20 backdrop-blur-sm border border-white/30 text-white placeholder:text-white/60 outline-none focus:bg-white/30 focus:border-white/50 w-56 transition"
-                    />
+                <div className="fixed top-[52px] right-4 z-[30]">
+                    <div className="relative">
+                        <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                        <input
+                            ref={searchInputRef}
+                            type="text"
+                            placeholder='Search cards... ("/")'
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="text-sm pl-8 pr-3 py-1.5 rounded-md bg-black/30 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 outline-none focus:bg-black/50 focus:border-white/40 w-56 transition shadow-lg"
+                        />
+                    </div>
                 </div>
                 <ol className="flex gap-x-3 h-full">
                     {orderedData.map((list, index) => {
