@@ -252,7 +252,7 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
                             style={{ color: data.fontColor ? data.fontColor : (data.color ? 'white' : 'black') }}
                         >
                             {title}
-                            <span className={`text-[10px] font-normal px-1.5 py-0.5 rounded-full ${data.color ? 'bg-white/20' : 'bg-neutral-300/60'}`}>{data.cards?.length || 0}</span>
+                            <span className={`ml-auto text-[10px] font-normal px-1.5 py-0.5 rounded-full ${data.color ? 'bg-white/20' : 'bg-neutral-300/60'}`}>{data.cards?.length || 0}</span>
                         </div>
                     )}
 
