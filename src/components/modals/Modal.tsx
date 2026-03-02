@@ -37,7 +37,12 @@ export const Modal = ({ isOpen, onClose, children }: ModalProps) => {
     if (!isOpen || !mounted) return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center pt-20 overflow-y-auto" style={{ pointerEvents: 'auto' }}>
+        <div
+            className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center pt-20 overflow-y-auto"
+            style={{ pointerEvents: 'auto' }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+        >
             <div
                 className="fixed inset-0"
                 onClick={onClose}

@@ -228,16 +228,16 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
             className={`shrink-0 h-full w-[272px] select-none ${isDragging ? "opacity-30" : ""}`}
         >
             <div
-                {...listeners}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className="w-full rounded-md text-black shadow-md pb-2 cursor-grab relative transition-colors flex flex-col"
+                className="w-full rounded-md text-black shadow-md pb-2 relative transition-colors flex flex-col"
                 style={{ backgroundColor: data.color ? data.color : '#f1f2f4', maxHeight: '600px' }}
             >
                 {/* List Header */}
                 <div
+                    {...listeners}
                     onContextMenu={handleContextMenu}
-                    className="pt-2 px-3 pb-1 text-sm font-semibold flex justify-between items-center gap-x-2 rounded-t-md"
+                    className="pt-2 px-3 pb-1 text-sm font-semibold flex justify-between items-center gap-x-2 rounded-t-md cursor-grab active:cursor-grabbing"
                 >
                     {isEditing ? (
                         <form ref={formRef} onSubmit={onSubmit} className="flex-1 px-[2px]">

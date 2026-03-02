@@ -74,7 +74,18 @@ export const BoardCanvas = ({
         if (isModalVisible) return;
 
         const target = e.target as HTMLElement;
+
+        // Prevent panning if clicking inside interactive elements
         if (target.closest('[role="button"]') || target.closest('button') || target.closest('input') || target.closest('textarea')) {
+            return;
+        }
+
+        // Only allow panning on MMB (button 1) OR LMB (button 0) directly on the background (id="board-content" or the canvas itself)
+        const isMiddleClick = e.button === 1;
+        const isLeftClick = e.button === 0;
+        const isBackground = target === scrollContainerRef.current || target.id === 'board-content';
+
+        if (!isMiddleClick && !(isLeftClick && isBackground)) {
             return;
         }
 
@@ -109,7 +120,8 @@ export const BoardCanvas = ({
             if (!scrollContainerRef.current) return;
             const x = pageX - scrollContainerRef.current.offsetLeft;
             const walkX = (x - startXRef.current) * 1.5;
-            scrollContainerRef.current.scrollLeft = scrollLeftRef.current - walkX;
+            // Reversed direction: '+' instead of '-'
+            scrollContainerRef.current.scrollLeft = scrollLeftRef.current + walkX;
         });
     };
 
