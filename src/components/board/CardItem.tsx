@@ -123,15 +123,17 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
     const isChecklistComplete = checklistTotal > 0 && checklistCompleted === checklistTotal;
     const hasLabels = data.labels && data.labels.length > 0;
 
-    // Check if the due date is past due or due soon
     let isPastDue = false;
+    let isDueSoon = false;
     let formattedDueDate = "";
     if (data.dueDate) {
         const date = new Date(data.dueDate);
-        // Use UTC values to avoid timezone offset showing previous day
         const utcDate = new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
         formattedDueDate = format(utcDate, "MMM d");
-        if (utcDate < new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())) isPastDue = true;
+        const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+        const diffDays = Math.ceil((utcDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) isPastDue = true;
+        else if (diffDays <= 3) isDueSoon = true;
     }
 
     if (isDragging) {
@@ -208,7 +210,7 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                         >
 
                             {data.dueDate && (
-                                <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isPastDue ? 'bg-red-900/40 text-red-400' : 'bg-neutral-800'}`}>
+                                <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isPastDue ? 'bg-red-900/40 text-red-400' : isDueSoon ? 'bg-yellow-900/40 text-yellow-400' : 'bg-neutral-800'}`}>
                                     <Clock className="h-3 w-3" />
                                     <span>{formattedDueDate}</span>
                                 </div>

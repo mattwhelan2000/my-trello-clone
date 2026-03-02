@@ -11,6 +11,9 @@ import { updateAttachmentCover } from "@/actions/update-attachment-cover";
 import { deleteAttachment } from "@/actions/delete-attachment";
 import { createLabel } from "@/actions/create-label";
 import { deleteLabel } from "@/actions/delete-label";
+import { createComment } from "@/actions/create-comment";
+import { moveCard } from "@/actions/move-card";
+import { useToast } from "@/components/ui/Toast";
 import { Description } from "./description";
 import { Checklist } from "./checklist";
 import { AttachmentPreview, AttachmentPreviewLarge } from "@/components/ui/AttachmentPreview";
@@ -22,18 +25,33 @@ interface CardModalProps {
     boardId: string;
     isOpen: boolean;
     onClose: () => void;
+    lists?: { id: string; title: string }[];
 }
 
-export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) => {
+export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [] }: CardModalProps) => {
     const [title, setTitle] = useState(data?.title || "");
     const [isAddingImage, setIsAddingImage] = useState(false);
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
     const [isLabelPickerOpen, setIsLabelPickerOpen] = useState(false);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+    const [isMovePickerOpen, setIsMovePickerOpen] = useState(false);
     const [newLabelTitle, setNewLabelTitle] = useState("");
     const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
+    const [commentText, setCommentText] = useState("");
+    const [fetchedLists, setFetchedLists] = useState<{ id: string; title: string }[]>(propLists);
     const inputRef = useRef<ElementRef<"input">>(null);
     const imageInputRef = useRef<ElementRef<"input">>(null);
+    const { addToast } = useToast();
+
+    // Fetch lists for move-card dropdown when modal opens
+    useEffect(() => {
+        if (isOpen && fetchedLists.length === 0) {
+            fetch(`/api/boards/${boardId}/lists`)
+                .then(res => res.ok ? res.json() : [])
+                .then(data => setFetchedLists(data))
+                .catch(() => { });
+        }
+    }, [isOpen, boardId, fetchedLists.length]);
 
     const { execute: executeUpdateCard } = useAction(updateCard, {
         onSuccess: (responseData: any) => {
@@ -90,6 +108,33 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
         onSuccess: () => { },
         onError: (error) => console.error(error)
     });
+
+    const { execute: executeCreateComment } = useAction(createComment, {
+        onSuccess: () => {
+            setCommentText("");
+            addToast("Comment added", "success");
+        },
+        onError: (error) => console.error(error)
+    });
+
+    const { execute: executeMoveCard } = useAction(moveCard, {
+        onSuccess: () => {
+            setIsMovePickerOpen(false);
+            addToast("Card moved", "success");
+            onClose();
+        },
+        onError: (error) => console.error(error)
+    });
+
+    // Keyboard shortcut: Esc to close modal
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", handleEsc);
+        return () => window.removeEventListener("keydown", handleEsc);
+    }, [isOpen, onClose]);
 
     const onAddChecklist = () => {
         executeCreateChecklist({ title: "Checklist", cardId: data.id, boardId });
@@ -332,13 +377,53 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                             <div className="w-full">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="font-semibold text-neutral-700 mt-1">Activity</h3>
-                                    <button className="bg-[#e9eaec] text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4]">Show details</button>
                                 </div>
-                                {/* Mock Comment input */}
-                                <div className="flex gap-x-3">
-                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold mt-1">U</div>
-                                    <div className="bg-white border rounded-md px-3 py-2 text-sm w-full h-12 shadow-sm text-neutral-400">Write a comment...</div>
+                                {/* Comment input */}
+                                <div className="flex gap-x-3 mb-4">
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold mt-1 flex-shrink-0">U</div>
+                                    <div className="flex-1">
+                                        <textarea
+                                            value={commentText}
+                                            onChange={(e) => setCommentText(e.target.value)}
+                                            placeholder="Write a comment..."
+                                            className="bg-white border rounded-md px-3 py-2 text-sm w-full shadow-sm resize-none outline-none focus:ring-2 focus:ring-blue-500 min-h-[48px]"
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    if (commentText.trim()) {
+                                                        executeCreateComment({ cardId: data.id, boardId, action: commentText.trim() });
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                        {commentText.trim() && (
+                                            <button
+                                                onClick={() => executeCreateComment({ cardId: data.id, boardId, action: commentText.trim() })}
+                                                className="mt-1 bg-blue-600 text-white rounded-md text-xs font-medium px-3 py-1.5 hover:bg-blue-700 transition"
+                                            >
+                                                Save
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
+                                {/* Activity History */}
+                                {data.activities && data.activities.length > 0 && (
+                                    <div className="flex flex-col gap-y-3 mt-2">
+                                        {data.activities.slice().reverse().map((activity: any) => (
+                                            <div key={activity.id} className="flex gap-x-3">
+                                                <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-neutral-600 font-semibold text-xs flex-shrink-0">
+                                                    {activity.userId?.charAt(0)?.toUpperCase() || "U"}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="text-sm text-neutral-700">{activity.action}</p>
+                                                    <p className="text-xs text-neutral-400 mt-0.5">
+                                                        {new Date(activity.createdAt).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -518,6 +603,43 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                             )}
                         </div>
                         <button onClick={onAddChecklist} className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"><CheckSquare className="h-4 w-4" /> Checklist</button>
+
+                        {/* Move Card */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setIsMovePickerOpen(!isMovePickerOpen)}
+                                className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"
+                            >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                                Move
+                            </button>
+                            {isMovePickerOpen && (
+                                <div className="absolute left-0 top-full mt-1 z-[100] w-56 bg-white rounded-md shadow-xl border-2 border-neutral-200 p-3" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex items-center justify-between mb-2 border-b pb-2">
+                                        <span className="font-semibold text-sm text-neutral-600">Move to list</span>
+                                        <button type="button" onClick={() => setIsMovePickerOpen(false)} className="text-neutral-500 hover:bg-neutral-100 p-0.5 rounded-sm">
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    <div className="flex flex-col gap-y-1">
+                                        {fetchedLists.map((list: any) => (
+                                            <button
+                                                key={list.id}
+                                                onClick={() => executeMoveCard({ cardId: data.id, targetListId: list.id, boardId })}
+                                                disabled={list.id === data.listId}
+                                                className={`text-left text-sm px-2 py-1.5 rounded-sm transition ${list.id === data.listId
+                                                    ? 'bg-blue-100 text-blue-700 font-medium cursor-default'
+                                                    : 'hover:bg-neutral-100 text-neutral-700'
+                                                    }`}
+                                            >
+                                                {list.title} {list.id === data.listId && '(current)'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         {/* URL Attachment */}
                         <div className="relative">

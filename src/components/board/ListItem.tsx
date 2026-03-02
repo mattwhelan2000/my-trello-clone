@@ -248,10 +248,11 @@ export const ListItem = ({ data, index }: { data: any; index: number }) => {
                     ) : (
                         <div
                             onClick={enableEditing}
-                            className={`w-full text-sm px-2.5 py-1 h-7 font-medium border-transparent cursor-pointer`}
+                            className={`w-full text-sm px-2.5 py-1 h-7 font-medium border-transparent cursor-pointer flex items-center gap-x-2`}
                             style={{ color: data.fontColor ? data.fontColor : (data.color ? 'white' : 'black') }}
                         >
                             {title}
+                            <span className={`text-[10px] font-normal px-1.5 py-0.5 rounded-full ${data.color ? 'bg-white/20' : 'bg-neutral-300/60'}`}>{data.cards?.length || 0}</span>
                         </div>
                     )}
 

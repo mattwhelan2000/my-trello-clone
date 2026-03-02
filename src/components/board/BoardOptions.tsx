@@ -6,39 +6,47 @@ import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
 import { exportBoard } from "@/actions/export-board";
+import { useToast } from "@/components/ui/Toast";
 
 interface BoardOptionsProps {
     boardId: string;
 }
 
 const COLORS = [
-    "#334155", // Slate 700
-    "#475569", // Slate 600
-    "#1e293b", // Slate 800
-    "#27272a", // Zinc 800
-    "#18181b", // Zinc 900
-    "#52525b", // Zinc 600
-    "#262626", // Neutral 800
-    "#171717", // Neutral 900
-    "#525252", // Neutral 600
-    "#1c1917", // Stone 900
-    "#292524", // Stone 800
-    "#57534e", // Stone 600
-    "#4338ca", // Darker blue/indigo
-    "#0f172a"  // Very dark slate
+    "#334155", "#475569", "#1e293b", "#27272a", "#18181b",
+    "#52525b", "#262626", "#171717", "#525252", "#1c1917",
+    "#292524", "#57534e", "#4338ca", "#0f172a"
 ];
+
+function boardToCSV(board: any): string {
+    const rows: string[][] = [];
+    rows.push(["List", "Card Title", "Description", "Due Date", "Labels", "Checklists"]);
+    for (const list of board.lists || []) {
+        for (const card of list.cards || []) {
+            rows.push([
+                list.title,
+                card.title,
+                card.description || "",
+                card.dueDate ? new Date(card.dueDate).toLocaleDateString() : "",
+                (card.labels || []).map((l: any) => l.title).join("; "),
+                (card.checklists || []).map((cl: any) => {
+                    const done = cl.items.filter((i: any) => i.isCompleted).length;
+                    return `${cl.title} (${done}/${cl.items.length})`;
+                }).join("; "),
+            ]);
+        }
+    }
+    return rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+}
 
 export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
+    const { addToast } = useToast();
 
     const { execute, isLoading } = useAction(updateBoard, {
-        onSuccess: () => {
-            setIsOpen(false);
-        },
-        onError: (error) => {
-            console.error(error);
-        }
+        onSuccess: () => { setIsOpen(false); },
+        onError: (error) => console.error(error)
     });
 
     const { execute: executeExport, isExecuting: isExporting } = useSafeAction(exportBoard, {
@@ -53,12 +61,30 @@ export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                addToast("Board exported as JSON", "success");
                 setIsOpen(false);
             }
         },
-        onError: (error) => {
-            console.error("Export failed", error);
-        }
+        onError: (error) => console.error("Export failed", error)
+    });
+
+    const { execute: executeExportCSV, isExecuting: isExportingCSV } = useSafeAction(exportBoard, {
+        onSuccess: ({ data }) => {
+            if (data && !("error" in data) && data.title) {
+                const csv = boardToCSV(data);
+                const blob = new Blob([csv], { type: "text/csv" });
+                const href = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = href;
+                link.download = `board-${data.title.replace(/\s+/g, '-').toLowerCase()}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                addToast("Board exported as CSV", "success");
+                setIsOpen(false);
+            }
+        },
+        onError: (error) => console.error("CSV Export failed", error)
     });
 
     const onColorSelect = (color: string) => {
@@ -70,6 +96,8 @@ export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
         if (!imageUrl) return;
         execute({ id: boardId, bgImage: imageUrl, bgColor: "" });
     };
+
+    const anyLoading = isLoading || isExporting || isExportingCSV;
 
     return (
         <div className="absolute top-4 right-4 z-[50]">
@@ -99,7 +127,7 @@ export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
                                     onClick={() => onColorSelect(color)}
                                     className="h-8 w-8 rounded-sm hover:opacity-80 transition cursor-pointer border border-black/10 shadow-sm"
                                     style={{ backgroundColor: color }}
-                                    disabled={isLoading}
+                                    disabled={anyLoading}
                                 />
                             ))}
                         </div>
@@ -113,22 +141,30 @@ export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
                                 onChange={(e) => setImageUrl(e.target.value)}
                                 placeholder="Paste image URL here..."
                                 className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-blue-600 w-full"
-                                disabled={isLoading || isExporting}
+                                disabled={anyLoading}
                             />
-                            <button type="submit" disabled={isLoading || isExporting} className="bg-blue-600 text-white w-full rounded-sm text-sm font-medium py-1.5 hover:bg-blue-700 transition">
+                            <button type="submit" disabled={anyLoading} className="bg-blue-600 text-white w-full rounded-sm text-sm font-medium py-1.5 hover:bg-blue-700 transition">
                                 Set Image
                             </button>
                         </form>
                     </div>
 
-                    <div className="pt-2 border-t">
+                    <div className="pt-2 border-t flex flex-col gap-y-2">
                         <button
                             onClick={() => executeExport({ id: boardId })}
-                            disabled={isLoading || isExporting}
+                            disabled={anyLoading}
                             className="bg-neutral-200 text-neutral-700 w-full rounded-sm text-sm font-medium py-1.5 hover:bg-neutral-300 transition flex items-center justify-center gap-x-2"
                         >
                             <Download className="h-4 w-4" />
-                            {isExporting ? "Exporting..." : "Export Board as JSON"}
+                            {isExporting ? "Exporting..." : "Export as JSON"}
+                        </button>
+                        <button
+                            onClick={() => executeExportCSV({ id: boardId })}
+                            disabled={anyLoading}
+                            className="bg-neutral-200 text-neutral-700 w-full rounded-sm text-sm font-medium py-1.5 hover:bg-neutral-300 transition flex items-center justify-center gap-x-2"
+                        >
+                            <Download className="h-4 w-4" />
+                            {isExportingCSV ? "Exporting..." : "Export as CSV"}
                         </button>
                     </div>
                 </div>

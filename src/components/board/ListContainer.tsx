@@ -2,7 +2,7 @@
 
 import { List } from "@prisma/client";
 import { ListItem } from "./ListItem";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     DndContext,
     DragEndEvent,
@@ -32,6 +32,8 @@ export const ListContainer = ({
     boardId: string;
 }) => {
     const [orderedData, setOrderedData] = useState(data);
+    const [searchQuery, setSearchQuery] = useState("");
+    const searchInputRef = useRef<ElementRef<"input">>(null);
 
     const { execute: executeUpdateListOrder } = useAction(updateListOrder, {
         onSuccess: () => {
@@ -74,6 +76,11 @@ export const ListContainer = ({
 
     const onKeyDown = (e: KeyboardEvent) => {
         if (e.key === "Escape") disableEditing();
+        // Keyboard shortcut: '/' focuses search
+        if (e.key === "/" && !isEditing && !(document.activeElement instanceof HTMLInputElement) && !(document.activeElement instanceof HTMLTextAreaElement)) {
+            e.preventDefault();
+            searchInputRef.current?.focus();
+        }
     };
 
     useEventListener("keydown", onKeyDown);
@@ -225,9 +232,29 @@ export const ListContainer = ({
                 items={orderedData.map((list) => list.id)}
                 strategy={horizontalListSortingStrategy}
             >
+                {/* Search Bar */}
+                <div className="fixed top-[52px] right-4 z-30">
+                    <input
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder='Search cards... (press "/")'
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="text-sm px-3 py-1.5 rounded-md bg-white/20 backdrop-blur-sm border border-white/30 text-white placeholder:text-white/60 outline-none focus:bg-white/30 focus:border-white/50 w-56 transition"
+                    />
+                </div>
                 <ol className="flex gap-x-3 h-full">
                     {orderedData.map((list, index) => {
-                        return <ListItem key={list.id} index={index} data={list} />;
+                        // Filter cards by search query
+                        const filteredList = searchQuery.trim()
+                            ? {
+                                ...list, cards: list.cards.filter((card: any) =>
+                                    card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                    (card.description && card.description.toLowerCase().includes(searchQuery.toLowerCase()))
+                                )
+                            }
+                            : list;
+                        return <ListItem key={list.id} index={index} data={filteredList} />;
                     })}
 
                     {/* Add New List Button/Form */}
