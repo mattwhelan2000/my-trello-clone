@@ -13,6 +13,8 @@ import { createLabel } from "@/actions/create-label";
 import { deleteLabel } from "@/actions/delete-label";
 import { Description } from "./description";
 import { Checklist } from "./checklist";
+import { AttachmentPreview, AttachmentPreviewLarge } from "@/components/ui/AttachmentPreview";
+import { detectFileType, getFileTypeLabel } from "@/lib/file-type-utils";
 import Image from "next/image";
 
 interface CardModalProps {
@@ -279,16 +281,10 @@ export const CardModal = ({ data, boardId, isOpen, onClose }: CardModalProps) =>
                                         {linkAttachments.map((link: any) => (
                                             <div key={link.id} className="flex flex-col gap-y-1 w-full">
                                                 <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full">
-                                                    <div className="h-16 w-24 bg-neutral-200 rounded-sm overflow-hidden flex-shrink-0 flex items-center justify-center relative">
-                                                        {link.thumbnailUrl ? (
-                                                            <img src={link.thumbnailUrl} alt="Thumbnail" className="object-cover w-full h-full" />
-                                                        ) : (
-                                                            <span className="text-xs font-semibold text-neutral-500">LINK</span>
-                                                        )}
-                                                    </div>
+                                                    <AttachmentPreview url={link.url} thumbnailUrl={link.thumbnailUrl} title={link.title} />
                                                     <div className="flex flex-col min-w-0 pr-2 pb-1">
                                                         <span className="font-semibold text-sm text-neutral-700 truncate">{link.title || link.url}</span>
-                                                        <span className="text-xs text-neutral-500 truncate mt-1">Website URL</span>
+                                                        <span className="text-xs text-neutral-500 truncate mt-1">{getFileTypeLabel(detectFileType(link.url))}</span>
                                                     </div>
                                                 </a>
                                                 {link.thumbnailUrl && (
