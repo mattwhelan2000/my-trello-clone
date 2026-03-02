@@ -162,10 +162,10 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 role="button"
                 onDoubleClick={() => setIsModalOpen(true)}
                 onContextMenu={handleContextMenu}
-                className="group border-2 border-transparent hover:border-neutral-500 text-sm hover:brightness-110 rounded-md shadow-sm flex flex-col overflow-hidden relative transition-all"
+                className="group border-2 border-transparent hover:border-neutral-500 text-sm hover:brightness-110 rounded-md shadow-sm flex flex-col relative transition-all"
             >
                 {renderableImageUrl && (
-                    <div className="w-full relative flex items-center justify-center bg-black border-b border-neutral-800">
+                    <div className="w-full relative flex items-center justify-center bg-black border-b border-neutral-800 overflow-hidden rounded-t-md">
                         <img src={renderableImageUrl} alt="Card Cover" className="w-full h-auto max-h-[260px] object-cover" />
                     </div>
                 )}
@@ -194,7 +194,7 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                     {/* DESCRIPTION */}
                     {hasDescription && (
                         <div className="text-[11px] w-full break-words opacity-80 mt-0.5" style={{ color: data.fontColor || "white" }}>
-                            {data.description.length > 100 ? data.description.substring(0, 100) + '...' : data.description}
+                            {data.description}
                         </div>
                     )}
 
