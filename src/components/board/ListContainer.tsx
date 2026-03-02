@@ -221,79 +221,81 @@ export const ListContainer = ({
     };
 
     return (
-        <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={onDragStart}
-            onDragOver={onDragOver}
-            onDragEnd={onDragEnd}
-        >
-            <SortableContext
-                items={orderedData.map((list) => list.id)}
-                strategy={horizontalListSortingStrategy}
+        <div id="board-content">
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={onDragStart}
+                onDragOver={onDragOver}
+                onDragEnd={onDragEnd}
             >
-                {/* Search Bar */}
-                <div className="fixed top-[52px] right-4 z-[30]">
-                    <div className="relative">
-                        <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-                        <input
-                            ref={searchInputRef}
-                            type="text"
-                            placeholder='Search cards... ("/")'
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="text-sm pl-8 pr-3 py-1.5 rounded-md bg-black/30 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 outline-none focus:bg-black/50 focus:border-white/40 w-56 transition shadow-lg"
-                        />
+                <SortableContext
+                    items={orderedData.map((list) => list.id)}
+                    strategy={horizontalListSortingStrategy}
+                >
+                    {/* Search Bar */}
+                    <div className="fixed top-[52px] left-1/2 -translate-x-1/2 z-[30]">
+                        <div className="relative">
+                            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                placeholder='Search cards... ("/")'
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="text-sm pl-8 pr-3 py-1.5 rounded-md bg-black/30 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 outline-none focus:bg-black/50 focus:border-white/40 w-56 transition shadow-lg"
+                            />
+                        </div>
                     </div>
-                </div>
-                <ol className="flex gap-x-3 h-full">
-                    {orderedData.map((list, index) => {
-                        return <ListItem key={list.id} index={index} data={list} searchQuery={searchQuery} />;
-                    })}
+                    <ol className="flex gap-x-3 h-full">
+                        {orderedData.map((list, index) => {
+                            return <ListItem key={list.id} index={index} data={list} searchQuery={searchQuery} />;
+                        })}
 
-                    {/* Add New List Button/Form */}
-                    <div className="shrink-0 w-[272px]">
-                        {isEditing ? (
-                            <form
-                                ref={formRef}
-                                onSubmit={onSubmit}
-                                className="w-full bg-white rounded-md shadow-md p-3 space-y-3"
-                            >
-                                <input
-                                    ref={inputRef}
-                                    name="title"
-                                    id="title"
-                                    className="text-sm px-2 py-1 font-medium border-transparent hover:border-input focus:border-input transition w-full outline-none"
-                                    placeholder="Enter list title..."
-                                />
-                                <div className="flex items-center gap-x-1">
-                                    <button
-                                        type="submit"
-                                        disabled={isListLoading}
-                                        className="bg-blue-600 text-white hover:bg-blue-700 transition px-3 py-1.5 rounded-md text-sm font-medium"
-                                    >
-                                        Add list
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={disableEditing}
-                                        className="px-2 py-1.5 text-sm hover:bg-black/5 rounded-md"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        ) : (
-                            <button
-                                onClick={enableEditing}
-                                className="w-full bg-white/50 hover:bg-white/80 transition rounded-md p-3 text-sm font-medium flex items-center"
-                            >
-                                + Add a list
-                            </button>
-                        )}
-                    </div>
-                </ol>
-            </SortableContext>
-        </DndContext>
+                        {/* Add New List Button/Form */}
+                        <div className="shrink-0 w-[272px]">
+                            {isEditing ? (
+                                <form
+                                    ref={formRef}
+                                    onSubmit={onSubmit}
+                                    className="w-full bg-white rounded-md shadow-md p-3 space-y-3"
+                                >
+                                    <input
+                                        ref={inputRef}
+                                        name="title"
+                                        id="title"
+                                        className="text-sm px-2 py-1 font-medium border-transparent hover:border-input focus:border-input transition w-full outline-none"
+                                        placeholder="Enter list title..."
+                                    />
+                                    <div className="flex items-center gap-x-1">
+                                        <button
+                                            type="submit"
+                                            disabled={isListLoading}
+                                            className="bg-blue-600 text-white hover:bg-blue-700 transition px-3 py-1.5 rounded-md text-sm font-medium"
+                                        >
+                                            Add list
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={disableEditing}
+                                            className="px-2 py-1.5 text-sm hover:bg-black/5 rounded-md"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <button
+                                    onClick={enableEditing}
+                                    className="w-full bg-white/50 hover:bg-white/80 transition rounded-md p-3 text-sm font-medium flex items-center"
+                                >
+                                    + Add a list
+                                </button>
+                            )}
+                        </div>
+                    </ol>
+                </SortableContext>
+            </DndContext>
+        </div>
     );
 };

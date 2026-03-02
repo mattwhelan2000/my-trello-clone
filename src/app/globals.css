@@ -51,3 +51,8 @@ ol::-webkit-scrollbar-thumb {
 ol::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.35);
 }
+
+/* Disable background interaction when modal is open */
+body.modal-open #board-content {
+  pointer-events: none;
+}
