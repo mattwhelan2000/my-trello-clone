@@ -9,7 +9,7 @@ import { useAction } from "@/hooks/use-action";
 import { deleteCard } from "@/actions/delete-card";
 import { copyCard } from "@/actions/copy-card";
 import { pasteCard } from "@/actions/paste-card";
-import { AlignLeft, CheckSquare, Clock, Paperclip } from "lucide-react";
+import { AlignLeft, CheckSquare, Clock, Paperclip, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 
 const renderTitleWithLinks = (titleText: string) => {
@@ -41,6 +41,7 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [mounted, setMounted] = useState(false);
+    const [isCommentsExpanded, setIsCommentsExpanded] = useState(false);
 
     useEffect(() => {
         setMounted(true);
@@ -131,6 +132,8 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
     }
     const isChecklistComplete = checklistTotal > 0 && checklistCompleted === checklistTotal;
     const hasLabels = data.labels && data.labels.length > 0;
+    const comments = data.activities ? data.activities.slice().reverse() : [];
+    const hasComments = comments.length > 0;
 
     let isPastDue = false;
     let isDueSoon = false;
@@ -254,6 +257,33 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                                 </div>
                             )}
 
+                            {hasComments && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setIsCommentsExpanded(!isCommentsExpanded); }}
+                                    className="flex items-center gap-x-1 text-xs hover:bg-black/10 px-1.5 py-0.5 rounded-sm transition"
+                                    title="Comments"
+                                >
+                                    <MessageSquare className="h-3 w-3" />
+                                    <span>{comments.length}</span>
+                                </button>
+                            )}
+
+                        </div>
+                    )}
+
+                    {/* EXPANDABLE COMMENTS */}
+                    {isCommentsExpanded && hasComments && (
+                        <div className="mt-2 pt-2 border-t border-black/10 flex flex-col gap-y-2 cursor-default" onClick={(e) => e.stopPropagation()}>
+                            {comments.map((comment: any) => (
+                                <div key={comment.id} className="text-xs bg-black/5 rounded-sm p-1.5 shadow-sm">
+                                    <div className="font-semibold mb-0.5 opacity-90" style={{ color: data.fontColor || "inherit" }}>
+                                        {comment.userId === "user" ? "User" : comment.userId}
+                                    </div>
+                                    <div className="break-words opacity-80" style={{ color: data.fontColor || "inherit" }}>
+                                        {comment.action}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>

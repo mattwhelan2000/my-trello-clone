@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Image as ImageIcon, Palette, X, Download } from "lucide-react";
+import { Settings, Image as ImageIcon, Palette, X, Download, Info } from "lucide-react";
 import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
@@ -41,6 +41,7 @@ function boardToCSV(board: any): string {
 
 export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
     const { addToast } = useToast();
 
@@ -100,14 +101,56 @@ export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
     const anyLoading = isLoading || isExporting || isExportingCSV;
 
     return (
-        <div className="absolute top-4 right-4 z-[50]">
+        <div className="absolute top-4 right-4 z-[50] flex items-center gap-x-2">
             <button
-                onClick={() => setIsOpen(true)}
+                onClick={() => {
+                    setIsInfoOpen(!isInfoOpen);
+                    setIsOpen(false);
+                }}
+                className="bg-black/20 hover:bg-black/30 text-white rounded-md px-3 py-1.5 flex items-center gap-x-2 text-sm font-medium backdrop-blur-sm transition"
+            >
+                <Info className="h-4 w-4" />
+                Controls
+            </button>
+            <button
+                onClick={() => {
+                    setIsOpen(!isOpen);
+                    setIsInfoOpen(false);
+                }}
                 className="bg-black/20 hover:bg-black/30 text-white rounded-md px-3 py-1.5 flex items-center gap-x-2 text-sm font-medium backdrop-blur-sm transition"
             >
                 <Settings className="h-4 w-4" />
                 Board Settings
             </button>
+
+            {isInfoOpen && (
+                <div className="absolute top-10 right-0 w-80 bg-white rounded-md shadow-lg border p-4 text-neutral-800">
+                    <div className="flex items-center justify-between mb-4 border-b pb-2">
+                        <span className="font-semibold text-sm">Page Controls</span>
+                        <button onClick={() => setIsInfoOpen(false)} className="text-neutral-500 hover:bg-neutral-100 p-1 rounded-sm">
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                    <ul className="text-sm space-y-3 text-neutral-600">
+                        <li className="flex items-start gap-x-2">
+                            <span className="bg-neutral-200 px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap">MMB + Drag</span>
+                            <span>Pan the board left, right, up, and down.</span>
+                        </li>
+                        <li className="flex items-start gap-x-2">
+                            <span className="bg-neutral-200 px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap">Double Click</span>
+                            <span>Open a card to see its full details and actions.</span>
+                        </li>
+                        <li className="flex items-start gap-x-2">
+                            <span className="bg-neutral-200 px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap">Right Click</span>
+                            <span>Open the quick-action menu on a card (Duplicate, Delete, Copy).</span>
+                        </li>
+                        <li className="flex items-start gap-x-2">
+                            <span className="bg-neutral-200 px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap">Ctrl + V</span>
+                            <span>Paste images, text, or iframes directly onto a list to create a card.</span>
+                        </li>
+                    </ul>
+                </div>
+            )}
 
             {isOpen && (
                 <div className="absolute top-10 right-0 w-80 bg-white rounded-md shadow-lg border p-4 text-neutral-800">
