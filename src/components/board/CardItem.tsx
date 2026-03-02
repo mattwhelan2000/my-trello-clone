@@ -151,8 +151,8 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 ref={setNodeRef}
                 style={{
                     ...style,
-                    backgroundColor: data.color || "black",
-                    color: data.fontColor || "white"
+                    backgroundColor: data.color || "#ffffff",
+                    color: data.fontColor || "#172b4d"
                 }}
                 className="opacity-30 border-2 border-neutral-500 truncate py-2 px-3 text-sm rounded-md shadow-sm"
             >
@@ -167,8 +167,8 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 ref={setNodeRef}
                 style={{
                     ...style,
-                    backgroundColor: data.color || "#111111",
-                    color: data.fontColor || "white"
+                    backgroundColor: data.color || "#ffffff",
+                    color: data.fontColor || "#172b4d"
                 }}
                 {...attributes}
                 {...listeners}
@@ -208,13 +208,13 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                     )}
 
                     {/* TITLE */}
-                    <div className="w-full font-medium break-words" style={{ color: data.fontColor || "white" }}>
+                    <div className="w-full font-medium break-words" style={{ color: data.fontColor || "#172b4d" }}>
                         {renderTitleWithLinks(data.title)}
                     </div>
 
                     {/* DESCRIPTION */}
                     {hasDescription && (
-                        <div className="text-[11px] w-full break-words opacity-80 mt-0.5" style={{ color: data.fontColor || "white" }}>
+                        <div className="text-[11px] w-full break-words opacity-80 mt-0.5" style={{ color: data.fontColor || "#172b4d" }}>
                             {data.description}
                         </div>
                     )}
