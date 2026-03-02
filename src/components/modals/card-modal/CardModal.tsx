@@ -313,7 +313,9 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                 className="font-semibold text-xl text-neutral-700 px-1 border-transparent hover:border-input focus:border-input transition bg-transparent focus:bg-white w-[95%]"
                             />
                         </form>
-                        <p className="text-sm text-neutral-500 mt-1 px-1">in list <span className="underline">Current List</span></p>
+                        <p className="text-sm text-neutral-500 mt-1 px-1">
+                            in list <span className="underline">{fetchedLists.find(l => l.id === data.listId)?.title || "..."}</span>
+                        </p>
                     </div>
                 </div>
 
