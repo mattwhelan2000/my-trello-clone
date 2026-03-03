@@ -15,6 +15,11 @@ import { deleteLabel } from "@/actions/delete-label";
 import { createComment } from "@/actions/create-comment";
 import { moveCard } from "@/actions/move-card";
 import { format } from "date-fns";
+import { useToast } from "@/components/ui/Toast";
+import { Description } from "./description";
+import { Checklist } from "./checklist";
+import { AttachmentPreview, AttachmentPreviewLarge } from "@/components/ui/AttachmentPreview";
+import { detectFileType, getFileTypeLabel } from "@/lib/file-type-utils";
 import Image from "next/image";
 
 interface CardModalProps {
