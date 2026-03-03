@@ -3,6 +3,7 @@
 import { List } from "@prisma/client";
 import { ListItem } from "./ListItem";
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
     DndContext,
     DragEndEvent,
@@ -35,9 +36,11 @@ export const ListContainer = ({
     const [searchQuery, setSearchQuery] = useState("");
     const searchInputRef = useRef<ElementRef<"input">>(null);
 
+    const router = useRouter();
     const { execute: executeUpdateListOrder } = useAction(updateListOrder, {
         onSuccess: () => {
             console.log("List order updated successfully on server.");
+            router.refresh();
         },
         onError: (error) => {
             console.error(error);
@@ -47,6 +50,7 @@ export const ListContainer = ({
     const { execute: executeUpdateCardOrder } = useAction(updateCardOrder, {
         onSuccess: () => {
             console.log("Card order updated successfully on server.");
+            router.refresh();
         },
         onError: (error) => {
             console.error(error);
@@ -89,6 +93,7 @@ export const ListContainer = ({
     const { execute: executeCreateList, isLoading: isListLoading } = useAction(createList, {
         onSuccess: () => {
             disableEditing();
+            router.refresh();
         },
         onError: (error) => {
             console.error(error);

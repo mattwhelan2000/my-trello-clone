@@ -82,6 +82,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const { execute: executeCreateChecklist } = useAction(createChecklist, {
         onSuccess: (responseData: any) => {
             // Checklist created
+            router.refresh();
         },
         onError: (error) => {
             console.error(error);
@@ -92,6 +93,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onSuccess: (responseData: any) => {
             setIsAddingImage(false);
             if (imageInputRef.current) imageInputRef.current.value = "";
+            router.refresh();
         },
         onError: (error) => {
             console.error(error);
@@ -101,6 +103,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const { execute: executeUpdateAttachmentCover } = useAction(updateAttachmentCover, {
         onSuccess: () => {
             // Cover updated successfully
+            router.refresh();
         },
         onError: (error) => {
             console.error(error);
@@ -108,7 +111,9 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     });
 
     const { execute: executeDeleteAttachment } = useAction(deleteAttachment, {
-        onSuccess: () => { },
+        onSuccess: () => {
+            router.refresh();
+        },
         onError: (error) => console.error(error)
     });
 
@@ -117,12 +122,15 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
             setIsLabelPickerOpen(false);
             setNewLabelTitle("");
             setSelectedLabelColor("");
+            router.refresh();
         },
         onError: (error) => console.error(error)
     });
 
     const { execute: executeDeleteLabel } = useAction(deleteLabel, {
-        onSuccess: () => { },
+        onSuccess: () => {
+            router.refresh();
+        },
         onError: (error) => console.error(error)
     });
 
@@ -130,6 +138,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onSuccess: () => {
             setCommentText("");
             addToast("Comment added", "success");
+            router.refresh();
         },
         onError: (error) => console.error(error)
     });
@@ -138,6 +147,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onSuccess: () => {
             setIsMovePickerOpen(false);
             addToast("Card moved", "success");
+            router.refresh();
             onClose();
         },
         onError: (error) => console.error(error)

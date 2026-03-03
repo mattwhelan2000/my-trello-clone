@@ -7,6 +7,7 @@ import { CardItem } from "./CardItem";
 import { useState, useRef, ElementRef, KeyboardEventHandler } from "react";
 import { useEventListener, useOnClickOutside } from "usehooks-ts";
 import { Palette, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateList } from "@/actions/update-list";
@@ -29,6 +30,7 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
     const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+    const router = useRouter();
 
     const LIST_COLORS = [
         "#f87171", "#fb923c", "#fbbf24", "#a3e635", "#4ade80",
@@ -44,6 +46,7 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
     const { execute: executeUpdateList, isExecuting: isLoading } = useSafeAction(updateList, {
         onSuccess: () => {
             disableEditing();
+            router.refresh();
         },
         onError: (error) => {
             console.error(error);
@@ -53,16 +56,17 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
     const { execute: executeCreateCard, isLoading: isCardLoading } = useAction(createCard, {
         onSuccess: () => {
             disableCardEditing();
+            router.refresh();
         },
         onError: (error) => {
             console.error(error);
         }
     });
 
-    const { execute: executeDeleteList } = useAction(deleteList);
-    const { execute: executeCopyList } = useAction(copyList);
-    const { execute: executePasteList } = useAction(pasteList);
-    const { execute: executePasteCard } = useAction(pasteCard);
+    const { execute: executeDeleteList } = useAction(deleteList, { onSuccess: () => router.refresh() });
+    const { execute: executeCopyList } = useAction(copyList, { onSuccess: () => router.refresh() });
+    const { execute: executePasteList } = useAction(pasteList, { onSuccess: () => router.refresh() });
+    const { execute: executePasteCard } = useAction(pasteCard, { onSuccess: () => router.refresh() });
 
     const enableEditing = () => {
         setIsEditing(true);
