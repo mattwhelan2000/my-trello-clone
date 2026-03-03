@@ -1,8 +1,9 @@
 "use client";
 
 import { Modal } from "@/components/modals/Modal";
-import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X } from "lucide-react";
 import { useState, useRef, ElementRef, useEffect } from "react";
+import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAction } from "@/hooks/use-action";
 import { updateCard } from "@/actions/update-card";
 import { createAttachment } from "@/actions/create-attachment";
@@ -44,6 +45,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const inputRef = useRef<ElementRef<"input">>(null);
     const imageInputRef = useRef<ElementRef<"input">>(null);
     const { addToast } = useToast();
+    const router = useRouter();
 
     // Fetch lists for move-card dropdown when modal opens
     useEffect(() => {
@@ -69,9 +71,10 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onSuccess: (responseData: any) => {
             setTitle(responseData.title || title);
             inputRef.current?.blur();
+            router.refresh(); // Hard refresh to force ListContainer to sync orderedData from DB
         },
         onError: (error) => {
-            console.error(error);
+            console.error("Update Card Error: ", error);
         }
     });
 
@@ -314,7 +317,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                             />
                         </form>
                         <p className="text-sm text-neutral-500 mt-1 px-1">
-                            in list <span className="underline">{fetchedLists.find(l => l.id === data.listId)?.title || "..."}</span>
+                            in list <span className="underline">{fetchedLists.find((l: any) => l.id === data.listId)?.title || "..."}</span>
                         </p>
                     </div>
                 </div>
@@ -541,7 +544,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                             <div>
                                                 <div className="text-xs font-semibold mb-2 text-neutral-600 w-full text-left">Existing labels</div>
                                                 <div className="flex flex-col gap-y-1">
-                                                    {boardLabels.map((label) => {
+                                                    {boardLabels.map((label: any) => {
                                                         const isAlreadyOnCard = data.labels?.some((l: any) => l.title === label.title && l.color === label.color);
                                                         if (isAlreadyOnCard) return null;
 

@@ -154,8 +154,8 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 ref={setNodeRef}
                 style={{
                     ...style,
-                    backgroundColor: data.color || "#ffffff",
-                    color: data.fontColor || "#172b4d"
+                    backgroundColor: data.color ? data.color : "#ffffff",
+                    color: data.fontColor ? data.fontColor : "#172b4d"
                 }}
                 className="opacity-30 border-2 border-neutral-500 truncate py-2 px-3 text-sm rounded-md shadow-sm"
             >
@@ -169,9 +169,9 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
             <div
                 ref={setNodeRef}
                 style={{
-                    ...style,
-                    backgroundColor: data.color || "#ffffff",
-                    color: data.fontColor || "#172b4d"
+                    backgroundColor: data.color ? data.color : "#ffffff",
+                    color: data.fontColor ? data.fontColor : "#172b4d",
+                    ...style
                 }}
                 {...attributes}
                 {...listeners}
