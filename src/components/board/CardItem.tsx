@@ -230,7 +230,7 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                         >
 
                             {data.dueDate && (
-                                <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isPastDue ? 'bg-red-900/40 text-red-400' : isDueSoon ? 'bg-yellow-900/40 text-yellow-400' : 'bg-neutral-800'}`}>
+                                <div className={`flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm ${isPastDue ? 'bg-red-500/20 text-red-700' : isDueSoon ? 'bg-yellow-500/20 text-yellow-700' : 'bg-neutral-200 text-neutral-600'}`}>
                                     <Clock className="h-3 w-3" />
                                     <span>{formattedDueDate}</span>
                                 </div>

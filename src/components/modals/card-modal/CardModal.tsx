@@ -14,11 +14,7 @@ import { createLabel } from "@/actions/create-label";
 import { deleteLabel } from "@/actions/delete-label";
 import { createComment } from "@/actions/create-comment";
 import { moveCard } from "@/actions/move-card";
-import { useToast } from "@/components/ui/Toast";
-import { Description } from "./description";
-import { Checklist } from "./checklist";
-import { AttachmentPreview, AttachmentPreviewLarge } from "@/components/ui/AttachmentPreview";
-import { detectFileType, getFileTypeLabel } from "@/lib/file-type-utils";
+import { format } from "date-fns";
 import Image from "next/image";
 
 interface CardModalProps {
@@ -316,9 +312,25 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                 className="font-semibold text-xl text-neutral-700 px-1 border-transparent hover:border-input focus:border-input transition bg-transparent focus:bg-white w-[95%]"
                             />
                         </form>
-                        <p className="text-sm text-neutral-500 mt-1 px-1">
-                            in list <span className="underline">{fetchedLists.find((l: any) => l.id === data.listId)?.title || "..."}</span>
-                        </p>
+                        <div className="flex items-center gap-x-6 mt-1 px-1">
+                            <p className="text-sm text-neutral-500">
+                                in list <span className="underline">{fetchedLists.find((l: any) => l.id === data.listId)?.title || "..."}</span>
+                            </p>
+                            {optimisticDueDate && (
+                                <div className="flex flex-col gap-y-1">
+                                    <h3 className="text-xs font-semibold text-neutral-500 uppercase">Due Date</h3>
+                                    <div className="flex items-center gap-x-2">
+                                        <div className={`flex items-center gap-x-2 px-3 py-1.5 rounded-sm text-sm font-medium ${new Date(optimisticDueDate) < new Date() ? 'bg-red-500/20 text-red-700' : 'bg-[#e9eaec] text-neutral-700'}`}>
+                                            <Clock className="h-4 w-4" />
+                                            {format(new Date(optimisticDueDate), "MMM d 'at' h:mm a")}
+                                            {new Date(optimisticDueDate) < new Date() && (
+                                                <span className="ml-2 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-sm uppercase">Overdue</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
