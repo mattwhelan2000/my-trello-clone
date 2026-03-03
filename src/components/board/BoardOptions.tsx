@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Image as ImageIcon, Palette, X, Download, Info } from "lucide-react";
+import { Settings, Image as ImageIcon, Palette, X, Download, Info, LayoutList, CreditCard } from "lucide-react";
 import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
@@ -10,6 +10,8 @@ import { useToast } from "@/components/ui/Toast";
 
 interface BoardOptionsProps {
     boardId: string;
+    listsCount: number;
+    cardsCount: number;
 }
 
 const COLORS = [
@@ -39,7 +41,7 @@ function boardToCSV(board: any): string {
     return rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
 }
 
-export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
+export const BoardOptions = ({ boardId, listsCount, cardsCount }: BoardOptionsProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
@@ -102,6 +104,17 @@ export const BoardOptions = ({ boardId }: BoardOptionsProps) => {
 
     return (
         <div className="absolute top-4 right-4 z-[50] flex items-center gap-x-2">
+            <div className="hidden md:flex items-center gap-x-4 bg-black/40 text-white rounded-md px-4 py-1.5 text-sm font-medium backdrop-blur-md shadow-sm border border-white/20 mr-2 font-mono">
+                <div className="flex items-center gap-x-1.5" title="Total Lists">
+                    <LayoutList className="h-4 w-4 opacity-80" />
+                    <span>{listsCount}</span>
+                </div>
+                <div className="w-[1px] h-4 bg-white/20" />
+                <div className="flex items-center gap-x-1.5" title="Total Cards">
+                    <CreditCard className="h-4 w-4 opacity-80" />
+                    <span>{cardsCount}</span>
+                </div>
+            </div>
             <button
                 onClick={() => {
                     setIsInfoOpen(!isInfoOpen);

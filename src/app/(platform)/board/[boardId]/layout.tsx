@@ -35,6 +35,14 @@ export default async function BoardIdLayout({
         notFound();
     }
 
+    const listsCount = await db.list.count({
+        where: { boardId: p.boardId }
+    });
+
+    const cardsCount = await db.card.count({
+        where: { list: { boardId: p.boardId } }
+    });
+
     return (
         <div
             className="relative min-h-screen"
@@ -52,7 +60,7 @@ export default async function BoardIdLayout({
             )}
             <div className="fixed inset-0 bg-black/10 z-0" />
             <div className="relative z-10 min-h-screen">
-                <BoardOptions boardId={board.id} />
+                <BoardOptions boardId={board.id} listsCount={listsCount} cardsCount={cardsCount} />
                 <main className="relative pt-24 min-h-[calc(100vh-6rem)]">{children}</main>
             </div>
         </div>
