@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { actionClient } from "@/lib/create-safe-action";
 import { CloneCardSchema } from "./schema";
-import { v4 as uuidv4 } from "uuid";
+import crypto from "crypto";
 
 export const cloneCard = actionClient
     .schema(CloneCardSchema)
@@ -17,7 +17,7 @@ export const cloneCard = actionClient
 
             let syncGroupId = cardToCopy.syncGroupId;
             if (!syncGroupId) {
-                syncGroupId = uuidv4();
+                syncGroupId = crypto.randomUUID();
                 // Update original card with new sync group
                 await db.card.update({
                     where: { id },
