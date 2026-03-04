@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CardItem } from "./CardItem";
-import { useState, useRef, ElementRef, KeyboardEventHandler } from "react";
+import { useState, useRef, ElementRef, KeyboardEventHandler, useCallback } from "react";
 import { useEventListener, useOnClickOutside } from "usehooks-ts";
 import { Palette, X } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -42,7 +42,43 @@ export const ListItem = ({
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
     const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+    const [isResizing, setIsResizing] = useState(false);
+    const resizeStartY = useRef(0);
+    const resizeStartHeight = useRef(600);
     const router = useRouter();
+
+    const listHeightKey = `board_list_height_${data.boardId}`;
+
+    const onResizeMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const currentHeight = parseInt(
+            getComputedStyle(document.documentElement).getPropertyValue("--list-max-height") || "600",
+            10
+        );
+        resizeStartY.current = e.clientY;
+        resizeStartHeight.current = currentHeight;
+        setIsResizing(true);
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+            const delta = moveEvent.clientY - resizeStartY.current;
+            const newHeight = Math.max(200, resizeStartHeight.current + delta);
+            document.documentElement.style.setProperty("--list-max-height", `${newHeight}px`);
+        };
+
+        const onMouseUp = (upEvent: MouseEvent) => {
+            const delta = upEvent.clientY - resizeStartY.current;
+            const newHeight = Math.max(200, resizeStartHeight.current + delta);
+            document.documentElement.style.setProperty("--list-max-height", `${newHeight}px`);
+            localStorage.setItem(listHeightKey, String(newHeight));
+            setIsResizing(false);
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+        };
+
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+    }, [listHeightKey]);
 
     const LIST_COLORS = [
         "#f87171", "#fb923c", "#fbbf24", "#a3e635", "#4ade80",
@@ -459,6 +495,15 @@ export const ListItem = ({
                             + Add a card
                         </button>
                     )}
+                </div>
+
+                {/* Resize Handle */}
+                <div
+                    onMouseDown={onResizeMouseDown}
+                    className={`w-full h-3 flex items-center justify-center cursor-ns-resize group rounded-b-md transition-colors ${isResizing ? 'bg-blue-500/40' : 'hover:bg-black/20'}`}
+                    title="Drag to resize all lists"
+                >
+                    <div className={`w-8 h-0.5 rounded-full transition-colors ${isResizing ? 'bg-blue-400' : 'bg-black/20 group-hover:bg-white/60'}`} />
                 </div>
             </div>
         </li>

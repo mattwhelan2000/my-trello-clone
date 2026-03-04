@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { BoardOptions } from "@/components/board/BoardOptions";
+import { BoardEnhancements } from "@/components/board/BoardEnhancements";
 
 export async function generateMetadata({
     params,
@@ -58,8 +59,9 @@ export default async function BoardIdLayout({
                     style={{ position: 'fixed' }}
                 />
             )}
-            <div className="fixed inset-0 bg-black/50 z-0" />
+            <div id="board-overlay" className="fixed inset-0 z-0" />
             <div className="relative z-10 min-h-screen">
+                <BoardEnhancements boardId={board.id} />
                 <BoardOptions boardId={board.id} listsCount={listsCount} cardsCount={cardsCount} />
                 <main className="relative pt-24 min-h-[calc(100vh-6rem)]">{children}</main>
             </div>
