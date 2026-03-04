@@ -296,7 +296,7 @@ export const ListContainer = ({
                                         ref={inputRef}
                                         name="title"
                                         id="title"
-                                        className="text-sm px-2 py-1 font-medium border-transparent hover:border-input focus:border-input transition w-full outline-none"
+                                        className="text-sm px-2 py-1 font-medium border-transparent hover:border-input focus:border-input transition w-full outline-none text-black bg-white"
                                         placeholder="Enter list title..."
                                     />
                                     <div className="flex items-center gap-x-1">

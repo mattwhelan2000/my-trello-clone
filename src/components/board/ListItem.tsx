@@ -4,7 +4,8 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CardItem } from "./CardItem";
-import { useState, useRef, ElementRef, KeyboardEventHandler, useCallback } from "react";
+import { useState, useRef, ElementRef, KeyboardEventHandler, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useEventListener, useOnClickOutside } from "usehooks-ts";
 import { Palette, X } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -35,6 +36,11 @@ export const ListItem = ({
     const formRef = useRef<ElementRef<"form">>(null);
     const inputRef = useRef<ElementRef<"input">>(null);
 
+    // Sync local title state whenever the server data changes
+    useEffect(() => {
+        setTitle(data.title);
+    }, [data.title]);
+
     const [isEditingCard, setIsEditingCard] = useState(false);
     const cardFormRef = useRef<ElementRef<"form">>(null);
     const cardInputRef = useRef<ElementRef<"textarea">>(null);
@@ -42,7 +48,10 @@ export const ListItem = ({
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
     const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+    const [mounted, setMounted] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
+
+    useEffect(() => { setMounted(true); }, []);
     const resizeStartY = useRef(0);
     const resizeStartHeight = useRef(600);
     const router = useRouter();
@@ -194,11 +203,17 @@ export const ListItem = ({
         const formData = new FormData(e.currentTarget);
         const newTitle = formData.get("title") as string;
 
-        if (newTitle === data.title || !newTitle) {
+        if (!newTitle || !newTitle.trim()) {
             return disableEditing();
         }
 
-        executeUpdateList({ title: newTitle, id: data.id, boardId: data.boardId });
+        if (newTitle.trim() === title) {
+            return disableEditing();
+        }
+
+        // Optimistically set title in local state so it doesn't flicker
+        setTitle(newTitle.trim());
+        executeUpdateList({ title: newTitle.trim(), id: data.id, boardId: data.boardId });
     };
 
     const onBgColorSelect = (color: string) => {
@@ -433,22 +448,23 @@ export const ListItem = ({
                     </div>
                 )}
 
-                {contextMenu && (
-                    <>
-                        <div className="fixed inset-0 z-40" onClick={handleMenuClose} onContextMenu={(e) => { e.preventDefault(); handleMenuClose(); }} />
+                {contextMenu && mounted && createPortal(
+                    <div style={{ pointerEvents: 'auto' }}>
+                        <div className="fixed inset-0 z-[60]" onClick={handleMenuClose} onContextMenu={(e) => { e.preventDefault(); handleMenuClose(); }} />
                         <div
-                            className="fixed z-50 bg-white border border-neutral-200 shadow-xl rounded-md py-1.5 w-48 text-sm text-neutral-800"
+                            className="fixed z-[70] bg-[#1a1a1a] border border-neutral-800 shadow-xl rounded-md py-1.5 w-48 text-sm text-neutral-200"
                             style={{ top: contextMenu.y, left: contextMenu.x }}
                         >
-                            <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b mb-1 uppercase tracking-wider">List Actions</span>
-                            <button onClick={onDeleteList} className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 transition text-red-600 font-medium">Delete List</button>
-                            <button onClick={onDuplicateList} className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 transition">Duplicate List</button>
-                            <div className="border-t my-1"></div>
-                            <button onClick={onCopyList} className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 transition">Copy List</button>
-                            <button onClick={onPasteList} className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 transition">Paste List</button>
-                            <button onClick={onPasteCard} className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 transition">Paste Card Here</button>
+                            <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b border-neutral-800 mb-1 uppercase tracking-wider">List Actions</span>
+                            <button onClick={(e) => { e.stopPropagation(); onDeleteList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-red-500 font-medium">Delete List</button>
+                            <button onClick={(e) => { e.stopPropagation(); onDuplicateList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Duplicate List</button>
+                            <div className="border-t border-neutral-800 my-1"></div>
+                            <button onClick={(e) => { e.stopPropagation(); onCopyList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Copy List</button>
+                            <button onClick={(e) => { e.stopPropagation(); onPasteList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste List</button>
+                            <button onClick={(e) => { e.stopPropagation(); onPasteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste Card Here</button>
                         </div>
-                    </>
+                    </div>,
+                    document.body
                 )}
 
                 {/* Cards Wrapper */}
