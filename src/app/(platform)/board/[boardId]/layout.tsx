@@ -58,7 +58,7 @@ export default async function BoardIdLayout({
                     style={{ position: 'fixed' }}
                 />
             )}
-            <div className="fixed inset-0 bg-black/10 z-0" />
+            <div className="fixed inset-0 bg-black/50 z-0" />
             <div className="relative z-10 min-h-screen">
                 <BoardOptions boardId={board.id} listsCount={listsCount} cardsCount={cardsCount} />
                 <main className="relative pt-24 min-h-[calc(100vh-6rem)]">{children}</main>

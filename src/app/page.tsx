@@ -11,8 +11,8 @@ export default async function HomePage() {
   });
 
   return (
-    <div className="pt-24 px-4 max-w-6xl mx-auto md:px-6 h-full pb-10">
-      <div className="flex items-center gap-x-2 font-semibold text-lg text-neutral-700 mb-6">
+    <div className="pt-24 px-4 max-w-6xl mx-auto md:px-6 min-h-full pb-10 bg-neutral-900 text-white">
+      <div className="flex items-center gap-x-2 font-semibold text-lg text-neutral-200 mb-6">
         <LayoutDashboard className="h-6 w-6" />
         Your Boards
       </div>

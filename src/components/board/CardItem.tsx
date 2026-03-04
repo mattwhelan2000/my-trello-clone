@@ -9,6 +9,8 @@ import { useAction } from "@/hooks/use-action";
 import { deleteCard } from "@/actions/delete-card";
 import { copyCard } from "@/actions/copy-card";
 import { pasteCard } from "@/actions/paste-card";
+import { cloneCard } from "@/actions/clone-card";
+import { decloneCard } from "@/actions/declone-card";
 import { AlignLeft, CheckSquare, Clock, Paperclip, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 
@@ -50,6 +52,8 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
     const { execute: executeDeleteCard } = useAction(deleteCard);
     const { execute: executeCopyCard } = useAction(copyCard);
     const { execute: executePasteCard } = useAction(pasteCard);
+    const { execute: executeCloneCard } = useAction(cloneCard);
+    const { execute: executeDecloneCard } = useAction(decloneCard);
 
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -72,6 +76,16 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
 
     const onDuplicateCard = () => {
         executeCopyCard({ id: data.id, boardId });
+        handleMenuClose();
+    };
+
+    const onCloneCard = () => {
+        executeCloneCard({ id: data.id, boardId });
+        handleMenuClose();
+    };
+
+    const onDecloneCard = () => {
+        executeDecloneCard({ id: data.id, boardId });
         handleMenuClose();
     };
 
@@ -299,6 +313,10 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                         <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b border-neutral-800 mb-1 uppercase tracking-wider">Card Actions</span>
                         <button onClick={(e) => { e.stopPropagation(); onDeleteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-red-500 font-medium">Delete Card</button>
                         <button onClick={(e) => { e.stopPropagation(); onDuplicateCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Duplicate Card</button>
+                        <button onClick={(e) => { e.stopPropagation(); onCloneCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Clone Card</button>
+                        {data.syncGroupId && (
+                            <button onClick={(e) => { e.stopPropagation(); onDecloneCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-yellow-500">Declone Card</button>
+                        )}
                         <div className="border-t border-neutral-800 my-1"></div>
                         <button onClick={(e) => { e.stopPropagation(); onCopyCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Copy Card</button>
                         <button onClick={(e) => { e.stopPropagation(); onPasteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste Card</button>

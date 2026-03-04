@@ -17,7 +17,19 @@ import { copyList } from "@/actions/copy-list";
 import { pasteList } from "@/actions/paste-list";
 import { pasteCard } from "@/actions/paste-card";
 
-export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: number; searchQuery?: string }) => {
+export const ListItem = ({
+    data,
+    index,
+    searchQuery = "",
+    searchCards = true,
+    searchLists = true
+}: {
+    data: any;
+    index: number;
+    searchQuery?: string;
+    searchCards?: boolean;
+    searchLists?: boolean;
+}) => {
     const [title, setTitle] = useState(data.title);
     const [isEditing, setIsEditing] = useState(false);
     const formRef = useRef<ElementRef<"form">>(null);
@@ -224,10 +236,17 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
         transition,
     };
 
+    const isListMatch = !searchQuery.trim() || (searchLists && data.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const hasMatchingCards = !searchQuery.trim() || (searchCards && data.cards?.some((card: any) =>
+        card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (card.description && card.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    ));
+    const showList = isListMatch || hasMatchingCards;
+
     return (
         <li
             ref={setNodeRef}
-            style={style}
+            style={{ ...style, display: showList ? 'block' : 'none' }}
             {...attributes}
             className={`shrink-0 h-full w-[272px] select-none ${isDragging ? "opacity-30" : ""}`}
         >
@@ -235,7 +254,7 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
                 className="w-full rounded-md text-black shadow-md pb-2 relative transition-colors flex flex-col"
-                style={{ backgroundColor: data.color ? data.color : '#f1f2f4', maxHeight: '600px' }}
+                style={{ backgroundColor: data.color ? data.color : '#f1f2f4', maxHeight: 'var(--list-max-height)' }}
             >
                 {/* List Header */}
                 <div
@@ -403,11 +422,12 @@ export const ListItem = ({ data, index, searchQuery = "" }: { data: any; index: 
                 >
                     <ol className="mx-1 px-1 py-2 flex flex-col gap-y-2 mt-2 min-h-[2px] flex-1 overflow-y-scroll">
                         {data.cards.map((card: any, idx: number) => {
-                            const matchesSearch = !searchQuery.trim() ||
+                            const matchesCardSearch = !searchQuery.trim() || isListMatch || (searchCards && (
                                 card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                (card.description && card.description.toLowerCase().includes(searchQuery.toLowerCase()));
+                                (card.description && card.description.toLowerCase().includes(searchQuery.toLowerCase()))
+                            ));
                             return (
-                                <div key={card.id} style={{ display: matchesSearch ? 'block' : 'none' }}>
+                                <div key={card.id} style={{ display: matchesCardSearch ? 'block' : 'none' }}>
                                     <CardItem index={idx} data={card} boardId={data.boardId} />
                                 </div>
                             );

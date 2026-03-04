@@ -9,15 +9,35 @@ export const updateCard = actionClient
     .schema(UpdateCardSchema)
     .action(async ({ parsedInput: { id, title, boardId, color, fontColor, dueDate } }) => {
         try {
-            const card = await db.card.update({
+            const existingCard = await db.card.findUnique({
                 where: { id },
-                data: {
-                    title,
-                    ... (color !== undefined && { color }),
-                    ... (fontColor !== undefined && { fontColor }),
-                    ... (dueDate !== undefined && { dueDate }),
-                },
+                select: { syncGroupId: true }
             });
+
+            if (!existingCard) return { error: "Card not found" };
+
+            const dataToUpdate = {
+                ...(title !== undefined && { title }),
+                ...(color !== undefined && { color }),
+                ...(fontColor !== undefined && { fontColor }),
+                ...(dueDate !== undefined && { dueDate }),
+            };
+
+            let card;
+            if (existingCard.syncGroupId) {
+                // Update all synced cards
+                await db.card.updateMany({
+                    where: { syncGroupId: existingCard.syncGroupId },
+                    data: dataToUpdate,
+                });
+                // Fetch the updated card to return
+                card = await db.card.findUnique({ where: { id } });
+            } else {
+                card = await db.card.update({
+                    where: { id },
+                    data: dataToUpdate,
+                });
+            }
 
             revalidatePath(`/board/${boardId}`);
             return card;

@@ -56,6 +56,7 @@ model Card {
   dueDate     DateTime?
   color       String?
   fontColor   String?
+  syncGroupId String?
   labels      Label[]
   checklists  Checklist[]
   attachments Attachment[]

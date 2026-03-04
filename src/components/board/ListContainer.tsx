@@ -34,6 +34,8 @@ export const ListContainer = ({
 }) => {
     const [orderedData, setOrderedData] = useState(data);
     const [searchQuery, setSearchQuery] = useState("");
+    const [searchCards, setSearchCards] = useState(true);
+    const [searchLists, setSearchLists] = useState(true);
     const searchInputRef = useRef<ElementRef<"input">>(null);
 
     const router = useRouter();
@@ -248,13 +250,38 @@ export const ListContainer = ({
                                 placeholder='Search cards... ("/")'
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="text-sm pl-8 pr-3 py-1.5 rounded-md bg-black/30 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 outline-none focus:bg-black/50 focus:border-white/40 w-56 transition shadow-lg"
+                                className="text-sm pl-8 pr-16 py-1.5 rounded-md bg-black/30 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 outline-none focus:bg-black/50 focus:border-white/40 w-64 transition shadow-lg"
                             />
+                            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-x-1">
+                                <button
+                                    onClick={() => setSearchCards(!searchCards)}
+                                    title="Toggle Card search"
+                                    className={`text-[10px] font-bold h-5 w-5 rounded flex items-center justify-center transition border ${searchCards ? 'bg-white/20 border-white/40 text-white' : 'bg-transparent border-white/10 text-white/30 hover:border-white/20'}`}
+                                >
+                                    C
+                                </button>
+                                <button
+                                    onClick={() => setSearchLists(!searchLists)}
+                                    title="Toggle List search"
+                                    className={`text-[10px] font-bold h-5 w-5 rounded flex items-center justify-center transition border ${searchLists ? 'bg-white/20 border-white/40 text-white' : 'bg-transparent border-white/10 text-white/30 hover:border-white/20'}`}
+                                >
+                                    L
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <ol className="flex gap-x-3 h-full">
                         {orderedData.map((list, index) => {
-                            return <ListItem key={list.id} index={index} data={list} searchQuery={searchQuery} />;
+                            return (
+                                <ListItem
+                                    key={list.id}
+                                    index={index}
+                                    data={list}
+                                    searchQuery={searchQuery}
+                                    searchCards={searchCards}
+                                    searchLists={searchLists}
+                                />
+                            );
                         })}
 
                         {/* Add New List Button/Form */}
