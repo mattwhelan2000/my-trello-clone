@@ -1,9 +1,40 @@
+"use client";
+
 import Link from "next/link";
 import { LayoutDashboard, Plus } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 
 export const Navbar = () => {
+    const pathname = usePathname();
+    const boardIdMatch = pathname?.match(/\/board\/([^/]+)/);
+    const boardId = boardIdMatch ? boardIdMatch[1] : null;
+
+    const bgOpacityKey = boardId ? `board_bg_opacity_${boardId}` : null;
+
+    const [bgOpacity, setBgOpacity] = useState(0.25);
+    const [isOnBoard, setIsOnBoard] = useState(false);
+
+    useEffect(() => {
+        setIsOnBoard(!!boardId);
+        if (bgOpacityKey) {
+            const saved = localStorage.getItem(bgOpacityKey);
+            const val = saved !== null ? parseFloat(saved) : 0.25;
+            setBgOpacity(val);
+            document.documentElement.style.setProperty("--board-overlay-opacity", String(val));
+        }
+    }, [bgOpacityKey, boardId]);
+
+    const onOpacityChange = useCallback((val: number) => {
+        setBgOpacity(val);
+        document.documentElement.style.setProperty("--board-overlay-opacity", String(val));
+        if (bgOpacityKey) {
+            localStorage.setItem(bgOpacityKey, String(val));
+        }
+    }, [bgOpacityKey]);
+
     return (
-        <nav className="fixed z-50 top-0 px-4 w-full h-14 border-b shadow-sm bg-white flex items-center">
+        <nav className="fixed z-50 top-0 px-4 w-full h-14 border-b border-white/10 shadow-sm bg-black/60 backdrop-blur-sm flex items-center">
             <div className="flex items-center gap-x-4">
                 <div className="hidden md:flex">
                     <Link href="/">
@@ -11,7 +42,7 @@ export const Navbar = () => {
                             <div className="bg-blue-600 p-1 rounded-sm">
                                 <LayoutDashboard className="h-5 w-5 text-white" />
                             </div>
-                            <p className="text-lg text-neutral-700 font-bold pb-1 text-center">
+                            <p className="text-lg text-white font-bold pb-1 text-center">
                                 Trello Clone
                             </p>
                         </div>
@@ -26,8 +57,23 @@ export const Navbar = () => {
                     </button>
                 </Link>
             </div>
-            <div className="ml-auto flex items-center gap-x-2">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold cursor-pointer">
+            <div className="ml-auto flex items-center gap-x-3">
+                {isOnBoard && (
+                    <div className="flex items-center gap-x-2">
+                        <span className="text-white/60 text-xs font-medium whitespace-nowrap">BG Opacity</span>
+                        <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={bgOpacity}
+                            onChange={(e) => onOpacityChange(parseFloat(e.target.value))}
+                            className="w-24 h-1.5 accent-white cursor-pointer"
+                        />
+                        <span className="text-white/50 text-xs w-7 text-right">{Math.round(bgOpacity * 100)}%</span>
+                    </div>
+                )}
+                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold cursor-pointer text-sm">
                     U
                 </div>
             </div>
