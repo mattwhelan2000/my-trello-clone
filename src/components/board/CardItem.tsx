@@ -13,6 +13,8 @@ import { cloneCard } from "@/actions/clone-card";
 import { decloneCard } from "@/actions/declone-card";
 import { AlignLeft, CheckSquare, Clock, Paperclip, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
+import { detectFileType } from "@/lib/file-type-utils";
+import { MiniAudioPlayer } from "@/components/ui/MiniAudioPlayer";
 
 const renderTitleWithLinks = (titleText: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -149,6 +151,11 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
     const comments = data.activities ? data.activities.slice().reverse() : [];
     const hasComments = comments.length > 0;
 
+    // First audio link attachment (if any)
+    const audioAttachment = data.attachments?.find(
+        (a: any) => a.type === "LINK" && detectFileType(a.url) === "audio"
+    ) ?? null;
+
     let isPastDue = false;
     let isDueSoon = false;
     let formattedDueDate = "";
@@ -228,6 +235,11 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                     <div className="w-full font-medium break-words" style={{ color: data.fontColor || "#172b4d" }}>
                         {renderTitleWithLinks(data.title)}
                     </div>
+
+                    {/* MINI AUDIO PLAYER */}
+                    {audioAttachment && (
+                        <MiniAudioPlayer url={audioAttachment.url} title={audioAttachment.title} />
+                    )}
 
                     {/* DESCRIPTION */}
                     {hasDescription && (
