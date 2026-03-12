@@ -183,6 +183,20 @@ export const MiniAudioPlayer = ({ url, title }: MiniAudioPlayerProps) => {
                     ))}
                 </div>
             )}
+            {/* Direct link for easy copy/paste */}
+            <div className="px-2.5 pb-2">
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="text-[10px] text-purple-400/70 hover:text-purple-300 transition underline underline-offset-2"
+                >
+                    ↗ Link
+                </a>
+            </div>
             <style>{`
                 @keyframes miniWave {
                     from { transform: scaleY(0.3); opacity: 0.4; }
