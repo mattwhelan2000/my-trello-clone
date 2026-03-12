@@ -11,7 +11,7 @@ import { copyCard } from "@/actions/copy-card";
 import { pasteCard } from "@/actions/paste-card";
 import { cloneCard } from "@/actions/clone-card";
 import { decloneCard } from "@/actions/declone-card";
-import { AlignLeft, CheckSquare, Clock, Paperclip, MessageSquare } from "lucide-react";
+import { AlignLeft, CheckSquare, Clock, Paperclip, MessageSquare, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { detectFileType } from "@/lib/file-type-utils";
 import { MiniAudioPlayer } from "@/components/ui/MiniAudioPlayer";
@@ -156,6 +156,11 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
         (a: any) => a.type === "LINK" && detectFileType(a.url) === "audio"
     ) ?? null;
 
+    // All non-audio LINK attachments (shown as clickable chips)
+    const linkAttachments: any[] = (data.attachments ?? []).filter(
+        (a: any) => a.type === "LINK" && detectFileType(a.url) !== "audio"
+    );
+
     let isPastDue = false;
     let isDueSoon = false;
     let formattedDueDate = "";
@@ -239,6 +244,36 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                     {/* MINI AUDIO PLAYER */}
                     {audioAttachment && (
                         <MiniAudioPlayer url={audioAttachment.url} title={audioAttachment.title} />
+                    )}
+
+                    {/* LINK CHIPS — clickable for any non-audio URL attachment */}
+                    {linkAttachments.length > 0 && (
+                        <div
+                            className="flex flex-col gap-y-1 mt-1"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            {linkAttachments.map((link: any) => (
+                                <a
+                                    key={link.id}
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-x-1.5 px-2 py-1 rounded-md bg-black/10 hover:bg-black/20 transition text-[11px] font-medium truncate group"
+                                    style={{ color: data.fontColor || "#172b4d" }}
+                                    title={link.url}
+                                >
+                                    <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-60 group-hover:opacity-100" />
+                                    <span className="truncate opacity-80 group-hover:opacity-100">
+                                        {link.title || link.url}
+                                    </span>
+                                </a>
+                            ))}
+                        </div>
                     )}
 
                     {/* DESCRIPTION */}
