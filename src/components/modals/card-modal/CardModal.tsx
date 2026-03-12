@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/Toast";
 import { Description } from "./description";
 import { Checklist } from "./checklist";
 import { AttachmentPreview, AttachmentPreviewLarge } from "@/components/ui/AttachmentPreview";
+import { AudioPlayer } from "@/components/ui/AudioPlayer";
 import { detectFileType, getFileTypeLabel } from "@/lib/file-type-utils";
 import Image from "next/image";
 
@@ -174,8 +175,8 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
 
         if (!url.trim()) return;
 
-        const isImage = url.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/i) || url.includes("dropbox.com");
-        const type = isImage ? "IMAGE" : "LINK";
+        const detectedType = detectFileType(url.trim());
+        const type = (detectedType === "image" || detectedType === "svg") ? "IMAGE" : "LINK";
 
         executeCreateAttachment({ id: data.id, boardId, url: url.trim(), type });
     };
@@ -368,49 +369,69 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                         <h3 className="font-semibold text-neutral-700 mt-1">Attachments</h3>
                                     </div>
                                     <div className="flex flex-col gap-y-3">
-                                        {linkAttachments.map((link: any) => (
-                                            <div key={link.id} className="flex flex-col gap-y-1 w-full">
-                                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full">
-                                                    <AttachmentPreview url={link.url} thumbnailUrl={link.thumbnailUrl} title={link.title} />
-                                                    <div className="flex flex-col min-w-0 pr-2 pb-1">
-                                                        <span className="font-semibold text-sm text-neutral-700 truncate">{link.title || link.url}</span>
-                                                        <span className="text-xs text-neutral-500 truncate mt-1">{getFileTypeLabel(detectFileType(link.url))}</span>
-                                                    </div>
-                                                </a>
-                                                {link.thumbnailUrl && (
-                                                    <div className="flex items-center gap-x-2 px-1 mt-1">
-                                                        {!link.isCover ? (
+                                        {linkAttachments.map((link: any) => {
+                                            const isAudio = detectFileType(link.url) === 'audio';
+
+                                            if (isAudio) {
+                                                return (
+                                                    <div key={link.id} className="flex flex-col gap-y-2 w-full">
+                                                        <AudioPlayer url={link.url} title={link.title} />
+                                                        <div className="flex items-center justify-end px-1">
                                                             <button
-                                                                onClick={() => executeUpdateAttachmentCover({ id: link.id, cardId: data.id, boardId })}
-                                                                className="text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1"
+                                                                onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
+                                                                className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1"
                                                             >
-                                                                <Layout className="w-3 h-3" /> Make Cover
+                                                                <X className="w-3 h-3" /> Delete
                                                             </button>
-                                                        ) : (
-                                                            <button className="text-xs font-medium text-white bg-blue-600 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 cursor-default">
-                                                                <CheckSquare className="w-3 h-3" /> Current Cover
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <div key={link.id} className="flex flex-col gap-y-1 w-full">
+                                                    <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full">
+                                                        <AttachmentPreview url={link.url} thumbnailUrl={link.thumbnailUrl} title={link.title} />
+                                                        <div className="flex flex-col min-w-0 pr-2 pb-1">
+                                                            <span className="font-semibold text-sm text-neutral-700 truncate">{link.title || link.url}</span>
+                                                            <span className="text-xs text-neutral-500 truncate mt-1">{getFileTypeLabel(detectFileType(link.url))}</span>
+                                                        </div>
+                                                    </a>
+                                                    {link.thumbnailUrl && (
+                                                        <div className="flex items-center gap-x-2 px-1 mt-1">
+                                                            {!link.isCover ? (
+                                                                <button
+                                                                    onClick={() => executeUpdateAttachmentCover({ id: link.id, cardId: data.id, boardId })}
+                                                                    className="text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1"
+                                                                >
+                                                                    <Layout className="w-3 h-3" /> Make Cover
+                                                                </button>
+                                                            ) : (
+                                                                <button className="text-xs font-medium text-white bg-blue-600 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 cursor-default">
+                                                                    <CheckSquare className="w-3 h-3" /> Current Cover
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
+                                                                className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 ml-auto"
+                                                            >
+                                                                <X className="w-3 h-3" /> Delete
                                                             </button>
-                                                        )}
-                                                        <button
-                                                            onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
-                                                            className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 ml-auto"
-                                                        >
-                                                            <X className="w-3 h-3" /> Delete
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                {!link.thumbnailUrl && (
-                                                    <div className="flex items-center gap-x-2 px-1 mt-1 justify-end">
-                                                        <button
-                                                            onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
-                                                            className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 ml-auto"
-                                                        >
-                                                            <X className="w-3 h-3" /> Delete
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
+                                                        </div>
+                                                    )}
+                                                    {!link.thumbnailUrl && (
+                                                        <div className="flex items-center gap-x-2 px-1 mt-1 justify-end">
+                                                            <button
+                                                                onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
+                                                                className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 ml-auto"
+                                                            >
+                                                                <X className="w-3 h-3" /> Delete
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>

@@ -2,6 +2,7 @@
 
 import { detectFileType, getFileTypeLabel, FileCategory } from "@/lib/file-type-utils";
 import { FileText, Film, Music, FileSpreadsheet, FileType, Code, File, Globe } from "lucide-react";
+import { AudioPlayer } from "@/components/ui/AudioPlayer";
 
 interface AttachmentPreviewProps {
     url: string;
@@ -161,17 +162,7 @@ export const AttachmentPreviewLarge = ({ url, title }: { url: string; title?: st
             );
 
         case 'audio':
-            return (
-                <div className="w-full rounded-md overflow-hidden bg-purple-50 p-4 flex flex-col items-center gap-y-2 border">
-                    <Music className="h-8 w-8 text-purple-600" />
-                    <audio
-                        src={url}
-                        controls
-                        className="w-full"
-                        preload="metadata"
-                    />
-                </div>
-            );
+            return <AudioPlayer url={url} title={title} />;
 
         case 'office-word':
         case 'office-excel':

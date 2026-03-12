@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutDashboard, Plus } from "lucide-react";
+import { LayoutDashboard, Plus, ChevronLeft } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { usePathname } from "next/navigation";
 
@@ -14,6 +14,7 @@ export const Navbar = () => {
 
     const [bgOpacity, setBgOpacity] = useState(0.25);
     const [isOnBoard, setIsOnBoard] = useState(false);
+    const [boardTitle, setBoardTitle] = useState<string | null>(null);
 
     useEffect(() => {
         setIsOnBoard(!!boardId);
@@ -22,6 +23,14 @@ export const Navbar = () => {
             const val = saved !== null ? parseFloat(saved) : 0.25;
             setBgOpacity(val);
             document.documentElement.style.setProperty("--board-overlay-opacity", String(val));
+        }
+        if (boardId) {
+            fetch(`/api/boards/${boardId}`)
+                .then((res) => res.ok ? res.json() : null)
+                .then((data) => setBoardTitle(data?.title ?? null))
+                .catch(() => setBoardTitle(null));
+        } else {
+            setBoardTitle(null);
         }
     }, [bgOpacityKey, boardId]);
 
@@ -36,6 +45,16 @@ export const Navbar = () => {
     return (
         <nav className="fixed z-50 top-0 px-4 w-full h-14 border-b border-white/10 shadow-sm bg-black/60 backdrop-blur-sm flex items-center">
             <div className="flex items-center gap-x-4">
+                {/* Back / Main Menu button — only shown on board pages */}
+                {isOnBoard && (
+                    <Link href="/">
+                        <button className="flex items-center gap-x-1 text-white/80 hover:text-white hover:bg-white/10 transition px-2 py-1.5 rounded-md text-sm font-medium">
+                            <ChevronLeft className="h-4 w-4" />
+                            <span className="hidden md:block">Main Menu</span>
+                        </button>
+                    </Link>
+                )}
+
                 <div className="hidden md:flex">
                     <Link href="/">
                         <div className="hover:opacity-75 transition items-center gap-x-2 hidden md:flex cursor-pointer">
@@ -43,19 +62,22 @@ export const Navbar = () => {
                                 <LayoutDashboard className="h-5 w-5 text-white" />
                             </div>
                             <p className="text-lg text-white font-bold pb-1 text-center">
-                                Trello Clone
+                                {isOnBoard && boardTitle ? boardTitle : "Trello Clone"}
                             </p>
                         </div>
                     </Link>
                 </div>
-                <Link href="/">
-                    <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition h-auto md:block">
-                        <span className="md:hidden">
-                            <Plus className="h-4 w-4" />
-                        </span>
-                        <span className="hidden md:block">Create</span>
-                    </button>
-                </Link>
+
+                {!isOnBoard && (
+                    <Link href="/">
+                        <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition h-auto md:block">
+                            <span className="md:hidden">
+                                <Plus className="h-4 w-4" />
+                            </span>
+                            <span className="hidden md:block">Create</span>
+                        </button>
+                    </Link>
+                )}
             </div>
             <div className="ml-auto flex items-center gap-x-3">
                 {isOnBoard && (
