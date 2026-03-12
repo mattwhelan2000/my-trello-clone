@@ -14,7 +14,7 @@ function toStreamableUrl(url: string): string {
     if (url.includes("dropbox.com")) {
         return url
             .replace(/[?&]dl=0/, (m) => m.replace("dl=0", "dl=1"))
-            .replace(/[?&]e=\d+/, ""); // strip ?e= param that sometimes blocks
+            .replace(/[?&]e=\d+/, "");
     }
     return url;
 }
@@ -26,12 +26,10 @@ function formatTime(seconds: number): string {
     return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-/** Extract a display-friendly filename from a URL */
 function extractFilename(url: string): string {
     try {
         const pathname = new URL(url).pathname;
         const name = decodeURIComponent(pathname.split("/").pop() || "");
-        // Strip common query-style cruft after the extension
         return name.replace(/\.(mp3|wav|flac|aac|m4a|ogg|wma).*$/i, ".$1").trim() || "Audio";
     } catch {
         return "Audio";
@@ -55,11 +53,9 @@ export const AudioPlayer = ({ url, title, onDelete }: AudioPlayerProps) => {
     const displayTitle = title || extractFilename(url);
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-    // Sync audio events
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
-
         const onTimeUpdate = () => { if (!isDragging) setCurrentTime(audio.currentTime); };
         const onDurationChange = () => setDuration(audio.duration);
         const onEnded = () => setIsPlaying(false);
@@ -110,38 +106,39 @@ export const AudioPlayer = ({ url, title, onDelete }: AudioPlayerProps) => {
         }
     };
 
-    /** Seek based on pointer X position within the timeline bar */
-    const seekFromEvent = useCallback((e: React.MouseEvent | MouseEvent) => {
+    /** Seek to a position based on clientX within the timeline bar */
+    const seekFromClientX = useCallback((clientX: number) => {
         const bar = timelineRef.current;
         const audio = audioRef.current;
         if (!bar || !audio || !duration) return;
         const rect = bar.getBoundingClientRect();
-        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
         const newTime = ratio * duration;
         audio.currentTime = newTime;
         setCurrentTime(newTime);
     }, [duration]);
 
-    const onTimelineMouseDown = (e: React.MouseEvent) => {
+    // --- Pointer events for timeline (works on mouse AND touch/iOS) ---
+    const onTimelinePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
         setIsDragging(true);
-        seekFromEvent(e);
+        seekFromClientX(e.clientX);
     };
 
-    useEffect(() => {
+    const onTimelinePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
         if (!isDragging) return;
-        const onMove = (e: MouseEvent) => seekFromEvent(e);
-        const onUp = (e: MouseEvent) => { seekFromEvent(e); setIsDragging(false); };
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onUp);
-        return () => {
-            window.removeEventListener("mousemove", onMove);
-            window.removeEventListener("mouseup", onUp);
-        };
-    }, [isDragging, seekFromEvent]);
+        seekFromClientX(e.clientX);
+    };
+
+    const onTimelinePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (!isDragging) return;
+        seekFromClientX(e.clientX);
+        setIsDragging(false);
+        e.currentTarget.releasePointerCapture(e.pointerId);
+    };
 
     return (
         <div className="w-full rounded-xl overflow-hidden border border-purple-900/30 bg-gradient-to-br from-[#1a0533] to-[#0f172a] shadow-xl">
-            {/* Hidden audio element */}
             <audio ref={audioRef} src={streamUrl} preload="metadata" />
 
             {/* Top row: icon + title */}
@@ -157,23 +154,25 @@ export const AudioPlayer = ({ url, title, onDelete }: AudioPlayerProps) => {
                 </div>
             </div>
 
-            {/* Timeline */}
+            {/* Timeline — touch-none prevents iOS scroll hijack, pointer events handle both mouse & touch */}
             <div className="px-4 pb-1">
                 <div
                     ref={timelineRef}
-                    onMouseDown={onTimelineMouseDown}
-                    className="relative w-full h-2 rounded-full bg-white/10 cursor-pointer group select-none"
-                    title="Click or drag to seek"
+                    onPointerDown={onTimelinePointerDown}
+                    onPointerMove={onTimelinePointerMove}
+                    onPointerUp={onTimelinePointerUp}
+                    onPointerCancel={() => setIsDragging(false)}
+                    className="relative w-full h-2 rounded-full bg-white/10 cursor-pointer group select-none touch-none"
+                    title="Tap or drag to seek"
                 >
-                    {/* Filled track */}
                     <div
                         className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-[width] duration-75"
                         style={{ width: `${progress}%` }}
                     />
-                    {/* Playhead dot */}
+                    {/* Playhead — always visible (touch users need it visible, not hover-only) */}
                     <div
-                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white shadow-lg shadow-purple-500/50 border border-purple-300 transition-[left] duration-75 opacity-0 group-hover:opacity-100"
-                        style={{ left: `${progress}%` }}
+                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white shadow-lg shadow-purple-500/50 border border-purple-300"
+                        style={{ left: `${progress}%`, transition: isDragging ? "none" : "left 0.075s linear" }}
                     />
                 </div>
             </div>
@@ -184,7 +183,7 @@ export const AudioPlayer = ({ url, title, onDelete }: AudioPlayerProps) => {
                 <button
                     onClick={togglePlay}
                     disabled={loadError}
-                    className="flex-shrink-0 w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition shadow-lg shadow-purple-700/40"
+                    className="flex-shrink-0 w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-500 active:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition shadow-lg shadow-purple-700/40"
                     title={isPlaying ? "Pause" : "Play"}
                 >
                     {isPlaying
@@ -200,13 +199,12 @@ export const AudioPlayer = ({ url, title, onDelete }: AudioPlayerProps) => {
                     {formatTime(duration)}
                 </span>
 
-                {/* Spacer */}
                 <div className="flex-1" />
 
-                {/* Volume */}
+                {/* Volume — hidden on mobile (iOS controls volume via hardware buttons only) */}
                 <button
                     onClick={toggleMute}
-                    className="text-purple-300/70 hover:text-purple-200 transition"
+                    className="text-purple-300/70 hover:text-purple-200 transition hidden sm:block"
                     title={isMuted ? "Unmute" : "Mute"}
                 >
                     {isMuted || volume === 0
@@ -221,7 +219,7 @@ export const AudioPlayer = ({ url, title, onDelete }: AudioPlayerProps) => {
                     step={0.02}
                     value={isMuted ? 0 : volume}
                     onChange={onVolumeChange}
-                    className="w-20 h-1.5 accent-purple-400 cursor-pointer"
+                    className="w-20 h-1.5 accent-purple-400 cursor-pointer hidden sm:block"
                     title="Volume"
                 />
             </div>
@@ -243,7 +241,6 @@ export const AudioPlayer = ({ url, title, onDelete }: AudioPlayerProps) => {
                 </div>
             )}
 
-            {/* Waveform animation keyframes (injected inline) */}
             <style>{`
                 @keyframes audioWave {
                     from { transform: scaleY(0.4); opacity: 0.5; }
