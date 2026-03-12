@@ -767,6 +767,9 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                         />
                                         <button type="submit" disabled={isAttachmentLoading} className="bg-blue-600 text-white rounded-sm text-sm font-medium px-4 py-1.5 hover:bg-blue-700 w-full transition">Attach</button>
                                     </form>
+                                    <p className="text-[10px] text-neutral-400 mt-2 leading-relaxed">
+                                        <span className="font-semibold text-neutral-500">Dropbox Audio Workaround (Unstable):</span> You can sometimes bypass playback issues by changing the URL to <span className="font-mono">dl.dropboxusercontent.com</span> (e.g. replacing <span className="font-mono">://dropbox.com</span> with <span className="font-mono">://dl.dropboxusercontent.com</span> and ensuring the query string includes <span className="font-mono">?raw=1</span>). Not officially supported by Dropbox and may change.
+                                    </p>
                                 </div>
                             )}
                         </div>
