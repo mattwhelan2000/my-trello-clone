@@ -15,11 +15,17 @@ export async function POST(req: NextRequest) {
         const arrayBuffer = await file.arrayBuffer();
         const pdfBuffer = new Uint8Array(arrayBuffer);
 
-        const { text } = await extractText(pdfBuffer, { mergePages: true });
+        // Extract per-page to preserve structure
+        const { text: pages, totalPages } = await extractText(pdfBuffer, { mergePages: false });
+        const text = pages.join('\n');
+
+        console.log("[SCRIPT INGEST] Total pages:", totalPages);
+        console.log("[SCRIPT INGEST] Text length:", text.length);
+        console.log("[SCRIPT INGEST] First 3000 chars:", text.substring(0, 3000));
 
         // Detect color from filename
         const filename = file.name.toUpperCase();
-        let bgColor = "#f8fafc"; // Default White
+        let bgColor = "#f8fafc";
         if (filename.includes("BLUE")) bgColor = "#3b82f6";
         else if (filename.includes("PINK")) bgColor = "#ec4899";
         else if (filename.includes("YELLOW")) bgColor = "#eab308";
@@ -39,7 +45,132 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // Create the DB Board
+        // ========== ROBUST SCENE PARSING ==========
+        // Use global regex on full text to find scene headings regardless of newline formatting.
+        // Standard screenplay scene headings: "INT." or "EXT." or "INT./EXT." or "I/E."
+        // Optionally preceded by a scene number and followed by location - time of day
+        
+        // This regex finds scene headings anywhere in the text, not just at line beginnings
+        const globalSceneRegex = /(?:^|\n)\s*(?:(\d+[A-Z]?)\s+)?(?:(INT\.|EXT\.|INT\.\/EXT\.|INT\/EXT\.|I\/E\.)\s+)([\s\S]*?)(?=(?:\n\s*(?:\d+[A-Z]?\s+)?(?:INT\.|EXT\.|INT\.\/EXT\.|INT\/EXT\.|I\/E\.)\s)|$)/gi;
+
+        // Also try a simpler approach: split the text at scene heading boundaries
+        const sceneHeadingPattern = /(?:(\d+[A-Z]?)\s+)?(INT\.|EXT\.|INT\.\/EXT\.|INT\/EXT\.|I\/E\.)\s+/gi;
+        
+        // Find all scene heading positions
+        const headingPositions: Array<{
+            index: number;
+            sceneNum: string;
+            intExt: string;
+            fullMatch: string;
+        }> = [];
+
+        let headingMatch;
+        while ((headingMatch = sceneHeadingPattern.exec(text)) !== null) {
+            headingPositions.push({
+                index: headingMatch.index,
+                sceneNum: headingMatch[1] || "",
+                intExt: headingMatch[2],
+                fullMatch: headingMatch[0]
+            });
+        }
+
+        console.log("[SCRIPT INGEST] Found", headingPositions.length, "scene headings");
+        
+        if (headingPositions.length === 0) {
+            // Log some text samples to help debug
+            console.log("[SCRIPT INGEST] No headings found. Checking for INT/EXT keywords...");
+            const intExtCount = (text.match(/\b(INT|EXT)\b/gi) || []).length;
+            console.log("[SCRIPT INGEST] Found", intExtCount, "INT/EXT keywords in text");
+            
+            // Return debug info
+            const board = await db.board.create({
+                data: {
+                    title: boardTitle,
+                    workspaceId: workspace.id,
+                    bgColor
+                }
+            });
+            
+            revalidatePath("/");
+            return NextResponse.json({ 
+                boardId: board.id, 
+                warning: `No scenes detected. PDF had ${totalPages} pages and ${text.length} chars. Found ${intExtCount} INT/EXT keywords but no standard scene headings.`,
+                textSample: text.substring(0, 500)
+            });
+        }
+
+        // Parse each scene from the heading positions
+        interface SceneData {
+            number: string;
+            isAutoNumbered: boolean;
+            intExt: string;
+            location: string;
+            timeOfDay: string;
+            bodyLength: number;
+        }
+
+        const scenes: SceneData[] = [];
+        let autoCounter = 1;
+
+        for (let i = 0; i < headingPositions.length; i++) {
+            const heading = headingPositions[i];
+            const nextHeading = headingPositions[i + 1];
+
+            // Extract the text between this heading and the next one
+            const headingEndIndex = heading.index + heading.fullMatch.length;
+            const sceneEndIndex = nextHeading ? nextHeading.index : text.length;
+            const sceneBody = text.substring(headingEndIndex, sceneEndIndex);
+
+            // Parse location and time of day from the first line after INT./EXT.
+            const firstLineEnd = sceneBody.indexOf('\n');
+            const headingLine = firstLineEnd > -1 ? sceneBody.substring(0, firstLineEnd).trim() : sceneBody.trim();
+
+            let location = "UNKNOWN LOCATION";
+            let timeOfDay = "UNKNOWN TIME";
+
+            // Split on " - " to separate location from time of day
+            const dashParts = headingLine.split(/\s+-\s+/);
+            if (dashParts.length > 1) {
+                timeOfDay = dashParts.pop()?.trim() || "UNKNOWN TIME";
+                location = dashParts.join(' - ').trim();
+            } else if (headingLine) {
+                location = headingLine.trim();
+            }
+
+            // Clean up location - remove trailing scene numbers
+            location = location.replace(/\s+\d+[A-Z]?\s*$/, "").trim();
+            if (!location) location = "UNKNOWN LOCATION";
+
+            // Determine scene number
+            let sceneNum = heading.sceneNum;
+            let isAuto = false;
+
+            if (!sceneNum) {
+                sceneNum = `${autoCounter++}`;
+                isAuto = true;
+            } else {
+                const parsedNum = parseInt(sceneNum.replace(/\D/g, ''));
+                if (!isNaN(parsedNum) && parsedNum >= autoCounter) {
+                    autoCounter = parsedNum + 1;
+                }
+            }
+
+            // Estimate body length for page-eighths calculation
+            const bodyLines = sceneBody.split('\n').filter((l: string) => l.trim().length > 0);
+
+            scenes.push({
+                number: sceneNum,
+                isAutoNumbered: isAuto,
+                intExt: heading.intExt.toUpperCase(),
+                location: location.toUpperCase(),
+                timeOfDay: timeOfDay.toUpperCase().replace(/\s+\d+[A-Z]?\s*$/, ""),
+                bodyLength: bodyLines.length
+            });
+        }
+
+        console.log("[SCRIPT INGEST] Parsed", scenes.length, "scenes. First 3 scenes:", JSON.stringify(scenes.slice(0, 3), null, 2));
+
+        // Create the board
         const board = await db.board.create({
             data: {
                 title: boardTitle,
@@ -48,84 +179,19 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        const lines = text.split('\n');
-        let currentScene: any = null;
-        const scenes: any[] = [];
-        let autoCounter = 1;
-
-        const sceneHeadingRegex = /^\s*(?:([0-9A-Z]+)\s+)?(INT\.|EXT\.|INT\/EXT\.|I\/E\.)\s+(.*?)(?:\s+-\s+(.*?))?(?:\s+([0-9A-Z]+))?\s*$/i;
-        const looseHeadingRegex = /^\s*(?:[0-9A-Z]+\s+)?(?:INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i;
-
-        for (const rawLine of lines) {
-            const line = rawLine.trim();
-            if (!line) continue;
-
-            if (looseHeadingRegex.test(line)) {
-                if (currentScene) scenes.push(currentScene);
-
-                const match = line.match(sceneHeadingRegex);
-                let sceneNum = "";
-                let intExt = "INT.";
-                let location = "UNKNOWN LOCATION";
-                let timeOfDay = "UNKNOWN TIME";
-                let isAuto = false;
-
-                if (match) {
-                    sceneNum = match[1] || match[5] || "";
-                    intExt = match[2];
-                    location = match[3] || "UNKNOWN LOCATION";
-                    timeOfDay = match[4] || "UNKNOWN TIME";
-                } else {
-                    intExt = line.match(/(INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i)?.[0] || "INT.";
-                    const noPrefix = line.replace(/^\s*(?:[0-9A-Z]+\s+)?(?:INT\.|EXT\.|INT\/EXT\.|I\/E\.)/i, "").trim();
-                    const parts = noPrefix.split('-');
-                    if (parts.length > 1) {
-                        timeOfDay = parts.pop()?.trim() || "UNKNOWN TIME";
-                        location = parts.join('-').trim();
-                    } else {
-                        location = noPrefix;
-                    }
-                }
-
-                location = location.replace(/\s+[0-9A-Z]+$/, "");
-
-                if (!sceneNum) {
-                    sceneNum = `${autoCounter++}`;
-                    isAuto = true;
-                } else {
-                    const parsedNum = parseInt(sceneNum.replace(/\D/g, ''));
-                    if (!isNaN(parsedNum) && parsedNum >= autoCounter) {
-                        autoCounter = parsedNum + 1;
-                    }
-                }
-
-                currentScene = {
-                    number: sceneNum,
-                    isAutoNumbered: isAuto,
-                    intExt: intExt.toUpperCase(),
-                    location: location.toUpperCase(),
-                    timeOfDay: timeOfDay.toUpperCase(),
-                    lineCount: 0
-                };
-            } else {
-                if (currentScene) currentScene.lineCount++;
-            }
-        }
-
-        if (currentScene) scenes.push(currentScene);
-
+        // Create lists and cards for each scene
         let listOrder = 0;
         for (const scene of scenes) {
-            let eighths = Math.max(1, Math.ceil(scene.lineCount / 6));
-            let pages = Math.floor(eighths / 8);
+            let eighths = Math.max(1, Math.ceil(scene.bodyLength / 6));
+            let pgs = Math.floor(eighths / 8);
             eighths = eighths % 8;
 
-            let lengthStr = pages > 0 ? `${pages}` : "";
+            let lengthStr = pgs > 0 ? `${pgs}` : "";
             if (eighths > 0) lengthStr += lengthStr ? `+${eighths}/8` : `${eighths}/8`;
             if (!lengthStr) lengthStr = "1/8";
 
-            const titleAutoFlag = scene.isAutoNumbered ? "[AUTO]" : "";
-            const listTitle = `Sc${scene.number} ${titleAutoFlag} ${scene.intExt} -- ${lengthStr} pgs`;
+            const titleAutoFlag = scene.isAutoNumbered ? "[AUTO] " : "";
+            const listTitle = `Sc${scene.number} ${titleAutoFlag}${scene.intExt} -- ${lengthStr} pgs`;
 
             const list = await db.list.create({
                 data: { title: listTitle, boardId: board.id, order: listOrder++ }
@@ -138,7 +204,7 @@ export async function POST(req: NextRequest) {
         }
 
         revalidatePath("/");
-        return NextResponse.json({ boardId: board.id });
+        return NextResponse.json({ boardId: board.id, scenesCreated: scenes.length });
 
     } catch (error: any) {
         console.error("Script ingestion failed:", error);
