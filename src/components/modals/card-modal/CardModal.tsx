@@ -2,7 +2,7 @@
 
 import { Modal } from "@/components/modals/Modal";
 import { useState, useRef, ElementRef, useEffect } from "react";
-import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X } from "lucide-react";
+import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction } from "@/hooks/use-action";
 import { updateCard } from "@/actions/update-card";
@@ -22,6 +22,7 @@ import { AttachmentPreview, AttachmentPreviewLarge } from "@/components/ui/Attac
 import { AudioPlayer } from "@/components/ui/AudioPlayer";
 import { detectFileType, getFileTypeLabel } from "@/lib/file-type-utils";
 import Image from "next/image";
+import { MidjourneyPopover } from "./MidjourneyPopover";
 
 interface CardModalProps {
     data: any;
@@ -38,6 +39,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [isLabelPickerOpen, setIsLabelPickerOpen] = useState(false);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [isMovePickerOpen, setIsMovePickerOpen] = useState(false);
+    const [isMidjourneyOpen, setIsMidjourneyOpen] = useState(false);
     const [newLabelTitle, setNewLabelTitle] = useState("");
     const [selectedLabelColor, setSelectedLabelColor] = useState("");
     const [boardLabels, setBoardLabels] = useState<{ id: string; title: string; color: string }[]>([]);
@@ -771,6 +773,23 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                         <span className="font-semibold text-neutral-500">Dropbox Audio Workaround (Unstable):</span> You can sometimes bypass playback issues by changing the URL to <span className="font-mono">dl.dropboxusercontent.com</span> (e.g. replacing <span className="font-mono">://dropbox.com</span> with <span className="font-mono">://dl.dropboxusercontent.com</span> and ensuring the query string includes <span className="font-mono">?raw=1</span>). Not officially supported by Dropbox and may change.
                                     </p>
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Midjourney Generation Button */}
+                        <div className="relative mt-2">
+                            <button 
+                                onClick={() => setIsMidjourneyOpen(!isMidjourneyOpen)} 
+                                className="w-full text-left text-sm px-3 py-2 rounded-sm flex items-center gap-x-2 bg-gradient-to-r from-purple-600/10 to-pink-600/10 hover:from-purple-600/20 hover:to-pink-600/20 border border-purple-500/20 text-purple-700 transition"
+                            >
+                                <Sparkles className="h-4 w-4 text-purple-600" /> Generate Image
+                            </button>
+                            {isMidjourneyOpen && (
+                                <MidjourneyPopover 
+                                    cardId={data.id} 
+                                    boardId={boardId} 
+                                    onClose={() => setIsMidjourneyOpen(false)} 
+                                />
                             )}
                         </div>
                     </div>
