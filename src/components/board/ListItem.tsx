@@ -294,6 +294,19 @@ export const ListItem = ({
     ));
     const showList = isListMatch || hasMatchingCards;
 
+    const renderTitle = (text: string) => {
+        if (text.includes("[AUTO]")) {
+            const parts = text.split("[AUTO]");
+            return (
+                <div className="flex items-center gap-x-1 truncate">
+                    <span className="text-red-500 font-bold shrink-0">{parts[0].trim()}</span>
+                    <span className="truncate">{parts[1]}</span>
+                </div>
+            );
+        }
+        return <span className="truncate">{text}</span>;
+    };
+
     return (
         <li
             ref={setNodeRef}
@@ -329,11 +342,11 @@ export const ListItem = ({
                     ) : (
                         <div
                             onClick={enableEditing}
-                            className={`w-full text-sm px-2.5 py-1 h-7 font-medium border-transparent cursor-pointer flex items-center gap-x-2`}
+                            className={`w-full text-sm px-2.5 py-1 h-7 font-medium border-transparent cursor-pointer flex items-center gap-x-2 overflow-hidden`}
                             style={{ color: data.fontColor ? data.fontColor : (data.color ? 'white' : 'black') }}
                         >
-                            {title}
-                            <span className={`ml-auto text-[10px] font-normal px-1.5 py-0.5 rounded-full ${data.color ? 'bg-white/20' : 'bg-neutral-300/60'}`}>{data.cards?.length || 0}</span>
+                            {renderTitle(title)}
+                            <span className={`ml-auto text-[10px] font-normal px-1.5 py-0.5 rounded-full shrink-0 ${data.color ? 'bg-white/20' : 'bg-neutral-300/60'}`}>{data.cards?.length || 0}</span>
                         </div>
                     )}
 
