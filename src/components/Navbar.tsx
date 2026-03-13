@@ -69,14 +69,21 @@ export const Navbar = () => {
                 </div>
 
                 {!isOnBoard && (
-                    <Link href="/">
-                        <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition h-auto md:block">
-                            <span className="md:hidden">
-                                <Plus className="h-4 w-4" />
-                            </span>
-                            <span className="hidden md:block">Create</span>
-                        </button>
-                    </Link>
+                    <div className="flex items-center gap-x-2">
+                        <Link href="/">
+                            <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition h-auto md:block">
+                                <span className="md:hidden">
+                                    <Plus className="h-4 w-4" />
+                                </span>
+                                <span className="hidden md:block">Create</span>
+                            </button>
+                        </Link>
+                        <Link href="/workflows">
+                            <button className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-md text-sm font-medium transition hidden md:block backdrop-blur-sm">
+                                Workflows
+                            </button>
+                        </Link>
+                    </div>
                 )}
             </div>
             <div className="ml-auto flex items-center gap-x-3">

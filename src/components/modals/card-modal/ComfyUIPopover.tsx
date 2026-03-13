@@ -8,6 +8,8 @@ import { useAction } from "@/hooks/use-action";
 import { initiateComfyUI } from "@/actions/initiate-comfyui";
 import { checkComfyUIStatus } from "@/actions/check-comfyui-status";
 import { createAttachment } from "@/actions/create-attachment"; 
+import { getWorkflows } from "@/actions/workflow-management/get-workflows";
+import { ComfyUIWorkflow } from "@prisma/client";
 
 interface ComfyUIPopoverProps {
     cardId: string;
@@ -21,12 +23,23 @@ export const ComfyUIPopover = ({
     onClose
 }: ComfyUIPopoverProps) => {
     const [prompt, setPrompt] = useState("");
-    const [resolution, setResolution] = useState("1024x1024");
+    const [resolution, setResolution] = useState("256x256");
+    const [workflowId, setWorkflowId] = useState<string>("");
+    const [workflows, setWorkflows] = useState<ComfyUIWorkflow[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [statusText, setStatusText] = useState("");
     const inputRef = useRef<ElementRef<"textarea">>(null);
     const { addToast } = useToast();
     const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+    useEffect(() => {
+        getWorkflows().then((data) => {
+            setWorkflows(data);
+            if (data.length > 0) {
+                setWorkflowId(data[0].id);
+            }
+        });
+    }, []);
 
     const { execute: executeInitiateSafe } = useAction(initiateComfyUI, {
         onSuccess: (data: any) => {
@@ -110,7 +123,7 @@ export const ComfyUIPopover = ({
         setIsGenerating(true);
         setStatusText("Initiating request to Home Server...");
         const [width, height] = resolution.split('x').map(Number);
-        executeInitiateSafe({ prompt, width, height, boardId, cardId });
+        executeInitiateSafe({ prompt, width, height, workflowId, boardId, cardId });
     };
 
     return (
@@ -151,6 +164,24 @@ export const ComfyUIPopover = ({
                         />
                     </div>
                     
+                    <div className="flex flex-col gap-y-1">
+                        <label className="text-xs font-semibold text-neutral-600">Workflow Model</label>
+                        <select
+                            value={workflowId}
+                            onChange={(e) => setWorkflowId(e.target.value)}
+                            className="text-sm px-2 py-1.5 border rounded-sm outline-none w-full bg-white cursor-pointer focus:ring-1 focus:ring-pink-600 disabled:opacity-50"
+                            disabled={workflows.length === 0}
+                        >
+                            {workflows.length === 0 ? (
+                                <option value="">No workflows found in DB</option>
+                            ) : (
+                                workflows.map((w) => (
+                                    <option key={w.id} value={w.id}>{w.name}</option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+
                     <div className="flex flex-col gap-y-1">
                         <label className="text-xs font-semibold text-neutral-600">Resolution</label>
                         <select
