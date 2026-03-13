@@ -21,6 +21,7 @@ export const ComfyUIPopover = ({
     onClose
 }: ComfyUIPopoverProps) => {
     const [prompt, setPrompt] = useState("");
+    const [resolution, setResolution] = useState("1024x1024");
     const [isGenerating, setIsGenerating] = useState(false);
     const [statusText, setStatusText] = useState("");
     const inputRef = useRef<ElementRef<"textarea">>(null);
@@ -108,7 +109,8 @@ export const ComfyUIPopover = ({
         if (!prompt.trim() || isGenerating) return;
         setIsGenerating(true);
         setStatusText("Initiating request to Home Server...");
-        executeInitiateSafe({ prompt, boardId, cardId });
+        const [width, height] = resolution.split('x').map(Number);
+        executeInitiateSafe({ prompt, width, height, boardId, cardId });
     };
 
     return (
@@ -147,6 +149,19 @@ export const ComfyUIPopover = ({
                             className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-pink-600 w-full resize-none h-24"
                             autoFocus
                         />
+                    </div>
+                    
+                    <div className="flex flex-col gap-y-1">
+                        <label className="text-xs font-semibold text-neutral-600">Resolution</label>
+                        <select
+                            value={resolution}
+                            onChange={(e) => setResolution(e.target.value)}
+                            className="text-sm px-2 py-1.5 border rounded-sm outline-none w-full bg-white cursor-pointer focus:ring-1 focus:ring-pink-600"
+                        >
+                            <option value="256x256">256 x 256 (Fast)</option>
+                            <option value="512x512">512 x 512 (Standard)</option>
+                            <option value="1024x1024">1024 x 1024 (High Res)</option>
+                        </select>
                     </div>
                     
                     <button 

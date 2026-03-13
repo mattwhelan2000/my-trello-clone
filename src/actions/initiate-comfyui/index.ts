@@ -5,7 +5,7 @@ import { InitiateComfyUI } from "./schema";
 
 export const initiateComfyUI = actionClient
     .schema(InitiateComfyUI)
-    .action(async ({ parsedInput: { prompt, boardId, cardId } }) => {
+    .action(async ({ parsedInput: { prompt, width, height, boardId, cardId } }) => {
         try {
             // Strip any trailing slashes from the URL
             const configUrl = process.env.COMFYUI_API_URL || "";
@@ -118,15 +118,15 @@ export const initiateComfyUI = actionClient
                       "98:103",
                       0
                     ],
-                    "width": 1024,
-                    "height": 1024
+                    "width": width,
+                    "height": height
                   },
                   "class_type": "Flux2Scheduler"
                 },
                 "98:47": {
                   "inputs": {
-                    "width": 1024,
-                    "height": 1024,
+                    "width": width,
+                    "height": height,
                     "batch_size": 1
                   },
                   "class_type": "EmptyFlux2LatentImage"
