@@ -149,7 +149,7 @@ export const initiateComfyUI = actionClient
                 },
                 "98:101": {
                   "inputs": {
-                    "lora_name": "Flux_2-Turbo-LoRA_comfyui.safetensors",
+                    "lora_name": "flux.2-turbo-lora.safetensors",
                     "strength_model": 1,
                     "model": [
                       "98:12",
@@ -226,19 +226,20 @@ export const initiateComfyUI = actionClient
             });
 
             if (!response.ok) {
-                return { error: "Failed to connect to ComfyUI. Is your Ngrok tunnel running and your PC awake?" };
+                const text = await response.text();
+                return { error: `ComfyUI API HTTP ${response.status}: ${text}` };
             }
 
             const result = await response.json();
 
             if (!result.prompt_id) {
-                return { error: "No prompt_id returned from ComfyUI API." }
+                return { error: `No prompt_id returned from ComfyUI. Response: ${JSON.stringify(result)}` }
             }
 
             return { data: { taskId: result.prompt_id } };
-        } catch (error) {
+        } catch (error: any) {
             return {
-                error: "Failed to communicate with ComfyUI. Ensure your Ngrok URL is correct and ComfyUI is running.",
+                error: `Failed to communicate with ComfyUI: ${error?.message || String(error)}`,
             };
         }
     });
