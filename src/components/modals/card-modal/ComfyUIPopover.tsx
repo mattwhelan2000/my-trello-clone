@@ -34,7 +34,8 @@ export const ComfyUIPopover = ({
                 setActiveTaskId(taskId);
                 setStatusText("Waiting for your PC...");
             } else {
-                addToast("Failed to retrieve a valid task ID.", "error");
+                const errMsg = data?.error || data?.data?.error || "Failed to retrieve a valid task ID.";
+                addToast(String(errMsg), "error");
                 setIsGenerating(false);
             }
         },
