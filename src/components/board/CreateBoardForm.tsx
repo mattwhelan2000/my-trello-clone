@@ -26,11 +26,11 @@ export const CreateBoardForm = () => {
     };
 
     return (
-        <form onSubmit={onSubmit} className="w-full flex flex-col gap-y-2">
+        <form onSubmit={onSubmit} className="w-full h-11 flex flex-row items-center gap-x-2 bg-white rounded-md shadow-sm border p-1">
             <input
                 required
-                className="px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
-                placeholder="Board title..."
+                className="px-3 py-1.5 text-sm w-full bg-transparent focus:outline-none focus:ring-0 text-neutral-800"
+                placeholder="New board title..."
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={isExecuting}
@@ -38,7 +38,7 @@ export const CreateBoardForm = () => {
             <button
                 disabled={isExecuting || !title.trim()}
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center disabled:opacity-50"
+                className="h-full shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 opacity-90 hover:opacity-100 rounded transition duration-200 flex items-center justify-center disabled:opacity-50"
             >
                 {isExecuting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
             </button>

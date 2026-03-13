@@ -68,14 +68,14 @@ export const ImportBoardButton = () => {
             <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isExecuting}
-                className="w-full bg-white hover:bg-neutral-50 border shadow-sm text-neutral-700 font-medium py-2 px-4 rounded-md transition duration-200 flex flex-col items-center justify-center gap-y-2 h-[120px] disabled:opacity-50"
+                className="w-full bg-white hover:bg-neutral-50 border shadow-sm text-neutral-700 font-medium py-2.5 px-4 rounded-md transition duration-200 flex items-center justify-center gap-x-2 h-11 disabled:opacity-50"
             >
                 {isExecuting ? (
-                    <Loader2 className="h-6 w-6 animate-spin text-neutral-500" />
+                    <Loader2 className="h-5 w-5 animate-spin text-neutral-500" />
                 ) : (
                     <>
-                        <UploadCloud className="h-6 w-6 text-neutral-500" />
-                        <span className="text-sm">Import from JSON</span>
+                        <UploadCloud className="h-5 w-5 text-neutral-500" />
+                        <span className="text-sm">Import JSON Board</span>
                     </>
                 )}
             </button>
