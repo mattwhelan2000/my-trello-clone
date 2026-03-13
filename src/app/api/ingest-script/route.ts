@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-
-// Lazy require to avoid module-level FS access that breaks Vercel
-function parsePdf(buffer: Buffer): Promise<{ text: string }> {
-    const pdfParse = require("pdf-parse");
-    return pdfParse(buffer);
-}
+import { extractText } from "unpdf";
 
 export async function POST(req: NextRequest) {
     try {
@@ -18,10 +13,9 @@ export async function POST(req: NextRequest) {
         }
 
         const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        const pdfBuffer = new Uint8Array(arrayBuffer);
 
-        const pdfData = await parsePdf(buffer);
-        const text = pdfData.text;
+        const { text } = await extractText(pdfBuffer, { mergePages: true });
 
         // Detect color from filename
         const filename = file.name.toUpperCase();
