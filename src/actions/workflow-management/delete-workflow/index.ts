@@ -14,7 +14,7 @@ export const deleteWorkflow = actionClient
       });
 
       revalidatePath("/workflows");
-      return { data: workflow };
+      return workflow;
     } catch (error) {
       return {
         error: "Failed to delete workflow.",

@@ -17,7 +17,7 @@ export const createWorkflow = actionClient
       });
 
       revalidatePath("/workflows");
-      return { data: workflow };
+      return workflow;
     } catch (error) {
       return {
         error: "Failed to create workflow.",
