@@ -5,21 +5,21 @@ import { Sparkles, X, Loader2 } from "lucide-react";
 
 import { useToast } from "@/components/ui/Toast";
 import { useAction } from "@/hooks/use-action";
-import { initiateMidjourney } from "@/actions/initiate-midjourney";
-import { checkMidjourneyStatus } from "@/actions/check-midjourney-status";
+import { initiateComfyUI } from "@/actions/initiate-comfyui";
+import { checkComfyUIStatus } from "@/actions/check-comfyui-status";
 import { createAttachment } from "@/actions/create-attachment"; 
 
-interface MidjourneyPopoverProps {
+interface ComfyUIPopoverProps {
     cardId: string;
     boardId: string;
     onClose: () => void;
 }
 
-export const MidjourneyPopover = ({
+export const ComfyUIPopover = ({
     cardId,
     boardId,
     onClose
-}: MidjourneyPopoverProps) => {
+}: ComfyUIPopoverProps) => {
     const [prompt, setPrompt] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
     const [statusText, setStatusText] = useState("");
@@ -27,12 +27,12 @@ export const MidjourneyPopover = ({
     const { addToast } = useToast();
     const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
-    const { execute: executeInitiateSafe } = useAction(initiateMidjourney, {
+    const { execute: executeInitiateSafe } = useAction(initiateComfyUI, {
         onSuccess: (data: any) => {
             const taskId = data?.taskId || data?.data?.taskId;
             if (taskId) {
                 setActiveTaskId(taskId);
-                setStatusText("Waiting to start...");
+                setStatusText("Waiting for your PC...");
             } else {
                 addToast("Failed to retrieve a valid task ID.", "error");
                 setIsGenerating(false);
@@ -46,7 +46,7 @@ export const MidjourneyPopover = ({
 
     const { execute: executeCreateAttachment } = useAction(createAttachment, {
         onSuccess: () => {
-            addToast("Image generated and attached!", "success");
+            addToast("Image generated and attached from home PC!", "success");
             setIsGenerating(false);
             onClose();
         },
@@ -61,7 +61,7 @@ export const MidjourneyPopover = ({
         if (!activeTaskId) return;
 
         const pollTimer = setInterval(async () => {
-             const resultRaw = await checkMidjourneyStatus({ taskId: activeTaskId });
+             const resultRaw = await checkComfyUIStatus({ taskId: activeTaskId });
              const result = resultRaw as any; // Bypass SafeActionResult typing complexity
 
              if (result?.data?.error || result?.error || result?.serverError) {
@@ -76,14 +76,15 @@ export const MidjourneyPopover = ({
 
              if (returnData) {
                  if (returnData.status === "failed") {
-                     addToast("Generation failed on Midjourney's side.", "error");
+                     addToast("Generation failed on ComfyUI.", "error");
                      setIsGenerating(false);
                      setActiveTaskId(null);
                      clearInterval(pollTimer);
                  } else if (returnData.status === "finished" && returnData.imageUrl) {
                      clearInterval(pollTimer);
                      setStatusText("Attaching image...");
-                     // Attach it to the card using existing attach action
+                     // Warning caveat: This attaches the Ngrok tunnel direct URL.
+                     // The image depends on the tunnel and PC staying online. Future enhancement would pipe this to S3.
                      executeCreateAttachment({
                          url: returnData.imageUrl,
                          boardId,
@@ -93,10 +94,10 @@ export const MidjourneyPopover = ({
                      setActiveTaskId(null);
                  } else {
                      // Still processing or pending
-                     setStatusText(`Generating... ${returnData.progress || "0%"}`);
+                     setStatusText(`Generating... ${returnData.progress || ""}`);
                  }
              }
-        }, 4000);
+        }, 3000);
 
         return () => clearInterval(pollTimer);
     }, [activeTaskId, boardId, cardId, executeCreateAttachment, addToast, onClose]);
@@ -105,7 +106,7 @@ export const MidjourneyPopover = ({
         e.preventDefault();
         if (!prompt.trim() || isGenerating) return;
         setIsGenerating(true);
-        setStatusText("Initiating request...");
+        setStatusText("Initiating request to Home Server...");
         executeInitiateSafe({ prompt, boardId, cardId });
     };
 
@@ -113,8 +114,8 @@ export const MidjourneyPopover = ({
         <div className="absolute top-full left-0 z-10 w-72 bg-white rounded-md shadow-xl border border-neutral-200 px-3 py-3 mt-1 text-neutral-700">
             <div className="flex items-center justify-between mb-2 pb-1 border-b">
                 <span className="text-sm font-semibold text-neutral-600 text-center w-full flex items-center justify-center gap-x-2">
-                    <Sparkles className="h-4 w-4 text-purple-600" />
-                    Generate with Midjourney
+                    <Sparkles className="h-4 w-4 text-pink-600" />
+                    AI Image Generator
                 </span>
                 {!isGenerating && (
                     <button onClick={onClose} className="absolute right-2 px-1 py-1 hover:bg-neutral-100 rounded-sm">
@@ -125,12 +126,12 @@ export const MidjourneyPopover = ({
 
             {isGenerating ? (
                  <div className="flex flex-col items-center justify-center py-6 gap-y-4">
-                     <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                     <Loader2 className="h-8 w-8 animate-spin text-pink-600" />
                      <div className="text-sm font-medium text-neutral-600 text-center px-4">
                          {statusText}
                      </div>
                      <p className="text-[10px] text-neutral-400 text-center mt-2">
-                         This usually takes 30-60 seconds. Do not close this panel.
+                         Pinging your local ComfyUI instance. Keep your PC awake!
                      </p>
                  </div>
             ) : (
@@ -142,7 +143,7 @@ export const MidjourneyPopover = ({
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             placeholder="A futuristic city at sunset, cyberpunk style, octane render..."
-                            className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-purple-600 w-full resize-none h-24"
+                            className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-pink-600 w-full resize-none h-24"
                             autoFocus
                         />
                     </div>
@@ -150,14 +151,14 @@ export const MidjourneyPopover = ({
                     <button 
                         type="submit" 
                         disabled={!prompt.trim()} 
-                        className="bg-purple-600 text-white rounded-sm text-sm font-medium px-4 py-2 hover:bg-purple-700 w-full transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-x-2"
+                        className="bg-pink-600 text-white rounded-sm text-sm font-medium px-4 py-2 hover:bg-pink-700 w-full transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-x-2"
                     >
                         <Sparkles className="h-4 w-4" />
                         Generate Image
                     </button>
                     
                     <p className="text-[10px] text-neutral-400 mt-1 leading-relaxed text-center">
-                        Images are generated using Midjourney v6 via API proxy.
+                        Images are generated locally using your ComfyUI server tunnel.
                     </p>
                 </form>
             )}

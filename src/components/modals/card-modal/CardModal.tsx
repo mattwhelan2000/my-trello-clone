@@ -22,7 +22,7 @@ import { AttachmentPreview, AttachmentPreviewLarge } from "@/components/ui/Attac
 import { AudioPlayer } from "@/components/ui/AudioPlayer";
 import { detectFileType, getFileTypeLabel } from "@/lib/file-type-utils";
 import Image from "next/image";
-import { MidjourneyPopover } from "./MidjourneyPopover";
+import { ComfyUIPopover } from "./ComfyUIPopover";
 
 interface CardModalProps {
     data: any;
@@ -39,7 +39,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [isLabelPickerOpen, setIsLabelPickerOpen] = useState(false);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [isMovePickerOpen, setIsMovePickerOpen] = useState(false);
-    const [isMidjourneyOpen, setIsMidjourneyOpen] = useState(false);
+    const [isComfyUIOpen, setIsComfyUIOpen] = useState(false);
     const [newLabelTitle, setNewLabelTitle] = useState("");
     const [selectedLabelColor, setSelectedLabelColor] = useState("");
     const [boardLabels, setBoardLabels] = useState<{ id: string; title: string; color: string }[]>([]);
@@ -776,19 +776,19 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                             )}
                         </div>
 
-                        {/* Midjourney Generation Button */}
+                        {/* ComfyUI AI Generation Button */}
                         <div className="relative mt-2">
                             <button 
-                                onClick={() => setIsMidjourneyOpen(!isMidjourneyOpen)} 
-                                className="w-full text-left text-sm px-3 py-2 rounded-sm flex items-center gap-x-2 bg-gradient-to-r from-purple-600/10 to-pink-600/10 hover:from-purple-600/20 hover:to-pink-600/20 border border-purple-500/20 text-purple-700 transition"
+                                onClick={() => setIsComfyUIOpen(!isComfyUIOpen)} 
+                                className="w-full text-left text-sm px-3 py-2 rounded-sm flex items-center gap-x-2 bg-gradient-to-r from-pink-600/10 to-red-600/10 hover:from-pink-600/20 hover:to-red-600/20 border border-pink-500/20 text-pink-700 transition"
                             >
-                                <Sparkles className="h-4 w-4 text-purple-600" /> Generate Image
+                                <Sparkles className="h-4 w-4 text-pink-600" /> AI Image Gen
                             </button>
-                            {isMidjourneyOpen && (
-                                <MidjourneyPopover 
+                            {isComfyUIOpen && (
+                                <ComfyUIPopover 
                                     cardId={data.id} 
                                     boardId={boardId} 
-                                    onClose={() => setIsMidjourneyOpen(false)} 
+                                    onClose={() => setIsComfyUIOpen(false)} 
                                 />
                             )}
                         </div>
