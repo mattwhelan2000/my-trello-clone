@@ -19,12 +19,14 @@ export const initiateComfyUI = actionClient
             }
 
             let workflowObj: any;
+            let workflowName = "Unknown Workflow";
 
             if (workflowId) {
                 const dbWorkflow = await db.comfyUIWorkflow.findUnique({ where: { id: workflowId } });
                 if (!dbWorkflow) {
                     return { error: "Selected workflow not found in database." };
                 }
+                workflowName = dbWorkflow.name;
                 try {
                     workflowObj = JSON.parse(dbWorkflow.json);
                 } catch (e) {
@@ -84,8 +86,8 @@ export const initiateComfyUI = actionClient
 
             if (card) {
                 const newDescription = card.description 
-                    ? `${card.description}\n\n**AI Generated Image Prompt:**\n> ${prompt}` 
-                    : `**AI Generated Image Prompt:**\n> ${prompt}`;
+                    ? `${card.description}\n\n**AI Generated Image Prompt (${workflowName}):**\n> ${prompt}` 
+                    : `**AI Generated Image Prompt (${workflowName}):**\n> ${prompt}`;
                 
                 await db.card.update({
                     where: { id: cardId },
