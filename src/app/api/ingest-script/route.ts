@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
             }
 
             // Is it undeniably a scene heading?
-            if (/^(INT\.|EXT\.|I\/E\.|INT\/EXT)\b/i.test(content)) {
+            if (/^(INT\.|EXT\.|I\/E\.|INT\/EXT)(?:\s+|$)/i.test(content)) {
                 isHeading = true;
             } else if (/^(CU\s|CLOSE UP\b|WIDE\b|ANGLE\b|POV\b)/i.test(content)) {
                 isHeading = true;
@@ -167,6 +167,14 @@ export async function POST(req: NextRequest) {
                     prevLoc = location;
                     location = location.replace(/(?:[\s,]+and\s+|\s+-\s+|[\s,]+|\s+)\b[A-Za-z]{0,2}\d+[A-Za-z]?\b[.,\s]*$/i, "").trim();
                 } while (location !== prevLoc);
+                
+                // If the specific scene number is attached to the very end of the text without a space, aggressively strip it
+                if (sceneNum) {
+                    const escapedSceneNum = sceneNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const exactTrailingRegex = new RegExp(`[\\s-]*${escapedSceneNum}$`, 'i');
+                    location = location.replace(exactTrailingRegex, '').trim();
+                }
+
                 location = location.replace(/[-,\s]+$/, "").trim(); // Clean up any hanging dashes or commas
 
                 if (!location) location = "UNKNOWN LOCATION";
