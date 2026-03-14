@@ -372,7 +372,8 @@ export async function POST(req: NextRequest) {
             if (!lengthStr) lengthStr = "1/8";
 
             const titleAutoFlag = scene.isAutoNumbered ? "[AUTO] " : "";
-            const listTitle = `Sc${scene.number} ${titleAutoFlag}${scene.intExt} -- ${lengthStr} pgs`;
+            const paddedSceneNum = scene.number.replace(/\d+/, match => match.padStart(3, '0'));
+            const listTitle = `Sc${paddedSceneNum} ${titleAutoFlag}${scene.intExt} -- ${lengthStr} pgs`;
 
             const list = await db.list.create({
                 data: { title: listTitle, boardId: board.id, order: listOrder++ }
