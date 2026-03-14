@@ -241,7 +241,7 @@ export const ListContainer = ({
                     strategy={horizontalListSortingStrategy}
                 >
                     {/* Search Bar */}
-                    <div className="fixed top-[52px] left-1/2 -translate-x-1/2 z-[30]">
+                    <div className="fixed top-[52px] left-1/2 -translate-x-1/2 z-[30] flex flex-col items-center">
                         <div className="relative">
                             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
                             <input
@@ -269,6 +269,33 @@ export const ListContainer = ({
                                 </button>
                             </div>
                         </div>
+
+                        {searchQuery.trim().length > 0 && (
+                            <div className="mt-1.5 bg-red-800/90 text-white/90 px-4 py-1.5 rounded-md text-xs font-semibold flex items-center gap-x-6 shadow-md backdrop-blur-sm border border-red-700/50">
+                                <span className="flex items-center gap-x-1.5">
+                                    <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+                                    {orderedData.reduce((acc, list) => {
+                                        const isListMatch = searchLists && list.title.toLowerCase().includes(searchQuery.toLowerCase());
+                                        const hasMatchingCards = isListMatch || (searchCards && list.cards.some((c: any) => c.title.toLowerCase().includes(searchQuery.toLowerCase()) || (c.description && c.description.toLowerCase().includes(searchQuery.toLowerCase()))));
+                                        return acc + (hasMatchingCards ? 1 : 0);
+                                    }, 0)}
+                                </span>
+                                <div className="w-[1px] h-3 bg-red-700/50"></div>
+                                <span className="flex items-center gap-x-1.5">
+                                    <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                                    {orderedData.reduce((acc, list) => {
+                                        const isListMatch = searchLists && list.title.toLowerCase().includes(searchQuery.toLowerCase());
+                                        let listCardsMatched = 0;
+                                        if (isListMatch) {
+                                            listCardsMatched = list.cards.length;
+                                        } else if (searchCards) {
+                                            listCardsMatched = list.cards.filter((c: any) => c.title.toLowerCase().includes(searchQuery.toLowerCase()) || (c.description && c.description.toLowerCase().includes(searchQuery.toLowerCase()))).length;
+                                        }
+                                        return acc + listCardsMatched;
+                                    }, 0)}
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <ol className="flex gap-x-3 h-full">
                         {orderedData.map((list, index) => {
