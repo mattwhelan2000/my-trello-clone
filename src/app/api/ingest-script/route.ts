@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
         let currentScene: any = null;
         let autoCounter = 1;
         let lastStandaloneNumber = "";
+        const characterCounts: Record<string, number> = {};
 
         const timeOfDayList = ['DAY', 'NIGHT', 'CONTINUOUS', 'SAME', 'MOMENTS LATER', 'LATER', 'FOLLOWING'];
 
@@ -215,6 +216,32 @@ export async function POST(req: NextRequest) {
                 continue;
             }
             
+            if (!isHeading) {
+                const lineUpper = line.toUpperCase();
+                const hasLetters = /[a-zA-Z]/.test(line);
+                const isAllCaps = hasLetters && lineUpper === line;
+
+                if (isAllCaps && line.length < 40) {
+                    if (
+                        !lineUpper.includes("CONTINUED") && 
+                        !lineUpper.includes("CUT TO") &&
+                        !lineUpper.includes("FADE") &&
+                        !lineUpper.includes("TITLE") &&
+                        !lineUpper.includes("SCENE START") &&
+                        !lineUpper.includes("END OF") &&
+                        !lineUpper.includes("ACT ") &&
+                        !lineUpper.includes("TEASER") &&
+                        !lineUpper.endsWith(":")
+                    ) {
+                        const cleanName = lineUpper.replace(/\s*\(.*?\)/g, "").trim();
+                        // Ignore names with numbers which are likely scene headers that slipped by
+                        if (cleanName && cleanName.length > 2 && !/\d/.test(cleanName)) {
+                            characterCounts[cleanName] = (characterCounts[cleanName] || 0) + 1;
+                        }
+                    }
+                }
+            }
+
             if (currentScene) {
                 currentScene.bodyLength++;
             }
@@ -251,6 +278,37 @@ export async function POST(req: NextRequest) {
 
         // Create lists and cards for each scene
         let listOrder = 0;
+
+        // 1. Characters List
+        const sortedCharacters = Object.entries(characterCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(e => e[0])
+            .filter((name, idx, arr) => characterCounts[name] > 1 || arr.length <= 15);
+
+        if (sortedCharacters.length > 0) {
+            const charsList = await db.list.create({
+                data: { title: "CHARACTERS", boardId: board.id, order: listOrder++ }
+            });
+            for (let i = 0; i < sortedCharacters.length; i++) {
+                await db.card.create({ 
+                    data: { title: sortedCharacters[i], listId: charsList.id, order: i, color: "#fecaca" } 
+                });
+            }
+        }
+
+        // 2. Locations List
+        const uniqueLocations = Array.from(new Set(scenes.map(s => s.location))).filter(Boolean).sort();
+        if (uniqueLocations.length > 0) {
+            const locsList = await db.list.create({
+                data: { title: "LOCATIONS", boardId: board.id, order: listOrder++ }
+            });
+            for (let i = 0; i < uniqueLocations.length; i++) {
+                await db.card.create({ 
+                    data: { title: uniqueLocations[i], listId: locsList.id, order: i, color: "#bae6fd" } 
+                });
+            }
+        }
+
         for (const scene of scenes) {
             let eighths = Math.max(1, Math.ceil(scene.bodyLength / 6));
             let pgs = Math.floor(eighths / 8);
