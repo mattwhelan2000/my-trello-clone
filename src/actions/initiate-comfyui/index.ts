@@ -10,6 +10,10 @@ export const initiateComfyUI = actionClient
         try {
             // Strip any trailing slashes from the URL
             let configUrl = (process.env.COMFYUI_API_URL || "").replace(/['"]/g, "").trim();
+            // Aggressively strip "COMFYUI_API_URL=" if the user accidentally pasted it in Vercel
+            if (configUrl.startsWith("COMFYUI_API_URL=")) {
+                configUrl = configUrl.replace("COMFYUI_API_URL=", "");
+            }
             if (configUrl && !configUrl.startsWith('http')) {
                 configUrl = `https://${configUrl}`;
             }
