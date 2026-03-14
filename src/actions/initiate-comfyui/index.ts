@@ -15,6 +15,8 @@ export const initiateComfyUI = actionClient
             }
             const COMFYUI_API_URL = configUrl.endsWith('/') ? configUrl.slice(0, -1) : configUrl;
             
+            console.log("[COMFYUI] Calling URL:", `${COMFYUI_API_URL}/prompt`);
+            
             if (!COMFYUI_API_URL) {
                 return {
                     error: "ComfyUI API URL missing. Please set COMFYUI_API_URL in your environment variables (e.g., your Ngrok URL)."
@@ -103,6 +105,7 @@ export const initiateComfyUI = actionClient
 
             return { data: { taskId: result.prompt_id } };
         } catch (error: any) {
+            console.error("[COMFYUI] Initiation Error:", error);
             return {
                 error: `Failed to communicate with ComfyUI: ${error?.message || String(error)}`,
             };
