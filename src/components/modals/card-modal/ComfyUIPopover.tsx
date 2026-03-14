@@ -7,22 +7,26 @@ import { useToast } from "@/components/ui/Toast";
 import { useAction } from "@/hooks/use-action";
 import { initiateComfyUI } from "@/actions/initiate-comfyui";
 import { checkComfyUIStatus } from "@/actions/check-comfyui-status";
-import { createAttachment } from "@/actions/create-attachment"; 
+import { createAttachment } from "@/actions/create-attachment";
 import { getWorkflows } from "@/actions/workflow-management/get-workflows";
 import { ComfyUIWorkflow } from "@prisma/client";
 
 interface ComfyUIPopoverProps {
     cardId: string;
     boardId: string;
+    defaultPrompt?: string;
     onClose: () => void;
 }
+
+const LOCAL_STORAGE_WORKFLOW_KEY = "trelloClone_lastComfyUIWorkflowId";
 
 export const ComfyUIPopover = ({
     cardId,
     boardId,
+    defaultPrompt,
     onClose
 }: ComfyUIPopoverProps) => {
-    const [prompt, setPrompt] = useState("");
+    const [prompt, setPrompt] = useState(defaultPrompt || "");
     const [resolution, setResolution] = useState("256x256");
     const [workflowId, setWorkflowId] = useState<string>("");
     const [workflows, setWorkflows] = useState<ComfyUIWorkflow[]>([]);
@@ -36,10 +40,22 @@ export const ComfyUIPopover = ({
         getWorkflows().then((data) => {
             setWorkflows(data);
             if (data.length > 0) {
-                setWorkflowId(data[0].id);
+                const savedId = localStorage.getItem(LOCAL_STORAGE_WORKFLOW_KEY);
+                // Ensure the saved ID actually exists in the current workflows list
+                if (savedId && data.some(w => w.id === savedId)) {
+                    setWorkflowId(savedId);
+                } else {
+                    setWorkflowId(data[0].id);
+                }
             }
         });
     }, []);
+
+    const handleWorkflowChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newId = e.target.value;
+        setWorkflowId(newId);
+        localStorage.setItem(LOCAL_STORAGE_WORKFLOW_KEY, newId);
+    };
 
     const { execute: executeInitiateSafe } = useAction(initiateComfyUI, {
         onSuccess: (data: any) => {
@@ -76,42 +92,42 @@ export const ComfyUIPopover = ({
         if (!activeTaskId) return;
 
         const pollTimer = setInterval(async () => {
-             const resultRaw = await checkComfyUIStatus({ taskId: activeTaskId });
-             const result = resultRaw as any; // Bypass SafeActionResult typing complexity
+            const resultRaw = await checkComfyUIStatus({ taskId: activeTaskId });
+            const result = resultRaw as any; // Bypass SafeActionResult typing complexity
 
-             if (result?.data?.error || result?.error || result?.serverError) {
-                 addToast(result?.data?.error || result?.error || result?.serverError || "Failed", "error");
-                 setIsGenerating(false);
-                 setActiveTaskId(null);
-                 clearInterval(pollTimer);
-                 return;
-             }
+            if (result?.data?.error || result?.error || result?.serverError) {
+                addToast(result?.data?.error || result?.error || result?.serverError || "Failed", "error");
+                setIsGenerating(false);
+                setActiveTaskId(null);
+                clearInterval(pollTimer);
+                return;
+            }
 
-             const returnData = result?.data?.data || result?.data;
+            const returnData = result?.data?.data || result?.data;
 
-             if (returnData) {
-                 if (returnData.status === "failed") {
-                     addToast("Generation failed on ComfyUI.", "error");
-                     setIsGenerating(false);
-                     setActiveTaskId(null);
-                     clearInterval(pollTimer);
-                 } else if (returnData.status === "finished" && returnData.imageUrl) {
-                     clearInterval(pollTimer);
-                     setStatusText("Attaching image...");
-                     // Warning caveat: This attaches the Ngrok tunnel direct URL.
-                     // The image depends on the tunnel and PC staying online. Future enhancement would pipe this to S3.
-                     executeCreateAttachment({
-                         url: returnData.imageUrl,
-                         boardId,
-                         id: cardId, // Action takes 'id' as cardId usually
-                         type: "IMAGE"
-                     });
-                     setActiveTaskId(null);
-                 } else {
-                     // Still processing or pending
-                     setStatusText(`Generating... ${returnData.progress || ""}`);
-                 }
-             }
+            if (returnData) {
+                if (returnData.status === "failed") {
+                    addToast("Generation failed on ComfyUI.", "error");
+                    setIsGenerating(false);
+                    setActiveTaskId(null);
+                    clearInterval(pollTimer);
+                } else if (returnData.status === "finished" && returnData.imageUrl) {
+                    clearInterval(pollTimer);
+                    setStatusText("Attaching image...");
+                    // Warning caveat: This attaches the Ngrok tunnel direct URL.
+                    // The image depends on the tunnel and PC staying online. Future enhancement would pipe this to S3.
+                    executeCreateAttachment({
+                        url: returnData.imageUrl,
+                        boardId,
+                        id: cardId, // Action takes 'id' as cardId usually
+                        type: "IMAGE"
+                    });
+                    setActiveTaskId(null);
+                } else {
+                    // Still processing or pending
+                    setStatusText(`Generating... ${returnData.progress || ""}`);
+                }
+            }
         }, 3000);
 
         return () => clearInterval(pollTimer);
@@ -141,15 +157,15 @@ export const ComfyUIPopover = ({
             </div>
 
             {isGenerating ? (
-                 <div className="flex flex-col items-center justify-center py-6 gap-y-4">
-                     <Loader2 className="h-8 w-8 animate-spin text-pink-600" />
-                     <div className="text-sm font-medium text-neutral-600 text-center px-4">
-                         {statusText}
-                     </div>
-                     <p className="text-[10px] text-neutral-400 text-center mt-2">
-                         Pinging your local ComfyUI instance. Keep your PC awake!
-                     </p>
-                 </div>
+                <div className="flex flex-col items-center justify-center py-6 gap-y-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-pink-600" />
+                    <div className="text-sm font-medium text-neutral-600 text-center px-4">
+                        {statusText}
+                    </div>
+                    <p className="text-[10px] text-neutral-400 text-center mt-2">
+                        Pinging your local ComfyUI instance. Keep your PC awake!
+                    </p>
+                </div>
             ) : (
                 <form onSubmit={handleFormSubmit} className="flex flex-col gap-y-3 mt-2">
                     <div className="flex flex-col gap-y-1">
@@ -163,12 +179,12 @@ export const ComfyUIPopover = ({
                             autoFocus
                         />
                     </div>
-                    
+
                     <div className="flex flex-col gap-y-1">
                         <label className="text-xs font-semibold text-neutral-600">Workflow Model</label>
                         <select
                             value={workflowId}
-                            onChange={(e) => setWorkflowId(e.target.value)}
+                            onChange={handleWorkflowChange}
                             className="text-sm px-2 py-1.5 border rounded-sm outline-none w-full bg-white cursor-pointer focus:ring-1 focus:ring-pink-600 disabled:opacity-50"
                             disabled={workflows.length === 0}
                         >
@@ -194,16 +210,16 @@ export const ComfyUIPopover = ({
                             <option value="1024x1024">1024 x 1024 (High Res)</option>
                         </select>
                     </div>
-                    
-                    <button 
-                        type="submit" 
-                        disabled={!prompt.trim()} 
+
+                    <button
+                        type="submit"
+                        disabled={!prompt.trim()}
                         className="bg-pink-600 text-white rounded-sm text-sm font-medium px-4 py-2 hover:bg-pink-700 w-full transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-x-2"
                     >
                         <Sparkles className="h-4 w-4" />
                         Generate Image
                     </button>
-                    
+
                     <p className="text-[10px] text-neutral-400 mt-1 leading-relaxed text-center">
                         Images are generated locally using your ComfyUI server tunnel.
                     </p>

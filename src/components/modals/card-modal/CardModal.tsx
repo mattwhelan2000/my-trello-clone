@@ -781,17 +781,18 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
 
                         {/* ComfyUI AI Generation Button */}
                         <div className="relative mt-2">
-                            <button 
-                                onClick={() => setIsComfyUIOpen(!isComfyUIOpen)} 
+                            <button
+                                onClick={() => setIsComfyUIOpen(!isComfyUIOpen)}
                                 className="w-full text-left text-sm px-3 py-2 rounded-sm flex items-center gap-x-2 bg-gradient-to-r from-pink-600/10 to-red-600/10 hover:from-pink-600/20 hover:to-red-600/20 border border-pink-500/20 text-pink-700 transition"
                             >
                                 <Sparkles className="h-4 w-4 text-pink-600" /> AI Image Gen
                             </button>
                             {isComfyUIOpen && (
-                                <ComfyUIPopover 
-                                    cardId={data.id} 
-                                    boardId={boardId} 
-                                    onClose={() => setIsComfyUIOpen(false)} 
+                                <ComfyUIPopover
+                                    cardId={data.id}
+                                    boardId={boardId}
+                                    defaultPrompt={`${data.title || ""} ${data.description || ""}`.trim()}
+                                    onClose={() => setIsComfyUIOpen(false)}
                                 />
                             )}
                         </div>
