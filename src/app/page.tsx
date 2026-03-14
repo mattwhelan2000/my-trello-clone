@@ -17,7 +17,7 @@ export default async function HomePage() {
         <div className="flex items-center gap-x-2 font-semibold text-xl text-neutral-200">
           <LayoutDashboard className="h-7 w-7 text-blue-500" />
           Your Boards
-          <span className="text-xs font-mono text-neutral-500 ml-2 bg-neutral-800 px-2 py-0.5 rounded-sm">0314.11:27</span>
+          <span className="text-xs font-mono text-neutral-500 ml-2 bg-neutral-800 px-2 py-0.5 rounded-sm">0314.11:35</span>
         </div>
 
         {/* Action Buttons Row */}

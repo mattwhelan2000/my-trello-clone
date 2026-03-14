@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
             timeOfDay: string;
             description: string;
             bodyLength: number;
+            characters: Set<string>;
         }
 
         const scenes: SceneData[] = [];
@@ -71,10 +72,12 @@ export async function POST(req: NextRequest) {
             const line = rawLine.trim();
             if (!line) continue;
             
-            // If the line is EXCLUSIVELY a number (like when unpdf splits a left-justified number onto its own line)
-            // It can be a number surrounded by up to two letters, e.g. 15, 15A, AA15, 15Z
-            if (/^[A-Za-z]{0,2}\d+[A-Za-z]?$/.test(line)) {
-                lastStandaloneNumber = line;
+            // If the line is EXCLUSIVELY a number or alphanumeric scene identifier
+            if (/^([A-Za-z0-9]+(?:[-.-][A-Za-z0-9]+)*)$/.test(line)) {
+                // If it contains at least one digit, it could be a standalone scene number
+                if (/\d/.test(line)) {
+                    lastStandaloneNumber = line;
+                }
             }
             
             let isHeading = false;
@@ -82,23 +85,24 @@ export async function POST(req: NextRequest) {
             let headingText = "";
             
             // 1. Check if line starts with a number. Use a generous match for the rest of the line.
-            // Screenplays generally have the scene number on the left.
-            const numMatch = line.match(/^([A-Za-z]{0,2}\d+[A-Za-z]?)\s+(.+)$/);
+            const numMatch = line.match(/^([A-Za-z0-9]+(?:[-.-][A-Za-z0-9]+)*)\s+(.+)$/);
             let content = line;
 
-            if (numMatch) {
+            if (numMatch && /\d/.test(numMatch[1])) {
                 sceneNum = numMatch[1];
                 content = numMatch[2].trim();
                 
                 // Remove trailing scene number if it matches the leading one
-                const trailingNumRegex = new RegExp(`\\s+${sceneNum}$`, 'i');
+                // Escape regex parts just in case
+                const escapedNum = sceneNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const trailingNumRegex = new RegExp(`\\s+${escapedNum}$`, 'i');
                 if (trailingNumRegex.test(content)) {
                     content = content.replace(trailingNumRegex, '').trim();
                 }
             } else {
                 // Also remove trailing numbers if there are any just in case, like INT. BASEMENT - DAY 2
-                const trailingNumMatch = content.match(/^(.*?)\s+([A-Za-z]{0,2}\d+[A-Za-z]?)$/);
-                if (trailingNumMatch) {
+                const trailingNumMatch = content.match(/^(.*?)\s+([A-Za-z0-9]+(?:[-.-][A-Za-z0-9]+)*)$/);
+                if (trailingNumMatch && /\d/.test(trailingNumMatch[2])) {
                     // Only strip if what's left looks like a heading
                     if (/(INT\.|EXT\.|I\/E\.|INT\/EXT)/i.test(trailingNumMatch[1])) {
                         content = trailingNumMatch[1].trim();
@@ -109,7 +113,7 @@ export async function POST(req: NextRequest) {
             }
 
             // Is it undeniably a scene heading?
-            if (/^(INT\.|EXT\.|I\/E\.|INT\/EXT)/i.test(content)) {
+            if (/^(INT\.|EXT\.|I\/E\.|INT\/EXT)\b/i.test(content)) {
                 isHeading = true;
             } else if (/^(CU\s|CLOSE UP\b|WIDE\b|ANGLE\b|POV\b)/i.test(content)) {
                 isHeading = true;
@@ -157,11 +161,13 @@ export async function POST(req: NextRequest) {
                 // Clean up any leading dash left over from extracting the intExt
                 location = location.replace(/^-\s*/, "").trim();
                 
-                // Strip redundant trailing scene numbers or page numbers from the location
-                location = location.replace(/\s+-\s+[A-Za-z]{0,2}\d+[A-Za-z]?$/, "").trim(); 
-                location = location.replace(/\s+[A-Za-z]{0,2}\d+[A-Za-z]?$/, "").trim();
-                location = location.replace(/\s+\d+$/, "").trim();
-                location = location.replace(/\s+-$/, "").trim(); // Clean up any hanging dashes
+                // Strip redundant trailing scene numbers, page numbers, and list of numbers
+                let prevLoc;
+                do {
+                    prevLoc = location;
+                    location = location.replace(/(?:[\s,]+and\s+|\s+-\s+|[\s,]+|\s+)\b[A-Za-z]{0,2}\d+[A-Za-z]?\b[.,\s]*$/i, "").trim();
+                } while (location !== prevLoc);
+                location = location.replace(/[-,\s]+$/, "").trim(); // Clean up any hanging dashes or commas
 
                 if (!location) location = "UNKNOWN LOCATION";
 
@@ -184,7 +190,8 @@ export async function POST(req: NextRequest) {
                     location: location.toUpperCase(),
                     timeOfDay: timeOfDay,
                     description: "",
-                    bodyLength: 0
+                    bodyLength: 0,
+                    characters: new Set<string>()
                 };
                 scenes.push(currentScene);
                 
@@ -237,6 +244,9 @@ export async function POST(req: NextRequest) {
                         // Ignore names with numbers which are likely scene headers that slipped by
                         if (cleanName && cleanName.length > 2 && !/\d/.test(cleanName)) {
                             characterCounts[cleanName] = (characterCounts[cleanName] || 0) + 1;
+                            if (currentScene) {
+                                currentScene.characters.add(cleanName);
+                            }
                         }
                     }
                 }
@@ -329,6 +339,17 @@ export async function POST(req: NextRequest) {
             await db.card.create({ data: { title: scene.timeOfDay || "N/A", listId: list.id, order: 1, color: "#fef08a" } });
             await db.card.create({ data: { title: "SET LOCATION", listId: list.id, order: 2, color: "#bbf7d0" } });
             await db.card.create({ data: { title: "VFX", listId: list.id, order: 3, color: "#fecaca" } });
+
+            const sceneChars = Array.from(scene.characters).join(", ");
+            await db.card.create({ 
+                data: { 
+                    title: "CHARACTERS", 
+                    description: sceneChars ? sceneChars : "No characters detected.",
+                    listId: list.id, 
+                    order: 4, 
+                    color: "#fbcfe8" // Pinkish color for characters
+                } 
+            });
         }
 
         revalidatePath("/");
