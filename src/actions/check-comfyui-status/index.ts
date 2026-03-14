@@ -14,7 +14,11 @@ export const checkComfyUIStatus = actionClient
                 return { error: "ComfyUI API URL missing." };
             }
 
-            const response = await fetch(`${COMFYUI_API_URL}/history/${taskId}`);
+            const response = await fetch(`${COMFYUI_API_URL}/history/${taskId}`, {
+                headers: {
+                    "ngrok-skip-browser-warning": "true"
+                }
+            });
             
             if (!response.ok) {
                 // Usually means not done yet, or server down

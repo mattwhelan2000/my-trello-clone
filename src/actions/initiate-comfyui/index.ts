@@ -64,7 +64,10 @@ export const initiateComfyUI = actionClient
 
             const response = await fetch(`${COMFYUI_API_URL}/prompt`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "ngrok-skip-browser-warning": "true"
+                },
                 body: JSON.stringify({ prompt: workflowObj }),
             });
 
