@@ -71,7 +71,8 @@ export async function POST(req: NextRequest) {
             if (!line) continue;
             
             // If the line is EXCLUSIVELY a number (like when unpdf splits a left-justified number onto its own line)
-            if (/^\d+[A-Z]?$/.test(line)) {
+            // It can be a number surrounded by up to two letters, e.g. 15, 15A, AA15, 15Z
+            if (/^[A-Za-z]{0,2}\d+[A-Za-z]?$/.test(line)) {
                 lastStandaloneNumber = line;
             }
             
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
             
             // 1. Check if line starts with a number. Use a generous match for the rest of the line.
             // Screenplays generally have the scene number on the left.
-            const numMatch = line.match(/^(\d+[A-Z]?)\s+(.+)$/);
+            const numMatch = line.match(/^([A-Za-z]{0,2}\d+[A-Za-z]?)\s+(.+)$/);
             let content = line;
 
             if (numMatch) {
@@ -89,13 +90,13 @@ export async function POST(req: NextRequest) {
                 content = numMatch[2].trim();
                 
                 // Remove trailing scene number if it matches the leading one
-                const trailingNumRegex = new RegExp(`\\s+${sceneNum}$`);
+                const trailingNumRegex = new RegExp(`\\s+${sceneNum}$`, 'i');
                 if (trailingNumRegex.test(content)) {
                     content = content.replace(trailingNumRegex, '').trim();
                 }
             } else {
                 // Also remove trailing numbers if there are any just in case, like INT. BASEMENT - DAY 2
-                const trailingNumMatch = content.match(/^(.*?)\s+(\d+[A-Z]?)$/);
+                const trailingNumMatch = content.match(/^(.*?)\s+([A-Za-z]{0,2}\d+[A-Za-z]?)$/);
                 if (trailingNumMatch) {
                     // Only strip if what's left looks like a heading
                     if (/(INT\.|EXT\.|I\/E\.|INT\/EXT)/i.test(trailingNumMatch[1])) {
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
                 isHeading = true;
             } else if (/^(CU\s|CLOSE UP\b|WIDE\b|ANGLE\b|POV\b)/i.test(content)) {
                 isHeading = true;
-            } else if (sceneNum && content.toUpperCase() === content && content.length > 3) {
+            } else if (sceneNum && content.toUpperCase() === content && content.length > 2) {
                 // If it had a number AND is all caps, it's likely a heading like "6 WYNN"
                 isHeading = true;
             }
@@ -144,22 +145,23 @@ export async function POST(req: NextRequest) {
                     }
                 }
                 
-                // 3. Extract INT/EXT/CU prefix
-                let intExt = "SCENE";
+                // 3. Extract INT/EXT prefix strictly. Set "N/A" if missing.
+                let intExt = "N/A";
                 const intExtMatch = location.match(/^(INT\.|EXT\.|I\/E\.|INT\/EXT)\s+/i);
                 if (intExtMatch) {
                     intExt = intExtMatch[1].toUpperCase();
                     location = location.substring(intExtMatch[0].length).trim();
-                } else if (location.startsWith("CU ")) {
-                    intExt = "CU";
-                    location = location.substring(3).trim();
-                } else if (location === "CU") {
-                    intExt = "CU";
-                    location = "";
                 }
                 
                 // Clean up any leading dash left over from extracting the intExt
                 location = location.replace(/^-\s*/, "").trim();
+                
+                // Strip redundant trailing scene numbers or page numbers from the location
+                location = location.replace(/\s+-\s+[A-Za-z]{0,2}\d+[A-Za-z]?$/, "").trim(); 
+                location = location.replace(/\s+[A-Za-z]{0,2}\d+[A-Za-z]?$/, "").trim();
+                location = location.replace(/\s+\d+$/, "").trim();
+                location = location.replace(/\s+-$/, "").trim(); // Clean up any hanging dashes
+
                 if (!location) location = "UNKNOWN LOCATION";
 
                 // Auto numbering fallback
