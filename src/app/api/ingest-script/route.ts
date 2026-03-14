@@ -45,50 +45,165 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // ========== ROBUST SCENE PARSING ==========
-        // Use global regex on full text to find scene headings regardless of newline formatting.
-        // Standard screenplay scene headings: "INT." or "EXT." or "INT./EXT." or "I/E."
-        // Optionally preceded by a scene number and followed by location - time of day
+        // ========== V2 SCENE PARSING (Line-by-Line) ==========
+        const lines = text.split('\n');
         
-        // This regex finds scene headings anywhere in the text, not just at line beginnings
-        const globalSceneRegex = /(?:^|\n)\s*(?:(\d+[A-Z]?)\s+)?(?:(INT\.|EXT\.|INT\.\/EXT\.|INT\/EXT\.|I\/E\.)\s+)([\s\S]*?)(?=(?:\n\s*(?:\d+[A-Z]?\s+)?(?:INT\.|EXT\.|INT\.\/EXT\.|INT\/EXT\.|I\/E\.)\s)|$)/gi;
-
-        // Also try a simpler approach: split the text at scene heading boundaries
-        const sceneHeadingPattern = /(?:(\d+[A-Z]?)\s+)?(INT\.|EXT\.|INT\.\/EXT\.|INT\/EXT\.|I\/E\.)\s+/gi;
-        
-        // Find all scene heading positions
-        const headingPositions: Array<{
-            index: number;
-            sceneNum: string;
+        interface SceneData {
+            number: string;
+            isAutoNumbered: boolean;
             intExt: string;
-            fullMatch: string;
-        }> = [];
-
-        let headingMatch;
-        while ((headingMatch = sceneHeadingPattern.exec(text)) !== null) {
-            headingPositions.push({
-                index: headingMatch.index,
-                sceneNum: headingMatch[1] || "",
-                intExt: headingMatch[2],
-                fullMatch: headingMatch[0]
-            });
+            location: string;
+            timeOfDay: string;
+            description: string;
+            bodyLength: number;
         }
 
-        console.log("[SCRIPT INGEST] Found", headingPositions.length, "scene headings");
-        
-        if (headingPositions.length === 0) {
+        const scenes: SceneData[] = [];
+        let currentScene: any = null;
+        let autoCounter = 1;
+
+        const timeOfDayList = ['DAY', 'NIGHT', 'CONTINUOUS', 'SAME', 'MOMENTS LATER', 'LATER', 'FOLLOWING'];
+
+        for (let i = 0; i < lines.length; i++) {
+            const rawLine = lines[i];
+            const line = rawLine.trim();
+            if (!line) continue;
+            
+            let isHeading = false;
+            let sceneNum = "";
+            let headingText = "";
+            
+            // 1. Check if line starts with a number. Use a generous match for the rest of the line.
+            // Screenplays generally have the scene number on the left.
+            const numMatch = line.match(/^(\d+[A-Z]?)\s+(.+)$/);
+            if (numMatch) {
+                sceneNum = numMatch[1];
+                let content = numMatch[2].trim();
+                
+                // Remove trailing scene number if it matches the leading one
+                const trailingNumRegex = new RegExp(`\\s+${sceneNum}$`);
+                let hasTrailingNum = false;
+                if (trailingNumRegex.test(content)) {
+                    content = content.replace(trailingNumRegex, '').trim();
+                    hasTrailingNum = true;
+                }
+
+                // Is it undeniably a scene heading?
+                if (/(INT\.|EXT\.|I\/E\.|INT\/EXT)/i.test(content)) {
+                    isHeading = true;
+                } else if (/^(CU|CLOSE UP|WIDE|ANGLE|POV)\b/i.test(content)) {
+                    isHeading = true;
+                } else if (hasTrailingNum && content.toUpperCase() === content) {
+                    isHeading = true;
+                }
+                
+                if (isHeading) {
+                    headingText = content;
+                }
+            }
+            
+            if (isHeading) {
+                let location = headingText;
+                let timeOfDay = "";
+                
+                // 2. Parse exact Time of Day from hardcoded list
+                const dashParts = headingText.split(/\s+-\s+/);
+                if (dashParts.length > 1) {
+                    const lastPart = dashParts[dashParts.length - 1].toUpperCase().trim();
+                    for (const time of timeOfDayList) {
+                        if (lastPart.includes(time)) {
+                            timeOfDay = time;
+                            dashParts.pop(); // Remove the time part from the location array
+                            location = dashParts.join(" - ").trim();
+                            break;
+                        }
+                    }
+                }
+                
+                // 3. Extract INT/EXT/CU prefix
+                let intExt = "SCENE";
+                const intExtMatch = location.match(/^(INT\.|EXT\.|I\/E\.|INT\/EXT)\s+/i);
+                if (intExtMatch) {
+                    intExt = intExtMatch[1].toUpperCase();
+                    location = location.substring(intExtMatch[0].length).trim();
+                } else if (location.startsWith("CU ")) {
+                    intExt = "CU";
+                    location = location.substring(3).trim();
+                } else if (location === "CU") {
+                    intExt = "CU";
+                    location = "";
+                }
+                
+                // Clean up any leading dash left over from extracting the intExt
+                location = location.replace(/^-\s*/, "").trim();
+                if (!location) location = "UNKNOWN LOCATION";
+
+                // Auto numbering fallback (though numMatch guarantees sceneNum exists, keep this just in case)
+                let isAuto = false;
+                if (!sceneNum) {
+                    sceneNum = `${autoCounter++}`;
+                    isAuto = true;
+                } else {
+                    const parsedNum = parseInt(sceneNum.replace(/\D/g, ''));
+                    if (!isNaN(parsedNum) && parsedNum >= autoCounter) {
+                        autoCounter = parsedNum + 1;
+                    }
+                }
+
+                currentScene = {
+                    number: sceneNum,
+                    isAutoNumbered: isAuto,
+                    intExt: intExt,
+                    location: location.toUpperCase(),
+                    timeOfDay: timeOfDay,
+                    description: "",
+                    bodyLength: 0
+                };
+                scenes.push(currentScene);
+                
+                // 4. Extract Scene Description
+                let descLines = [];
+                let j = i + 1;
+                // Skip immediate empty lines
+                while (j < lines.length && lines[j].trim() === "") j++;
+                
+                while (j < lines.length) {
+                    const nextLine = lines[j].trim();
+                    if (nextLine === "") break; // Stop at first empty line after a text block
+                    
+                    const hasLetters = /[a-zA-Z]/.test(nextLine);
+                    const isAllCaps = hasLetters && nextLine.toUpperCase() === nextLine;
+                    
+                    // Dialogue usually starts with a character name (ALL CAPS) or is heavily indented.
+                    // If a line is ALL CAPS, or has significant leading spaces, it's NOT the scene description.
+                    const leadingSpaces = lines[j].search(/\S/);
+                    if (isAllCaps || leadingSpaces > 15) {
+                        break; 
+                    }
+                    
+                    descLines.push(nextLine);
+                    j++;
+                }
+                
+                currentScene.description = descLines.join(" ").trim();
+                continue;
+            }
+            
+            if (currentScene) {
+                currentScene.bodyLength++;
+            }
+        }
+
+        console.log("[SCRIPT INGEST] Parsed", scenes.length, "scenes. First 3 scenes:", JSON.stringify(scenes.slice(0, 3), null, 2));
+
+        if (scenes.length === 0) {
             // Log some text samples to help debug
             console.log("[SCRIPT INGEST] No headings found. Checking for INT/EXT keywords...");
             const intExtCount = (text.match(/\b(INT|EXT)\b/gi) || []).length;
-            console.log("[SCRIPT INGEST] Found", intExtCount, "INT/EXT keywords in text");
             
             // Return debug info
             const board = await db.board.create({
-                data: {
-                    title: boardTitle,
-                    workspaceId: workspace.id,
-                    bgColor
-                }
+                data: { title: boardTitle, workspaceId: workspace.id, bgColor }
             });
             
             revalidatePath("/");
@@ -98,77 +213,6 @@ export async function POST(req: NextRequest) {
                 textSample: text.substring(0, 500)
             });
         }
-
-        // Parse each scene from the heading positions
-        interface SceneData {
-            number: string;
-            isAutoNumbered: boolean;
-            intExt: string;
-            location: string;
-            timeOfDay: string;
-            bodyLength: number;
-        }
-
-        const scenes: SceneData[] = [];
-        let autoCounter = 1;
-
-        for (let i = 0; i < headingPositions.length; i++) {
-            const heading = headingPositions[i];
-            const nextHeading = headingPositions[i + 1];
-
-            // Extract the text between this heading and the next one
-            const headingEndIndex = heading.index + heading.fullMatch.length;
-            const sceneEndIndex = nextHeading ? nextHeading.index : text.length;
-            const sceneBody = text.substring(headingEndIndex, sceneEndIndex);
-
-            // Parse location and time of day from the first line after INT./EXT.
-            const firstLineEnd = sceneBody.indexOf('\n');
-            const headingLine = firstLineEnd > -1 ? sceneBody.substring(0, firstLineEnd).trim() : sceneBody.trim();
-
-            let location = "UNKNOWN LOCATION";
-            let timeOfDay = "UNKNOWN TIME";
-
-            // Split on " - " to separate location from time of day
-            const dashParts = headingLine.split(/\s+-\s+/);
-            if (dashParts.length > 1) {
-                timeOfDay = dashParts.pop()?.trim() || "UNKNOWN TIME";
-                location = dashParts.join(' - ').trim();
-            } else if (headingLine) {
-                location = headingLine.trim();
-            }
-
-            // Clean up location - remove trailing scene numbers
-            location = location.replace(/\s+\d+[A-Z]?\s*$/, "").trim();
-            if (!location) location = "UNKNOWN LOCATION";
-
-            // Determine scene number
-            let sceneNum = heading.sceneNum;
-            let isAuto = false;
-
-            if (!sceneNum) {
-                sceneNum = `${autoCounter++}`;
-                isAuto = true;
-            } else {
-                const parsedNum = parseInt(sceneNum.replace(/\D/g, ''));
-                if (!isNaN(parsedNum) && parsedNum >= autoCounter) {
-                    autoCounter = parsedNum + 1;
-                }
-            }
-
-            // Estimate body length for page-eighths calculation
-            const bodyLines = sceneBody.split('\n').filter((l: string) => l.trim().length > 0);
-
-            scenes.push({
-                number: sceneNum,
-                isAutoNumbered: isAuto,
-                intExt: heading.intExt.toUpperCase(),
-                location: location.toUpperCase(),
-                timeOfDay: timeOfDay.toUpperCase().replace(/\s+\d+[A-Z]?\s*$/, ""),
-                bodyLength: bodyLines.length
-            });
-        }
-
-        console.log("[SCRIPT INGEST] Parsed", scenes.length, "scenes. First 3 scenes:", JSON.stringify(scenes.slice(0, 3), null, 2));
 
         // Create the board
         const board = await db.board.create({
@@ -197,8 +241,8 @@ export async function POST(req: NextRequest) {
                 data: { title: listTitle, boardId: board.id, order: listOrder++ }
             });
 
-            await db.card.create({ data: { title: scene.location, listId: list.id, order: 0, color: "#bae6fd" } });
-            await db.card.create({ data: { title: scene.timeOfDay, listId: list.id, order: 1, color: "#fef08a" } });
+            await db.card.create({ data: { title: scene.location, listId: list.id, order: 0, color: "#bae6fd", description: scene.description } });
+            await db.card.create({ data: { title: scene.timeOfDay || "N/A", listId: list.id, order: 1, color: "#fef08a" } });
             await db.card.create({ data: { title: "SET LOCATION", listId: list.id, order: 2, color: "#bbf7d0" } });
             await db.card.create({ data: { title: "VFX", listId: list.id, order: 3, color: "#fecaca" } });
         }
