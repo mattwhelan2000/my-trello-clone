@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
             let isHeading = false;
             let sceneNum = "";
             let headingText = "";
+            let trailingNumMatch: RegExpMatchArray | null = null;
             
             // 1. Check if line starts with a number. Use a generous match for the rest of the line.
             const numMatch = line.match(/^([A-Za-z0-9]+(?:[-.-][A-Za-z0-9]+)*)\s+(.+)$/);
@@ -101,12 +102,12 @@ export async function POST(req: NextRequest) {
                 }
             } else {
                 // Also remove trailing numbers if there are any just in case, like INT. BASEMENT - DAY 2
-                const trailingNumMatch = content.match(/^(.*?)\s+([A-Za-z0-9]+(?:[-.-][A-Za-z0-9]+)*)$/);
+                trailingNumMatch = content.match(/^(.*?)\s+([A-Za-z0-9]+(?:[-.-][A-Za-z0-9]+)*)$/);
                 if (trailingNumMatch && /\d/.test(trailingNumMatch[2])) {
                     // Only strip if what's left looks like a heading
                     if (/(INT\.|EXT\.|I\/E\.|INT\/EXT)/i.test(trailingNumMatch[1])) {
                         content = trailingNumMatch[1].trim();
-                        // If we didn't have a flush-left number, we can use the flush-right one
+                        // If we didn't have a flush-left number, we can use the flush-right one for now
                         if (!sceneNum) sceneNum = trailingNumMatch[2];
                     }
                 }
@@ -125,8 +126,9 @@ export async function POST(req: NextRequest) {
             if (isHeading) {
                 headingText = content;
                 
-                // If we didn't capture a number on this line, see if the previous line was a standalone number
-                if (!sceneNum && lastStandaloneNumber) {
+                // If we didn't capture a number on the LEFT side of this line, but the previous line was a standalone number,
+                // we should heavily prefer the standalone number over any flush-right number (which might just be a page number).
+                if (lastStandaloneNumber && (!sceneNum || sceneNum === trailingNumMatch?.[2])) {
                     sceneNum = lastStandaloneNumber;
                 }
                 
