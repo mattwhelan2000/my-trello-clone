@@ -292,16 +292,22 @@ export async function POST(req: NextRequest) {
         // 1. Characters List
         const sortedCharacters = Object.entries(characterCounts)
             .sort((a, b) => b[1] - a[1])
-            .map(e => e[0])
-            .filter((name, idx, arr) => characterCounts[name] > 1 || arr.length <= 15);
+            .filter((entry, idx, arr) => entry[1] > 1 || arr.length <= 15);
 
         if (sortedCharacters.length > 0) {
             const charsList = await db.list.create({
                 data: { title: "CHARACTERS", boardId: board.id, order: listOrder++ }
             });
             for (let i = 0; i < sortedCharacters.length; i++) {
+                const [name, count] = sortedCharacters[i];
                 await db.card.create({ 
-                    data: { title: sortedCharacters[i], listId: charsList.id, order: i, color: "#fecaca" } 
+                    data: { 
+                        title: name, 
+                        description: `Speaking Lines: ${count}`,
+                        listId: charsList.id, 
+                        order: i, 
+                        color: "#fecaca" 
+                    } 
                 });
             }
         }
