@@ -120,9 +120,14 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
             if (data && "success" in data) {
                 addToast("Google Sheet Synced successfully", "success");
                 setIsOpen(false);
+            } else if (data && "error" in data) {
+                addToast(data.error as string, "error");
             }
         },
-        onError: (error) => console.error("Sync failed", error)
+        onError: (error) => {
+            console.error("Sync failed", error);
+            addToast("A network error occurred during sync.", "error");
+        }
     });
 
     const anyLoading = isLoading || isExporting || isExportingCSV || isSyncing;
