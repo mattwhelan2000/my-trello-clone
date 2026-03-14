@@ -9,7 +9,7 @@ export const initiateComfyUI = actionClient
     .action(async ({ parsedInput: { prompt, width, height, workflowId, boardId, cardId } }) => {
         try {
             // Strip any trailing slashes from the URL
-            const configUrl = process.env.COMFYUI_API_URL || "";
+            const configUrl = (process.env.COMFYUI_API_URL || "").replace(/['"]/g, "").trim();
             const COMFYUI_API_URL = configUrl.endsWith('/') ? configUrl.slice(0, -1) : configUrl;
             
             if (!COMFYUI_API_URL) {

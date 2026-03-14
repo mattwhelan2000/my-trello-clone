@@ -7,7 +7,7 @@ export const checkComfyUIStatus = actionClient
     .schema(CheckComfyUIStatus)
     .action(async ({ parsedInput: { taskId } }) => {
         try {
-            const configUrl = process.env.COMFYUI_API_URL || "";
+            const configUrl = (process.env.COMFYUI_API_URL || "").replace(/['"]/g, "").trim();
             const COMFYUI_API_URL = configUrl.endsWith('/') ? configUrl.slice(0, -1) : configUrl;
 
             if (!COMFYUI_API_URL) {
