@@ -266,6 +266,22 @@ export async function POST(req: NextRequest) {
                 currentScene.bodyLength++;
             }
         }
+        // Post-process scenes to find any previously established characters mentioned in action lines
+        // Only consider valid speaking characters to avoid false positives with random capitalized words
+        const allKnownCharacters = Object.keys(characterCounts).filter(name => characterCounts[name] > 0);
+        for (const scene of scenes) {
+            for (const charName of allKnownCharacters) {
+                // Skip if already found as speaking
+                if (scene.characters.has(charName)) continue;
+                
+                // Escape name and check if it exists in the description as a distinct word
+                const escapedName = charName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const nameRegex = new RegExp(`\\b${escapedName}\\b`, 'i');
+                if (nameRegex.test(scene.description)) {
+                    scene.characters.add(charName);
+                }
+            }
+        }
 
         console.log("[SCRIPT INGEST] Parsed", scenes.length, "scenes. First 3 scenes:", JSON.stringify(scenes.slice(0, 3), null, 2));
 
@@ -360,7 +376,7 @@ export async function POST(req: NextRequest) {
             await db.card.create({ 
                 data: { 
                     title: "CHARACTERS", 
-                    description: sceneChars ? sceneChars : "No characters detected.",
+                    description: sceneChars ? `Characters in scene: ${sceneChars}` : "No characters detected.",
                     listId: list.id, 
                     order: 4, 
                     color: "#fbcfe8" // Pinkish color for characters
