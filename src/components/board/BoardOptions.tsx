@@ -7,6 +7,7 @@ import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
 import { exportBoard } from "@/actions/export-board";
 import { syncGoogleSheet } from "@/actions/sync-google-sheet";
+import { pushGoogleSheet } from "@/actions/push-google-sheet";
 import { useToast } from "@/components/ui/Toast";
 
 interface BoardOptionsProps {
@@ -130,7 +131,22 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         }
     });
 
-    const anyLoading = isLoading || isExporting || isExportingCSV || isSyncing;
+    const { execute: executePush, isExecuting: isPushing } = useSafeAction(pushGoogleSheet, {
+        onSuccess: ({ data }) => {
+            if (data && "success" in data) {
+                addToast("Board pushed to Google Sheet successfully", "success");
+                setIsOpen(false);
+            } else if (data && "error" in data) {
+                addToast(data.error as string, "error");
+            }
+        },
+        onError: (error) => {
+            console.error("Push failed", error);
+            addToast("A network error occurred during push.", "error");
+        }
+    });
+
+    const anyLoading = isLoading || isExporting || isExportingCSV || isSyncing || isPushing;
 
     return (
         <div className="absolute top-4 right-4 z-[50] flex items-center gap-x-2">
@@ -275,6 +291,15 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                         >
                             <LayoutList className="h-4 w-4" />
                             {isSyncing ? "Syncing..." : "Sync from Sheet"}
+                        </button>
+
+                        <button
+                            onClick={() => executePush({ boardId })}
+                            disabled={anyLoading || !sheetId}
+                            className="bg-purple-100 text-purple-800 w-full rounded-sm text-sm font-medium py-1.5 hover:bg-purple-200 transition flex items-center justify-center gap-x-2"
+                        >
+                            <Download className="h-4 w-4" />
+                            {isPushing ? "Pushing..." : "Push to Sheet"}
                         </button>
                     </div>
                 </div>
