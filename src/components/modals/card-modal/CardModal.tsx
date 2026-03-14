@@ -205,6 +205,9 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         if (url.includes("dropbox.com") && url.includes("dl=0")) {
             return url.replace("dl=0", "raw=1");
         }
+        if (url.includes("ngrok-free.dev") && url.includes("view?filename=")) {
+            return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+        }
         return url;
     };
 
