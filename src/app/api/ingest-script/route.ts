@@ -68,7 +68,8 @@ export async function POST(req: NextRequest) {
         const timeOfDayList = ['DAY', 'NIGHT', 'CONTINUOUS', 'SAME', 'MOMENTS LATER', 'LATER', 'FOLLOWING'];
 
         for (let i = 0; i < lines.length; i++) {
-            const rawLine = lines[i];
+            // Strip out asterisks from the entire line right away
+            const rawLine = lines[i].replace(/\*/g, '');
             const line = rawLine.trim();
             if (!line) continue;
             
@@ -180,6 +181,16 @@ export async function POST(req: NextRequest) {
                 location = location.replace(/[-,\s]+$/, "").trim(); // Clean up any hanging dashes or commas
 
                 if (!location) location = "UNKNOWN LOCATION";
+
+                // Validation Catch 1: Is this an omitted scene?
+                if (location.toUpperCase().includes("OMITTED")) {
+                    continue; // Skip adding this scene entirely
+                }
+
+                // Validation Catch 2: Does the location actually contain text, and not just numbers/symbols?
+                if (!/[A-Za-z]/.test(location)) {
+                    continue; // Skip adding this scene entirely
+                }
 
                 // Auto numbering fallback
                 let isAuto = false;
