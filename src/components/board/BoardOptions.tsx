@@ -6,12 +6,14 @@ import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
 import { exportBoard } from "@/actions/export-board";
+import { syncGoogleSheet } from "@/actions/sync-google-sheet";
 import { useToast } from "@/components/ui/Toast";
 
 interface BoardOptionsProps {
     boardId: string;
     listsCount: number;
     cardsCount: number;
+    initialGoogleSheetId?: string | null;
 }
 
 const COLORS = [
@@ -41,10 +43,11 @@ function boardToCSV(board: any): string {
     return rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
 }
 
-export const BoardOptions = ({ boardId, listsCount, cardsCount }: BoardOptionsProps) => {
+export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleSheetId }: BoardOptionsProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
+    const [sheetId, setSheetId] = useState(initialGoogleSheetId || "");
     const { addToast } = useToast();
 
     const { execute, isLoading } = useAction(updateBoard, {
@@ -100,7 +103,29 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount }: BoardOptionsPr
         execute({ id: boardId, bgImage: imageUrl, bgColor: "" });
     };
 
-    const anyLoading = isLoading || isExporting || isExportingCSV;
+    const onSheetSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        // Extract ID from URL if user pastes a full URL
+        let finalId = sheetId;
+        const urlMatch = sheetId.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (urlMatch) {
+            finalId = urlMatch[1];
+        }
+        execute({ id: boardId, googleSheetId: finalId });
+        setSheetId(finalId);
+    };
+
+    const { execute: executeSync, isExecuting: isSyncing } = useSafeAction(syncGoogleSheet, {
+        onSuccess: ({ data }) => {
+            if (data && "success" in data) {
+                addToast("Google Sheet Synced successfully", "success");
+                setIsOpen(false);
+            }
+        },
+        onError: (error) => console.error("Sync failed", error)
+    });
+
+    const anyLoading = isLoading || isExporting || isExportingCSV || isSyncing;
 
     return (
         <div className="absolute top-4 right-4 z-[50] flex items-center gap-x-2">
@@ -205,6 +230,22 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount }: BoardOptionsPr
                         </form>
                     </div>
 
+                    <div>
+                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><LayoutList className="h-3 w-3" /> Google Sheet ID</h4>
+                        <form onSubmit={onSheetSubmit} className="flex flex-col gap-y-2 mb-4">
+                            <input
+                                value={sheetId}
+                                onChange={(e) => setSheetId(e.target.value)}
+                                placeholder="Paste Sheet URL or ID..."
+                                className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-green-600 w-full"
+                                disabled={anyLoading}
+                            />
+                            <button type="submit" disabled={anyLoading} className="bg-green-600 text-white w-full rounded-sm text-sm font-medium py-1.5 hover:bg-green-700 transition">
+                                Link Sheet
+                            </button>
+                        </form>
+                    </div>
+
                     <div className="pt-2 border-t flex flex-col gap-y-2">
                         <button
                             onClick={() => executeExport({ id: boardId })}
@@ -221,6 +262,14 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount }: BoardOptionsPr
                         >
                             <Download className="h-4 w-4" />
                             {isExportingCSV ? "Exporting..." : "Export as CSV"}
+                        </button>
+                        <button
+                            onClick={() => executeSync({ boardId })}
+                            disabled={anyLoading || !sheetId}
+                            className="bg-green-100 text-green-800 w-full rounded-sm text-sm font-medium py-1.5 hover:bg-green-200 transition flex items-center justify-center gap-x-2"
+                        >
+                            <LayoutList className="h-4 w-4" />
+                            {isSyncing ? "Syncing..." : "Sync from Sheet"}
                         </button>
                     </div>
                 </div>

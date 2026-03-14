@@ -5,4 +5,5 @@ export const UpdateBoardSchema = z.object({
     title: z.string().optional(),
     bgImage: z.string().optional(),
     bgColor: z.string().optional(),
+    googleSheetId: z.string().optional(),
 });
