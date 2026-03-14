@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
         const scenes: SceneData[] = [];
         let currentScene: any = null;
         let autoCounter = 1;
+        let lastStandaloneNumber = "";
 
         const timeOfDayList = ['DAY', 'NIGHT', 'CONTINUOUS', 'SAME', 'MOMENTS LATER', 'LATER', 'FOLLOWING'];
 
@@ -69,6 +70,11 @@ export async function POST(req: NextRequest) {
             const line = rawLine.trim();
             if (!line) continue;
             
+            // If the line is EXCLUSIVELY a number (like when unpdf splits a left-justified number onto its own line)
+            if (/^\d+[A-Z]?$/.test(line)) {
+                lastStandaloneNumber = line;
+            }
+            
             let isHeading = false;
             let sceneNum = "";
             let headingText = "";
@@ -76,33 +82,51 @@ export async function POST(req: NextRequest) {
             // 1. Check if line starts with a number. Use a generous match for the rest of the line.
             // Screenplays generally have the scene number on the left.
             const numMatch = line.match(/^(\d+[A-Z]?)\s+(.+)$/);
+            let content = line;
+
             if (numMatch) {
                 sceneNum = numMatch[1];
-                let content = numMatch[2].trim();
+                content = numMatch[2].trim();
                 
                 // Remove trailing scene number if it matches the leading one
                 const trailingNumRegex = new RegExp(`\\s+${sceneNum}$`);
-                let hasTrailingNum = false;
                 if (trailingNumRegex.test(content)) {
                     content = content.replace(trailingNumRegex, '').trim();
-                    hasTrailingNum = true;
                 }
+            } else {
+                // Also remove trailing numbers if there are any just in case, like INT. BASEMENT - DAY 2
+                const trailingNumMatch = content.match(/^(.*?)\s+(\d+[A-Z]?)$/);
+                if (trailingNumMatch) {
+                    // Only strip if what's left looks like a heading
+                    if (/(INT\.|EXT\.|I\/E\.|INT\/EXT)/i.test(trailingNumMatch[1])) {
+                        content = trailingNumMatch[1].trim();
+                        // If we didn't have a flush-left number, we can use the flush-right one
+                        if (!sceneNum) sceneNum = trailingNumMatch[2];
+                    }
+                }
+            }
 
-                // Is it undeniably a scene heading?
-                if (/(INT\.|EXT\.|I\/E\.|INT\/EXT)/i.test(content)) {
-                    isHeading = true;
-                } else if (/^(CU|CLOSE UP|WIDE|ANGLE|POV)\b/i.test(content)) {
-                    isHeading = true;
-                } else if (hasTrailingNum && content.toUpperCase() === content) {
-                    isHeading = true;
-                }
-                
-                if (isHeading) {
-                    headingText = content;
-                }
+            // Is it undeniably a scene heading?
+            if (/^(INT\.|EXT\.|I\/E\.|INT\/EXT)/i.test(content)) {
+                isHeading = true;
+            } else if (/^(CU\s|CLOSE UP\b|WIDE\b|ANGLE\b|POV\b)/i.test(content)) {
+                isHeading = true;
+            } else if (sceneNum && content.toUpperCase() === content && content.length > 3) {
+                // If it had a number AND is all caps, it's likely a heading like "6 WYNN"
+                isHeading = true;
             }
             
             if (isHeading) {
+                headingText = content;
+                
+                // If we didn't capture a number on this line, see if the previous line was a standalone number
+                if (!sceneNum && lastStandaloneNumber) {
+                    sceneNum = lastStandaloneNumber;
+                }
+                
+                // Reset since we've used it or passed it
+                lastStandaloneNumber = "";
+                
                 let location = headingText;
                 let timeOfDay = "";
                 
@@ -138,7 +162,7 @@ export async function POST(req: NextRequest) {
                 location = location.replace(/^-\s*/, "").trim();
                 if (!location) location = "UNKNOWN LOCATION";
 
-                // Auto numbering fallback (though numMatch guarantees sceneNum exists, keep this just in case)
+                // Auto numbering fallback
                 let isAuto = false;
                 if (!sceneNum) {
                     sceneNum = `${autoCounter++}`;
