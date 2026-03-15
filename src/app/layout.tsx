@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { ToastProvider } from "@/components/ui/Toast";
+import { ComfyUIBackgroundPoller } from "@/components/providers/ComfyUIBackgroundPoller";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +32,7 @@ export default function RootLayout({
       >
         <QueryProvider>
           <ToastProvider>
+            <ComfyUIBackgroundPoller />
             {children}
           </ToastProvider>
         </QueryProvider>

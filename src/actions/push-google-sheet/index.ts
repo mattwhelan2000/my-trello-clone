@@ -16,7 +16,14 @@ export const pushGoogleSheet = actionClient
                     lists: { 
                         orderBy: { order: 'asc' },
                         include: { 
-                            cards: { orderBy: { order: 'asc' } } 
+                            cards: { 
+                                orderBy: { order: 'asc' },
+                                include: {
+                                    attachments: {
+                                        where: { isCover: true }
+                                    }
+                                }
+                            } 
                         } 
                     } 
                 }
@@ -48,16 +55,17 @@ export const pushGoogleSheet = actionClient
             const sheets = google.sheets({ version: 'v4', auth: authClient });
             const spreadsheetId = board.googleSheetId;
 
-            // Strict 9 Columns as requested
             const headers = [
                 "SCENE",
                 "INT/EXT",
                 "LENGTH",
                 "Scene LOCATION",
                 "Scene DESCRIPTION",
+                "THUMBNAIL",
                 "TIME",
                 "SET LOCATION",
                 "VFX",
+                "VFX THUMBNAIL",
                 "CHARACTERS"
             ];
 
@@ -95,17 +103,25 @@ export const pushGoogleSheet = actionClient
                 // If the list itself was unsynced (title changed locally), track it to relink
                 if (!list.isSyncedWithSheet) listsToReLink.push(list.id);
 
-                // Map specific cards to columns 4-9 by Order (1st card = Scene LOCATION, etc)
+                // Map specific cards by Order
                 const sortedCards = list.cards || [];
                 
                 if (sortedCards[0]) {
                     row[3] = sortedCards[0].title;
                     row[4] = sortedCards[0].description || "";
+                    if (sortedCards[0].attachments && sortedCards[0].attachments.length > 0) {
+                        row[5] = `=IMAGE("${sortedCards[0].attachments[0].url}")`;
+                    }
                 }
-                if (sortedCards[1]) row[5] = sortedCards[1].title; // Time Title
-                if (sortedCards[2]) row[6] = sortedCards[2].description || "";
-                if (sortedCards[3]) row[7] = sortedCards[3].description || "";
-                if (sortedCards[4]) row[8] = sortedCards[4].description || "";
+                if (sortedCards[1]) row[6] = sortedCards[1].title; // Time Title
+                if (sortedCards[2]) row[7] = sortedCards[2].description || "";
+                if (sortedCards[3]) {
+                    row[8] = sortedCards[3].description || "";
+                    if (sortedCards[3].attachments && sortedCards[3].attachments.length > 0) {
+                        row[9] = `=IMAGE("${sortedCards[3].attachments[0].url}")`;
+                    }
+                }
+                if (sortedCards[4]) row[10] = sortedCards[4].description || "";
 
                 for (const card of sortedCards) {
                     if (!card.isSyncedWithSheet) cardsToReLink.push(card.id);
@@ -121,6 +137,50 @@ export const pushGoogleSheet = actionClient
                 range: 'A1',
                 valueInputOption: 'USER_ENTERED',
                 requestBody: { values: rows }
+            });
+
+            // Get sheet ID to apply formatting
+            const spreadsheetData = await sheets.spreadsheets.get({ spreadsheetId });
+            const sheetId = spreadsheetData.data.sheets?.[0]?.properties?.sheetId || 0;
+
+            // Apply formatting: blue header, thick border, freeze row 1
+            await sheets.spreadsheets.batchUpdate({
+                spreadsheetId,
+                requestBody: {
+                    requests: [
+                        {
+                            updateSheetProperties: {
+                                properties: {
+                                    sheetId: sheetId,
+                                    gridProperties: { frozenRowCount: 1 }
+                                },
+                                fields: "gridProperties.frozenRowCount"
+                            }
+                        },
+                        {
+                            repeatCell: {
+                                range: {
+                                    sheetId: sheetId,
+                                    startRowIndex: 0,
+                                    endRowIndex: 1
+                                },
+                                cell: {
+                                    userEnteredFormat: {
+                                        backgroundColor: { red: 0.1, green: 0.3, blue: 0.6 },
+                                        textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                                        borders: {
+                                            top: { style: "SOLID_THICK" },
+                                            bottom: { style: "SOLID_THICK" },
+                                            left: { style: "SOLID_THICK" },
+                                            right: { style: "SOLID_THICK" }
+                                        }
+                                    }
+                                },
+                                fields: "userEnteredFormat(backgroundColor,textFormat,borders)"
+                            }
+                        }
+                    ]
+                }
             });
 
             // Re-establish Links in the Database!

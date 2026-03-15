@@ -6,10 +6,9 @@ import { Sparkles, X, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useAction } from "@/hooks/use-action";
 import { initiateComfyUI } from "@/actions/initiate-comfyui";
-import { checkComfyUIStatus } from "@/actions/check-comfyui-status";
-import { createAttachment } from "@/actions/create-attachment";
 import { getWorkflows } from "@/actions/workflow-management/get-workflows";
 import { ComfyUIWorkflow } from "@prisma/client";
+import { useComfyUIStore } from "@/hooks/use-comfyui-store";
 
 interface ComfyUIPopoverProps {
     cardId: string;
@@ -31,10 +30,9 @@ export const ComfyUIPopover = ({
     const [workflowId, setWorkflowId] = useState<string>("");
     const [workflows, setWorkflows] = useState<ComfyUIWorkflow[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [statusText, setStatusText] = useState("");
     const inputRef = useRef<ElementRef<"textarea">>(null);
     const { addToast } = useToast();
-    const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+    const { addTask } = useComfyUIStore();
 
     useEffect(() => {
         getWorkflows().then((data) => {
@@ -61,8 +59,15 @@ export const ComfyUIPopover = ({
         onSuccess: (data: any) => {
             const taskId = data?.taskId || data?.data?.taskId;
             if (taskId) {
-                setActiveTaskId(taskId);
-                setStatusText("Waiting for your PC...");
+                addTask({
+                    taskId,
+                    boardId,
+                    cardId,
+                    statusText: "Waiting for your PC..."
+                });
+                addToast("Image generation is running in the background. You can safely close this or it will close automatically.", "success");
+                setIsGenerating(false);
+                onClose();
             } else {
                 const errMsg = data?.error || data?.data?.error || "Failed to retrieve a valid task ID.";
                 addToast(String(errMsg), "error");
@@ -75,69 +80,10 @@ export const ComfyUIPopover = ({
         }
     });
 
-    const { execute: executeCreateAttachment } = useAction(createAttachment, {
-        onSuccess: () => {
-            addToast("Image generated and attached from home PC!", "success");
-            setIsGenerating(false);
-            onClose();
-        },
-        onError: (error: string) => {
-            addToast(error, "error");
-            setIsGenerating(false);
-            onClose();
-        }
-    });
-
-    useEffect(() => {
-        if (!activeTaskId) return;
-
-        const pollTimer = setInterval(async () => {
-            const resultRaw = await checkComfyUIStatus({ taskId: activeTaskId });
-            const result = resultRaw as any; // Bypass SafeActionResult typing complexity
-
-            if (result?.data?.error || result?.error || result?.serverError) {
-                addToast(result?.data?.error || result?.error || result?.serverError || "Failed", "error");
-                setIsGenerating(false);
-                setActiveTaskId(null);
-                clearInterval(pollTimer);
-                return;
-            }
-
-            const returnData = result?.data?.data || result?.data;
-
-            if (returnData) {
-                if (returnData.status === "failed") {
-                    addToast("Generation failed on ComfyUI.", "error");
-                    setIsGenerating(false);
-                    setActiveTaskId(null);
-                    clearInterval(pollTimer);
-                } else if (returnData.status === "finished" && returnData.imageUrl) {
-                    clearInterval(pollTimer);
-                    setStatusText("Attaching image...");
-                    // Warning caveat: This attaches the Ngrok tunnel direct URL.
-                    // The image depends on the tunnel and PC staying online. Future enhancement would pipe this to S3.
-                    executeCreateAttachment({
-                        url: returnData.imageUrl,
-                        boardId,
-                        id: cardId, // Action takes 'id' as cardId usually
-                        type: "IMAGE"
-                    });
-                    setActiveTaskId(null);
-                } else {
-                    // Still processing or pending
-                    setStatusText(`Generating... ${returnData.progress || ""}`);
-                }
-            }
-        }, 3000);
-
-        return () => clearInterval(pollTimer);
-    }, [activeTaskId, boardId, cardId, executeCreateAttachment, addToast, onClose]);
-
     const handleFormSubmit = (e: FormEvent) => {
         e.preventDefault();
         if (!prompt.trim() || isGenerating) return;
         setIsGenerating(true);
-        setStatusText("Initiating request to Home Server...");
         const [width, height] = resolution.split('x').map(Number);
         executeInitiateSafe({ prompt, width, height, workflowId, boardId, cardId });
     };
@@ -160,11 +106,8 @@ export const ComfyUIPopover = ({
                 <div className="flex flex-col items-center justify-center py-6 gap-y-4">
                     <Loader2 className="h-8 w-8 animate-spin text-pink-600" />
                     <div className="text-sm font-medium text-neutral-600 text-center px-4">
-                        {statusText}
+                        Routing task to background poller...
                     </div>
-                    <p className="text-[10px] text-neutral-400 text-center mt-2">
-                        Pinging your local ComfyUI instance. Keep your PC awake!
-                    </p>
                 </div>
             ) : (
                 <form onSubmit={handleFormSubmit} className="flex flex-col gap-y-3 mt-2">
