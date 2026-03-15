@@ -21,6 +21,7 @@ export const updateCard = actionClient
                 ...(color !== undefined && { color }),
                 ...(fontColor !== undefined && { fontColor }),
                 ...(dueDate !== undefined && { dueDate }),
+                isSyncedWithSheet: false, // Break the link!
             };
 
             let card;

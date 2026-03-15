@@ -33,31 +33,33 @@ model Board {
 }
 
 model List {
-  id        String   @id @default(uuid())
-  boardId   String
-  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  title     String
-  order     Int
-  color     String?
-  fontColor String?
-  cards     Card[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(uuid())
+  boardId           String
+  board             Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  title             String
+  order             Int
+  color             String?
+  fontColor         String?
+  isSyncedWithSheet Boolean  @default(true)
+  cards             Card[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([boardId])
 }
 
 model Card {
-  id          String      @id @default(uuid())
-  listId      String
-  list        List        @relation(fields: [listId], references: [id], onDelete: Cascade)
-  title       String
-  description String?     @db.Text
-  order       Int
-  dueDate     DateTime?
-  color       String?
-  fontColor   String?
-  syncGroupId String?
+  id                String      @id @default(uuid())
+  listId            String
+  list              List        @relation(fields: [listId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?     @db.Text
+  order             Int
+  dueDate           DateTime?
+  color             String?
+  fontColor         String?
+  syncGroupId       String?
+  isSyncedWithSheet Boolean     @default(true)
   labels      Label[]
   checklists  Checklist[]
   attachments Attachment[]

@@ -9,7 +9,7 @@ export const updateList = actionClient
     .schema(UpdateListSchema)
     .action(async ({ parsedInput: { id, title, boardId, color, fontColor } }) => {
         try {
-            const updateData: any = {};
+            const updateData: any = { isSyncedWithSheet: false }; // Break the link!
             if (title !== undefined) updateData.title = title;
             if (color !== undefined) updateData.color = color;
             if (fontColor !== undefined) updateData.fontColor = fontColor;

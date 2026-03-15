@@ -66,79 +66,102 @@ export const syncGoogleSheet = actionClient
                 return { error: "No data found in the linked Google Sheet." };
             }
 
-            // Simple MVP Mapping:
-            // Find columns:
-            // "SCENES" -> List Title
-            // "Description" -> Description Card
-            // "Location" -> Location Card Text (or list mapping)
-            // Let's assume Row 1 (index 0) is headers
-            const headers: string[] = rows[0].map(h => String(h).toUpperCase().trim());
-            const sceneIdx = headers.findIndex(h => h.includes("SCENE") || h === "SCENES" || h === "SC");
-            
-            if (sceneIdx === -1) {
-                return { error: "Could not find a 'SCENES' column in the first row to act as List titles." };
-            }
+            // Strict V8 Mapping Headers
+            const SCENE_IDX = 0;
+            const INT_EXT_IDX = 1;
+            const LENGTH_IDX = 2;
+            const LOC_IDX = 3;
+            const TIME_IDX = 4;
+            const SET_IDX = 5;
+            const VFX_IDX = 6;
+            const CHAR_IDX = 7;
 
             // Sync Logic: for simplicity, we map data but don't delete unused ones yet unless we do a full rewrite.
-            // Let's do a non-destructive insert/update.
-            // For each row, check if a list matching the scene number exists. If not, create it.
             let listOrderCounter = Math.max(...board.lists.map(l => l.order), -1) + 1;
 
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row[sceneIdx]) continue; // Skip empty rows
+                if (!row[SCENE_IDX]) continue; // Skip empty rows without a Scene number
 
-                const sceneName = String(row[sceneIdx]).trim();
-                if (!sceneName) continue;
+                const sceneNum = String(row[SCENE_IDX]).trim();
+                const intExt = row[INT_EXT_IDX] ? String(row[INT_EXT_IDX]).trim() : "";
+                const length = row[LENGTH_IDX] ? String(row[LENGTH_IDX]).trim() : "";
+                
+                if (!sceneNum) continue;
+
+                // Construct Title "Sc001 INT. HOSPITAL - 2/8 pgs" from columns, or fallback
+                // Let's build a clean string
+                let constructedTitle = sceneNum;
+                if (intExt) constructedTitle += ` ${intExt}`;
+                // User's format implies a location is missing from the title but usually "INT. HOSPITAL - DAY", 
+                // but the prompt says 3 objects: Scene, INT/EXT, Length. 
+                if (length) constructedTitle += ` - ${length}`;
 
                 // Find or create List
-                let targetList = board.lists.find(l => l.title.includes(sceneName) || l.title === sceneName);
+                // Try finding by exact scene match prefix
+                let targetList = board.lists.find(l => l.title.startsWith(sceneNum));
                 
                 if (!targetList) {
-                    targetList = await db.list.create({
+                    const newList = await db.list.create({
                         data: {
                             boardId: board.id,
-                            title: sceneName,
-                            order: listOrderCounter++
+                            title: constructedTitle,
+                            order: listOrderCounter++,
+                            isSyncedWithSheet: true
                         },
                         include: { cards: true }
                     });
-                    board.lists.push(targetList);
+                    board.lists.push(newList);
+                    targetList = newList;
+                } else if (targetList.isSyncedWithSheet && targetList.title !== constructedTitle) {
+                    // Update Title only if it hasn't been locally overridden
+                    await db.list.update({
+                        where: { id: targetList.id },
+                        data: { title: constructedTitle }
+                    });
                 }
 
-                // Process other columns into Cards
+                // Process the 5 standard cards mapped directly to columns 3-7
+                const cardDefs = [
+                    { title: "Scene LOCATION", value: row[LOC_IDX] },
+                    { title: "TIME", value: row[TIME_IDX] },
+                    { title: "SET LOCATION", value: row[SET_IDX] },
+                    { title: "VFX", value: row[VFX_IDX] },
+                    { title: "CHARACTERS", value: row[CHAR_IDX] },
+                ];
+
                 let cardOrderCounter = Math.max(...(targetList.cards || []).map(c => c.order), -1) + 1;
 
-                for (let j = 0; j < headers.length; j++) {
-                    if (j === sceneIdx) continue;
-                    const colName = headers[j];
-                    const cellValue = row[j] ? String(row[j]).trim() : "";
+                for (let j = 0; j < cardDefs.length; j++) {
+                    const def = cardDefs[j];
+                    const cellValue = def.value ? String(def.value).trim() : "";
 
-                    if (!cellValue) continue;
-
-                    // Check if card with this column name exists in this list
-                    const existingCard = targetList.cards?.find(c => c.title.toLowerCase() === colName.toLowerCase());
+                    // Check if card with this title exists in this list (case insensitive)
+                    const existingCard = targetList.cards?.find(c => c.title.toUpperCase() === def.title.toUpperCase());
 
                     if (existingCard) {
-                        // Update existing card description with sheet value
-                        await db.card.update({
-                            where: { id: existingCard.id },
-                            data: { description: cellValue }
-                        });
-                    } else {
-                        // Create new card
+                        // Crucial V8 Logic: Overwrite ONLY if isSyncedWithSheet == true
+                        if (existingCard.isSyncedWithSheet && existingCard.description !== cellValue) {
+                            await db.card.update({
+                                where: { id: existingCard.id },
+                                data: { description: cellValue }
+                            });
+                        }
+                    } else if (cellValue) {
+                        // Create new card if it has value
                         const newCard = await db.card.create({
                             data: {
-                                listId: targetList.id,
-                                title: colName,
+                                listId: targetList!.id,
+                                title: def.title,
                                 description: cellValue,
-                                order: cardOrderCounter++
+                                order: cardOrderCounter++,
+                                isSyncedWithSheet: true
                             }
                         });
-                        if (targetList.cards) {
-                            targetList.cards.push(newCard);
+                        if (targetList!.cards) {
+                            targetList!.cards.push(newCard);
                         } else {
-                            targetList.cards = [newCard];
+                            targetList!.cards = [newCard];
                         }
                     }
                 }
