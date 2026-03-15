@@ -89,7 +89,7 @@ export const pushGoogleSheet = actionClient
                 else if (upperTitle.includes("EXT")) row[1] = "EXT.";
 
                 // Length parsing (look for "pgs" or "p.")
-                const pgsMatch = list.title.match(/(\d+\/\d+|\d+)\s*(pgs|pages|p\.)/i);
+                const pgsMatch = list.title.match(/((?:\d+\s*\+\s*)?\d+\/\d+|\d+)\s*(pgs|pages|p\.)/i);
                 if (pgsMatch) row[2] = pgsMatch[0];
 
                 // If the list itself was unsynced (title changed locally), track it to relink
