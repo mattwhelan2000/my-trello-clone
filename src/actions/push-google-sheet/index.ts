@@ -12,7 +12,14 @@ export const pushGoogleSheet = actionClient
         try {
             const board = await db.board.findUnique({
                 where: { id: boardId },
-                include: { lists: { include: { cards: true } } }
+                include: { 
+                    lists: { 
+                        orderBy: { order: 'asc' },
+                        include: { 
+                            cards: { orderBy: { order: 'asc' } } 
+                        } 
+                    } 
+                }
             });
 
             if (!board) return { error: "Board not found." };
@@ -41,12 +48,13 @@ export const pushGoogleSheet = actionClient
             const sheets = google.sheets({ version: 'v4', auth: authClient });
             const spreadsheetId = board.googleSheetId;
 
-            // Strict 8 Columns as requested
+            // Strict 9 Columns as requested
             const headers = [
                 "SCENE",
                 "INT/EXT",
                 "LENGTH",
                 "Scene LOCATION",
+                "Scene DESCRIPTION",
                 "TIME",
                 "SET LOCATION",
                 "VFX",
@@ -87,14 +95,17 @@ export const pushGoogleSheet = actionClient
                 // If the list itself was unsynced (title changed locally), track it to relink
                 if (!list.isSyncedWithSheet) listsToReLink.push(list.id);
 
-                // Map specific cards to columns 4-8 by Order (1st card = Scene LOCATION, etc)
-                const sortedCards = (list.cards || []).sort((a, b) => a.order - b.order);
+                // Map specific cards to columns 4-9 by Order (1st card = Scene LOCATION, etc)
+                const sortedCards = list.cards || [];
                 
-                if (sortedCards[0]) row[3] = sortedCards[0].description || sortedCards[0].title;
-                if (sortedCards[1]) row[4] = sortedCards[1].description || sortedCards[1].title;
-                if (sortedCards[2]) row[5] = sortedCards[2].description || sortedCards[2].title;
-                if (sortedCards[3]) row[6] = sortedCards[3].description || sortedCards[3].title;
-                if (sortedCards[4]) row[7] = sortedCards[4].description || sortedCards[4].title;
+                if (sortedCards[0]) {
+                    row[3] = sortedCards[0].title;
+                    row[4] = sortedCards[0].description || "";
+                }
+                if (sortedCards[1]) row[5] = sortedCards[1].title; // Time Title
+                if (sortedCards[2]) row[6] = sortedCards[2].description || "";
+                if (sortedCards[3]) row[7] = sortedCards[3].description || "";
+                if (sortedCards[4]) row[8] = sortedCards[4].description || "";
 
                 for (const card of sortedCards) {
                     if (!card.isSyncedWithSheet) cardsToReLink.push(card.id);

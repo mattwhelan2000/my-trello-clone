@@ -12,7 +12,14 @@ export const syncGoogleSheet = actionClient
         try {
             const board = await db.board.findUnique({
                 where: { id: boardId },
-                include: { lists: { include: { cards: true } } }
+                include: { 
+                    lists: { 
+                        orderBy: { order: 'asc' },
+                        include: { 
+                            cards: { orderBy: { order: 'asc' } } 
+                        } 
+                    } 
+                }
             });
 
             if (!board) {
@@ -66,22 +73,23 @@ export const syncGoogleSheet = actionClient
                 return { error: "No data found in the linked Google Sheet." };
             }
 
-            // Strict V8 Mapping Headers
+            // Strict V8 Mapping Headers (9 Columns)
             const SCENE_IDX = 0;
             const INT_EXT_IDX = 1;
             const LENGTH_IDX = 2;
-            const LOC_IDX = 3;
-            const TIME_IDX = 4;
-            const SET_IDX = 5;
-            const VFX_IDX = 6;
-            const CHAR_IDX = 7;
+            const LOC_TITLE_IDX = 3;
+            const LOC_DESC_IDX = 4;
+            const TIME_IDX = 5;
+            const SET_IDX = 6;
+            const VFX_IDX = 7;
+            const CHAR_IDX = 8;
 
-            // Sync Logic: for simplicity, we map data but don't delete unused ones yet unless we do a full rewrite.
+            // Sync Logic
             let listOrderCounter = Math.max(...board.lists.map(l => l.order), -1) + 1;
 
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row[SCENE_IDX]) continue; // Skip empty rows without a Scene number
+                if (!row[SCENE_IDX]) continue; 
 
                 const sceneNum = String(row[SCENE_IDX]).trim();
                 const intExt = row[INT_EXT_IDX] ? String(row[INT_EXT_IDX]).trim() : "";
@@ -89,16 +97,11 @@ export const syncGoogleSheet = actionClient
                 
                 if (!sceneNum) continue;
 
-                // Construct Title "Sc001 INT. HOSPITAL - 2/8 pgs" from columns, or fallback
-                // Let's build a clean string
                 let constructedTitle = sceneNum;
                 if (intExt) constructedTitle += ` ${intExt}`;
-                // User's format implies a location is missing from the title but usually "INT. HOSPITAL - DAY", 
-                // but the prompt says 3 objects: Scene, INT/EXT, Length. 
                 if (length) constructedTitle += ` - ${length}`;
 
                 // Find or create List
-                // Try finding by exact scene match prefix
                 let targetList = board.lists.find(l => l.title.startsWith(sceneNum));
                 
                 if (!targetList) {
@@ -114,57 +117,68 @@ export const syncGoogleSheet = actionClient
                     board.lists.push(newList);
                     targetList = newList;
                 } else if (targetList.isSyncedWithSheet && targetList.title !== constructedTitle) {
-                    // Update Title only if it hasn't been locally overridden
                     await db.list.update({
                         where: { id: targetList.id },
                         data: { title: constructedTitle }
                     });
                 }
 
-                // Process the 5 standard cards mapped directly to columns 3-7
-                const cardDefs = [
-                    { title: "Scene LOCATION", value: row[LOC_IDX] },
-                    { title: "TIME", value: row[TIME_IDX] },
-                    { title: "SET LOCATION", value: row[SET_IDX] },
-                    { title: "VFX", value: row[VFX_IDX] },
-                    { title: "CHARACTERS", value: row[CHAR_IDX] },
-                ];
+                // Process the 5 standard cards mapped directly to columns 3-8 by sequential order!
+                let sortedCards = (targetList.cards || []).sort((a, b) => a.order - b.order);
+                let cardOrderCounter = Math.max(...sortedCards.map(c => c.order), -1) + 1;
 
-                let cardOrderCounter = Math.max(...(targetList.cards || []).map(c => c.order), -1) + 1;
-
-                for (let j = 0; j < cardDefs.length; j++) {
-                    const def = cardDefs[j];
-                    const cellValue = def.value ? String(def.value).trim() : "";
-
-                    // Check if card with this title exists in this list (case insensitive)
-                    const existingCard = targetList.cards?.find(c => c.title.toUpperCase() === def.title.toUpperCase());
-
+                // Helper to update or create
+                const applyCardSync = async (
+                    cardIdx: number, 
+                    defaultTitle: string, 
+                    newTitle: string | undefined, 
+                    newDesc: string | undefined
+                ) => {
+                    const existingCard = sortedCards[cardIdx];
                     if (existingCard) {
-                        // Crucial V8 Logic: Overwrite ONLY if isSyncedWithSheet == true
-                        if (existingCard.isSyncedWithSheet && existingCard.description !== cellValue) {
-                            await db.card.update({
-                                where: { id: existingCard.id },
-                                data: { description: cellValue }
-                            });
+                        if (existingCard.isSyncedWithSheet) {
+                            const dataToUpdate: any = {};
+                            if (newTitle !== undefined && existingCard.title !== newTitle) dataToUpdate.title = newTitle;
+                            if (newDesc !== undefined && existingCard.description !== newDesc) dataToUpdate.description = newDesc;
+                            
+                            if (Object.keys(dataToUpdate).length > 0) {
+                                await db.card.update({
+                                    where: { id: existingCard.id },
+                                    data: dataToUpdate
+                                });
+                            }
                         }
-                    } else if (cellValue) {
-                        // Create new card if it has value
-                        const newCard = await db.card.create({
+                    } else if (newTitle || newDesc) { // Only create if missing and has data
+                        const newC = await db.card.create({
                             data: {
                                 listId: targetList!.id,
-                                title: def.title,
-                                description: cellValue,
+                                title: newTitle || defaultTitle,
+                                description: newDesc || "",
                                 order: cardOrderCounter++,
                                 isSyncedWithSheet: true
                             }
                         });
-                        if (targetList!.cards) {
-                            targetList!.cards.push(newCard);
-                        } else {
-                            targetList!.cards = [newCard];
-                        }
+                        sortedCards.push(newC);
                     }
-                }
+                };
+
+                const locTitle = row[LOC_TITLE_IDX] ? String(row[LOC_TITLE_IDX]).trim() : "Scene LOCATION";
+                const locDesc = row[LOC_DESC_IDX] ? String(row[LOC_DESC_IDX]).trim() : "";
+                const timeTitle = row[TIME_IDX] ? String(row[TIME_IDX]).trim() : "TIME";
+                const setDesc = row[SET_IDX] ? String(row[SET_IDX]).trim() : "";
+                const vfxDesc = row[VFX_IDX] ? String(row[VFX_IDX]).trim() : "";
+                const charDesc = row[CHAR_IDX] ? String(row[CHAR_IDX]).trim() : "";
+
+                // 0: Scene Location (Col 3 = Title, Col 4 = Desc)
+                await applyCardSync(0, "Scene LOCATION", locTitle, locDesc);
+                // 1: Time (Col 5 = Title)
+                await applyCardSync(1, "TIME", timeTitle, undefined);
+                // 2: Set Location (Col 6 = Desc)
+                await applyCardSync(2, "SET LOCATION", undefined, setDesc);
+                // 3: VFX (Col 7 = Desc)
+                await applyCardSync(3, "VFX", undefined, vfxDesc);
+                // 4: Characters (Col 8 = Desc)
+                await applyCardSync(4, "CHARACTERS", undefined, charDesc);
             }
 
             revalidatePath(`/board/${board.id}`);
