@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { actionClient } from "@/lib/create-safe-action";
 import { PushGoogleSheetSchema } from "./schema";
@@ -74,6 +75,11 @@ export const pushGoogleSheet = actionClient
             // taking everything that currently exists in the DB to form the sheet.
             const rows: any[][] = [headers];
             
+            // Get the host URL for the image proxy
+            const host = headers().get("host");
+            const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
+            const baseUrl = `${protocol}://${host}`;
+
             // To collect cards/lists we need to reset to true
             const listsToReLink: string[] = [];
             const cardsToReLink: string[] = [];
@@ -111,7 +117,10 @@ export const pushGoogleSheet = actionClient
                     row[4] = sortedCards[0].description || "";
                     if (sortedCards[0].attachments && sortedCards[0].attachments.length > 0) {
                         const img = sortedCards[0].attachments.find(a => a.isCover) || sortedCards[0].attachments.find(a => a.type === "IMAGE");
-                        if (img) row[5] = `=IMAGE("${img.url}")`;
+                        if (img) {
+                            const proxyUrl = `${baseUrl}/api/proxy-image?url=${encodeURIComponent(img.url)}`;
+                            row[5] = `=IMAGE("${proxyUrl}")`;
+                        }
                     }
                 }
                 if (sortedCards[1]) row[6] = sortedCards[1].title; // Time Title
@@ -120,7 +129,10 @@ export const pushGoogleSheet = actionClient
                     row[8] = sortedCards[3].description || "";
                     if (sortedCards[3].attachments && sortedCards[3].attachments.length > 0) {
                         const img = sortedCards[3].attachments.find(a => a.isCover) || sortedCards[3].attachments.find(a => a.type === "IMAGE");
-                        if (img) row[9] = `=IMAGE("${img.url}")`;
+                        if (img) {
+                            const proxyUrl = `${baseUrl}/api/proxy-image?url=${encodeURIComponent(img.url)}`;
+                            row[9] = `=IMAGE("${proxyUrl}")`;
+                        }
                     }
                 }
                 if (sortedCards[4]) row[10] = sortedCards[4].description || "";
