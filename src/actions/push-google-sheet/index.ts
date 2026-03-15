@@ -56,7 +56,7 @@ export const pushGoogleSheet = actionClient
             const sheets = google.sheets({ version: 'v4', auth: authClient });
             const spreadsheetId = board.googleSheetId;
 
-            const headers = [
+            const sheetHeaders = [
                 "SCENE",
                 "INT/EXT",
                 "LENGTH",
@@ -73,10 +73,10 @@ export const pushGoogleSheet = actionClient
             // Build Rows. 
             // We'll rewrite the entire sheet for simplicity of architecture, 
             // taking everything that currently exists in the DB to form the sheet.
-            const rows: any[][] = [headers];
+            const rows: any[][] = [sheetHeaders];
             
-            // Get the host URL for the image proxy
-            const host = headers().get("host");
+            const headersList = await headers();
+            const host = headersList.get("host");
             const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
             const baseUrl = `${protocol}://${host}`;
 
@@ -88,7 +88,7 @@ export const pushGoogleSheet = actionClient
                 // Ignore the system meta lists
                 if (list.title === "CHARACTERS" || list.title === "LOCATIONS") continue;
 
-                const row = new Array(headers.length).fill("");
+                const row = new Array(sheetHeaders.length).fill("");
                 
                 // Parse List Title: "Sc001 INT. HOSPITAL - 2/8 pgs" -> [Sc001, INT., 2/8 pgs]
                 // Fallback mechanics if it's not strictly formatted
