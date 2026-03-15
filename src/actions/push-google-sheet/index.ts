@@ -20,7 +20,7 @@ export const pushGoogleSheet = actionClient
                                 orderBy: { order: 'asc' },
                                 include: {
                                     attachments: {
-                                        where: { isCover: true }
+                                        orderBy: { createdAt: 'desc' }
                                     }
                                 }
                             } 
@@ -110,7 +110,8 @@ export const pushGoogleSheet = actionClient
                     row[3] = sortedCards[0].title;
                     row[4] = sortedCards[0].description || "";
                     if (sortedCards[0].attachments && sortedCards[0].attachments.length > 0) {
-                        row[5] = `=IMAGE("${sortedCards[0].attachments[0].url}")`;
+                        const img = sortedCards[0].attachments.find(a => a.isCover) || sortedCards[0].attachments.find(a => a.type === "IMAGE");
+                        if (img) row[5] = `=IMAGE("${img.url}")`;
                     }
                 }
                 if (sortedCards[1]) row[6] = sortedCards[1].title; // Time Title
@@ -118,7 +119,8 @@ export const pushGoogleSheet = actionClient
                 if (sortedCards[3]) {
                     row[8] = sortedCards[3].description || "";
                     if (sortedCards[3].attachments && sortedCards[3].attachments.length > 0) {
-                        row[9] = `=IMAGE("${sortedCards[3].attachments[0].url}")`;
+                        const img = sortedCards[3].attachments.find(a => a.isCover) || sortedCards[3].attachments.find(a => a.type === "IMAGE");
+                        if (img) row[9] = `=IMAGE("${img.url}")`;
                     }
                 }
                 if (sortedCards[4]) row[10] = sortedCards[4].description || "";
