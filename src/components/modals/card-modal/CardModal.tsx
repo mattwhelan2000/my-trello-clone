@@ -197,6 +197,21 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         }
 
         executeCreateAttachment({ id: data.id, boardId, url: urlFinal, type: finalType as "IMAGE" | "LINK" | "IFRAME", title: finalTitle || "" });
+
+        // Update SET LOCATION card description with the plaintext address and URL
+        if (finalType === "IFRAME" && (data.title === "SET LOCATION" || data.title.toLowerCase().includes("location"))) {
+            const currentDesc = data.description || "";
+            const appendedDesc = `${finalTitle ? finalTitle + "\n\n" : ""}${urlFinal}`;
+            const newDescription = currentDesc ? `${currentDesc}\n\n---\n\n${appendedDesc}` : appendedDesc;
+            
+            // Call executeUpdateCard to sync to DB immediately
+            executeUpdateCard({
+                id: data.id,
+                boardId,
+                title: data.title,
+                description: newDescription
+            });
+        }
     };
 
     const onBlur = () => {

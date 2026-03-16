@@ -55,9 +55,17 @@ export const ScriptUploadModal = ({ isOpen, onClose }: ScriptUploadModalProps) =
             const fd = new FormData();
             fd.append("file", file);
             const res = await fetch("/api/ingest-script", { method: "POST", body: fd });
-            const data = await res.json();
+            const responseText = await res.text();
+            
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (jsonErr) {
+                throw new Error(`Server returned non-JSON error: ${responseText.substring(0, 100)}...`);
+            }
+
             if (!res.ok || data.error) {
-                setError(data.error || "Failed to ingest script.");
+                setError(data.error || `Server Error ${res.status}`);
             } else {
                 onClose();
                 setFile(null);
