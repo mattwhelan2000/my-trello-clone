@@ -325,7 +325,9 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        // Create lists and cards for each scene
+        // Batch arrays for createMany
+        const listsToInsert: any[] = [];
+        const cardsToInsert: any[] = [];
         let listOrder = 0;
 
         // 1. Characters List
@@ -334,19 +336,18 @@ export async function POST(req: NextRequest) {
             .filter((entry, idx, arr) => entry[1] > 1 || arr.length <= 15);
 
         if (sortedCharacters.length > 0) {
-            const charsList = await db.list.create({
-                data: { title: "CHARACTERS", boardId: board.id, order: listOrder++ }
-            });
+            const listId = crypto.randomUUID();
+            listsToInsert.push({ id: listId, title: "CHARACTERS", boardId: board.id, order: listOrder++, isSyncedWithSheet: true });
             for (let i = 0; i < sortedCharacters.length; i++) {
                 const [name, count] = sortedCharacters[i];
-                await db.card.create({ 
-                    data: { 
-                        title: name, 
-                        description: `Speaking Lines: ${count}`,
-                        listId: charsList.id, 
-                        order: i, 
-                        color: "#fecaca" 
-                    } 
+                cardsToInsert.push({
+                    id: crypto.randomUUID(), 
+                    title: name, 
+                    description: `Speaking Lines: ${count}`,
+                    listId: listId, 
+                    order: i, 
+                    color: "#fecaca",
+                    isSyncedWithSheet: true
                 });
             }
         }
@@ -354,16 +355,21 @@ export async function POST(req: NextRequest) {
         // 2. Locations List
         const uniqueLocations = Array.from(new Set(scenes.map(s => s.location))).filter(Boolean).sort();
         if (uniqueLocations.length > 0) {
-            const locsList = await db.list.create({
-                data: { title: "LOCATIONS", boardId: board.id, order: listOrder++ }
-            });
+            const listId = crypto.randomUUID();
+            listsToInsert.push({ id: listId, title: "LOCATIONS", boardId: board.id, order: listOrder++, isSyncedWithSheet: true });
             for (let i = 0; i < uniqueLocations.length; i++) {
-                await db.card.create({ 
-                    data: { title: uniqueLocations[i], listId: locsList.id, order: i, color: "#bae6fd" } 
+                cardsToInsert.push({ 
+                    id: crypto.randomUUID(),
+                    title: uniqueLocations[i], 
+                    listId: listId, 
+                    order: i, 
+                    color: "#bae6fd",
+                    isSyncedWithSheet: true
                 });
             }
         }
 
+        // 3. Scene Lists
         for (const scene of scenes) {
             let eighths = Math.max(1, Math.ceil(scene.bodyLength / 6));
             let pgs = Math.floor(eighths / 8);
@@ -377,26 +383,37 @@ export async function POST(req: NextRequest) {
             const paddedSceneNum = scene.number.replace(/\d+/, match => match.padStart(3, '0'));
             const listTitle = `Sc${paddedSceneNum} ${titleAutoFlag}${scene.intExt} -- ${lengthStr} pgs`;
 
-            const list = await db.list.create({
-                data: { title: listTitle, boardId: board.id, order: listOrder++ }
+            const listId = crypto.randomUUID();
+            listsToInsert.push({
+                id: listId,
+                title: listTitle, 
+                boardId: board.id, 
+                order: listOrder++,
+                isSyncedWithSheet: true
             });
 
-            await db.card.create({ data: { title: scene.location, listId: list.id, order: 0, color: "#bae6fd", description: scene.description } });
-            await db.card.create({ data: { title: scene.timeOfDay || "N/A", listId: list.id, order: 1, color: "#fef08a" } });
-            await db.card.create({ data: { title: "SET LOCATION", listId: list.id, order: 2, color: "#bbf7d0" } });
-            await db.card.create({ data: { title: "VFX", listId: list.id, order: 3, color: "#fecaca" } });
+            cardsToInsert.push({ id: crypto.randomUUID(), title: scene.location, listId, order: 0, color: "#bae6fd", description: scene.description, isSyncedWithSheet: true });
+            cardsToInsert.push({ id: crypto.randomUUID(), title: scene.timeOfDay || "N/A", listId, order: 1, color: "#fef08a", description: "", isSyncedWithSheet: true });
+            cardsToInsert.push({ id: crypto.randomUUID(), title: "SET LOCATION", listId, order: 2, color: "#bbf7d0", description: "", isSyncedWithSheet: true });
+            cardsToInsert.push({ id: crypto.randomUUID(), title: "VFX", listId, order: 3, color: "#fecaca", description: "", isSyncedWithSheet: true });
 
             const sceneChars = Array.from(scene.characters).join(", ");
-            await db.card.create({ 
-                data: { 
-                    title: "CHARACTERS", 
-                    description: sceneChars ? `Characters in scene: ${sceneChars}` : "No characters detected.",
-                    listId: list.id, 
-                    order: 4, 
-                    color: "#fbcfe8" // Pinkish color for characters
-                } 
+            cardsToInsert.push({ 
+                id: crypto.randomUUID(),
+                title: "CHARACTERS", 
+                description: sceneChars ? `Characters in scene: ${sceneChars}` : "No characters detected.",
+                listId, 
+                order: 4, 
+                color: "#fbcfe8", // Pinkish color for characters
+                isSyncedWithSheet: true
             });
         }
+
+        // Batch insert the arrays
+        await db.list.createMany({ data: listsToInsert });
+        
+        // Push cards in batches if there are thousands, but 600 is well within Postgres limits
+        await db.card.createMany({ data: cardsToInsert });
 
         revalidatePath("/");
         return NextResponse.json({ boardId: board.id, scenesCreated: scenes.length });
