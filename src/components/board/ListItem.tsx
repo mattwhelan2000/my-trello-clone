@@ -24,7 +24,9 @@ export const ListItem = ({
     index,
     searchQuery = "",
     searchCards = true,
-    searchLists = true
+    searchLists = true,
+    listColorSwatches,
+    textColorSwatches
 }: {
     data: any;
     index: number;
