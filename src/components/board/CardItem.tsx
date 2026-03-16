@@ -178,6 +178,24 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
         else if (diffDays <= 3) isDueSoon = true;
     }
 
+    let setLocationUrl = null;
+    if (data.title?.trim().toUpperCase() === "SET LOCATION") {
+        const descMatch = data.description?.match(/(https?:\/\/[^\s]+)/);
+        if (descMatch) {
+            setLocationUrl = descMatch[1];
+        } else {
+            const mapAttachment = data.attachments?.find((a: any) => (a.type === "IFRAME" || a.type === "LINK") && a.url?.includes("google.com/maps"));
+            if (mapAttachment) {
+                setLocationUrl = mapAttachment.url;
+            } else {
+                const anyLink = data.attachments?.find((a: any) => a.type === "IFRAME" || a.type === "LINK");
+                if (anyLink) {
+                    setLocationUrl = anyLink.url;
+                }
+            }
+        }
+    }
+
     if (isDragging) {
         return (
             <div
@@ -242,7 +260,21 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
 
                     {/* TITLE */}
                     <div className="w-full font-medium break-words" style={{ color: data.fontColor || "#172b4d" }}>
-                        {renderTitleWithLinks(data.title)}
+                        {setLocationUrl ? (
+                            <a
+                                href={setLocationUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:opacity-80 transition"
+                                onDoubleClick={(e) => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ color: "#3b82f6" }}
+                            >
+                                {data.title}
+                            </a>
+                        ) : (
+                            renderTitleWithLinks(data.title)
+                        )}
                     </div>
 
                     {/* MINI AUDIO PLAYER */}

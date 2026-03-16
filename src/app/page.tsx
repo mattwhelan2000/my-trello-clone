@@ -34,6 +34,11 @@ export default async function HomePage() {
         </div>
       </div>
 
+      <div className="text-sm font-mono text-neutral-400 mb-4">
+          {/* TIMESTAMP FOR VERCEL UPDATES */}
+          0316.10:45
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {boards.map((board) => (
           <DashboardBoardItem key={board.id} board={board} />
