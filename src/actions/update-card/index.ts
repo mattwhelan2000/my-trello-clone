@@ -7,7 +7,7 @@ import { UpdateCardSchema } from "./schema";
 
 export const updateCard = actionClient
     .schema(UpdateCardSchema)
-    .action(async ({ parsedInput: { id, title, boardId, color, fontColor, dueDate } }) => {
+    .action(async ({ parsedInput: { id, title, description, boardId, color, fontColor, dueDate } }) => {
         try {
             const existingCard = await db.card.findUnique({
                 where: { id },
@@ -18,6 +18,7 @@ export const updateCard = actionClient
 
             const dataToUpdate = {
                 ...(title !== undefined && { title }),
+                ...(description !== undefined && { description }),
                 ...(color !== undefined && { color }),
                 ...(fontColor !== undefined && { fontColor }),
                 ...(dueDate !== undefined && { dueDate }),
