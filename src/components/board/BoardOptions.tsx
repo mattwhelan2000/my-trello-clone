@@ -70,7 +70,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     const colorInputRef = React.useRef<HTMLInputElement>(null);
 
     const { execute, isLoading } = useAction(updateBoard, {
-        onSuccess: () => { setIsOpen(false); },
+        onSuccess: () => {},
         onError: (error) => console.error(error)
     });
 
