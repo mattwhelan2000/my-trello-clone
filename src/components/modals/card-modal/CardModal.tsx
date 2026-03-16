@@ -257,10 +257,21 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const imageAttachments = data.attachments?.filter((a: any) => a.type === "IMAGE") || [];
     const linkAttachments = data.attachments?.filter((a: any) => a.type === "LINK" || a.type === "IFRAME") || [];
 
+    const coverIframeAttachment = data.attachments?.find((a: any) => a.isCover && a.type === "IFRAME");
+    const renderableIframeUrl = coverIframeAttachment ? coverIframeAttachment.url : null;
+
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
-            {!imageAttachments.length && optimisticColor && (
+            {!imageAttachments.length && !renderableIframeUrl && optimisticColor && (
                 <div className="w-full h-24 rounded-t-xl" style={{ backgroundColor: optimisticColor }} />
+            )}
+            {renderableIframeUrl && (
+                <div className="w-full relative bg-neutral-200 flex items-center justify-center overflow-hidden shadow-sm first:rounded-t-xl group">
+                    <iframe src={renderableIframeUrl} className="w-full h-[400px] border-0" allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                    <div className="absolute top-4 left-4 bg-black/60 text-white text-xs px-2 py-1 rounded-sm flex items-center gap-x-1 backdrop-blur-sm z-10 pointer-events-none">
+                        <Layout className="w-3 h-3" /> Cover
+                    </div>
+                </div>
             )}
             {imageAttachments.length > 0 && (
                 <div className="flex flex-col gap-y-4 pt-4 px-4 bg-neutral-100/50 pb-4 first:rounded-t-lg">
