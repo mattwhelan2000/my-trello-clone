@@ -43,6 +43,7 @@ const renderTitleWithLinks = (titleText: string) => {
 
 export const CardItem = ({ data, index, boardId }: { data: any; index: number; boardId: string }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [contextMenuAction, setContextMenuAction] = useState<string | null>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [mounted, setMounted] = useState(false);
     const [isCommentsExpanded, setIsCommentsExpanded] = useState(false);
@@ -361,6 +362,7 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                         style={{ top: contextMenu.y, left: contextMenu.x }}
                     >
                         <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b border-neutral-800 mb-1 uppercase tracking-wider">Card Actions</span>
+                        <button onClick={(e) => { e.stopPropagation(); setContextMenuAction('move'); handleMenuClose(); setIsModalOpen(true); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-blue-400 font-medium">Move Card</button>
                         <button onClick={(e) => { e.stopPropagation(); onDeleteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-red-500 font-medium">Delete Card</button>
                         <button onClick={(e) => { e.stopPropagation(); onDuplicateCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Duplicate Card</button>
                         <button onClick={(e) => { e.stopPropagation(); onCloneCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Clone Card</button>
@@ -379,7 +381,8 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 data={data}
                 boardId={boardId}
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => { setIsModalOpen(false); setContextMenuAction(null); }}
+                defaultMoveOpen={contextMenuAction === 'move'}
             />
         </>
     );

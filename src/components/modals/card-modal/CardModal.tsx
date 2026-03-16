@@ -30,9 +30,10 @@ interface CardModalProps {
     isOpen: boolean;
     onClose: () => void;
     lists?: { id: string; title: string }[];
+    defaultMoveOpen?: boolean;
 }
 
-export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [] }: CardModalProps) => {
+export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [], defaultMoveOpen }: CardModalProps) => {
     const [title, setTitle] = useState(data?.title || "");
     const [isAddingImage, setIsAddingImage] = useState(false);
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);

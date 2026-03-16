@@ -217,10 +217,12 @@ export const ListItem = ({
     };
 
     const onBgColorSelect = (color: string) => {
+        setIsColorPickerOpen(false);
         executeUpdateList({ title: data.title, id: data.id, boardId: data.boardId, color });
     };
 
     const onTextColorSelect = (color: string) => {
+        setIsColorPickerOpen(false);
         executeUpdateList({ title: data.title, id: data.id, boardId: data.boardId, fontColor: color });
     };
 

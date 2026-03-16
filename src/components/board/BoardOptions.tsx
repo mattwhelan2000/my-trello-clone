@@ -8,6 +8,7 @@ import { updateBoard } from "@/actions/update-board";
 import { exportBoard } from "@/actions/export-board";
 import { syncGoogleSheet } from "@/actions/sync-google-sheet";
 import { pushGoogleSheet } from "@/actions/push-google-sheet";
+import { updateListColors } from "@/actions/update-list-colors";
 import { useToast } from "@/components/ui/Toast";
 
 interface BoardOptionsProps {
@@ -21,6 +22,11 @@ const COLORS = [
     "#334155", "#475569", "#1e293b", "#27272a", "#18181b",
     "#52525b", "#262626", "#171717", "#525252", "#1c1917",
     "#292524", "#57534e", "#4338ca", "#0f172a"
+];
+
+const LIST_COLORS = [
+    "#3b82f6", "#ec4899", "#8b5cf6", "#10b981", "#f59e0b",
+    "#ef4444", "#06b6d4", "#0ea5e9", "#64748b", "#84cc16"
 ];
 
 function boardToCSV(board: any): string {
@@ -146,7 +152,18 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         }
     });
 
-    const anyLoading = isLoading || isExporting || isExportingCSV || isSyncing || isPushing;
+    const { execute: executeUpdateListsColors, isLoading: isUpdatingListsColors } = useAction(updateListColors, {
+        onSuccess: (data) => {
+            addToast("All list colors updated", "success");
+            setIsOpen(false);
+        },
+        onError: (error) => {
+            console.error(error);
+            addToast("Failed to update list colors", "error");
+        }
+    });
+
+    const anyLoading = isLoading || isExporting || isExportingCSV || isSyncing || isPushing || isUpdatingListsColors;
 
     return (
         <div className="absolute top-4 right-4 z-[50] flex items-center gap-x-2">
@@ -228,6 +245,21 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                                     key={color}
                                     onClick={() => onColorSelect(color)}
                                     className="h-8 w-8 rounded-sm hover:opacity-80 transition cursor-pointer border border-black/10 shadow-sm"
+                                    style={{ backgroundColor: color }}
+                                    disabled={anyLoading}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="mb-4">
+                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><LayoutList className="h-3 w-3" /> List Colors</h4>
+                        <div className="grid grid-cols-5 gap-1">
+                            {LIST_COLORS.map((color) => (
+                                <button
+                                    key={color}
+                                    onClick={() => executeUpdateListsColors({ boardId, color })}
+                                    className="h-8 w-full rounded-sm hover:opacity-80 transition cursor-pointer border border-black/10 shadow-sm"
                                     style={{ backgroundColor: color }}
                                     disabled={anyLoading}
                                 />
