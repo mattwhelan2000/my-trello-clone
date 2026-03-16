@@ -56,6 +56,36 @@ export const pushGoogleSheet = actionClient
             const sheets = google.sheets({ version: 'v4', auth: authClient });
             const spreadsheetId = board.googleSheetId;
 
+            // Sanitize board title for tab name: Google Sheets disallows * ? : [ ] \ /
+            const tabName = board.title.replace(/[*?:\[\]\\/]/g, '').trim().substring(0, 100) || "Board Export";
+
+            // Determine sheetId and ensure tab exists
+            let sheetId: number | null | undefined = null;
+            const spreadsheetData = await sheets.spreadsheets.get({ spreadsheetId });
+            const existingSheets = spreadsheetData.data.sheets || [];
+            const targetSheet = existingSheets.find(s => s.properties?.title === tabName);
+
+            if (!targetSheet) {
+                // Create new sheet
+                const response = await sheets.spreadsheets.batchUpdate({
+                    spreadsheetId,
+                    requestBody: {
+                        requests: [
+                            {
+                                addSheet: {
+                                    properties: {
+                                        title: tabName
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                });
+                sheetId = response.data.replies?.[0]?.addSheet?.properties?.sheetId;
+            } else {
+                sheetId = targetSheet.properties?.sheetId;
+            }
+
             const sheetHeaders = [
                 "SCENE",
                 "INT/EXT",
@@ -145,20 +175,17 @@ export const pushGoogleSheet = actionClient
             }
 
             // Write Everything
-            await sheets.spreadsheets.values.clear({ spreadsheetId, range: 'A:ZZ' }).catch(() => {});
+            await sheets.spreadsheets.values.clear({ spreadsheetId, range: `'${tabName}'!A:ZZ` }).catch(() => {});
             await sheets.spreadsheets.values.update({
                 spreadsheetId,
-                range: 'A1',
+                range: `'${tabName}'!A1`,
                 valueInputOption: 'USER_ENTERED',
                 requestBody: { values: rows }
             });
 
-            // Get sheet ID to apply formatting
-            const spreadsheetData = await sheets.spreadsheets.get({ spreadsheetId });
-            const sheetId = spreadsheetData.data.sheets?.[0]?.properties?.sheetId || 0;
-
             // Apply formatting: blue header, thick border, freeze row 1
-            await sheets.spreadsheets.batchUpdate({
+            if (sheetId !== null && sheetId !== undefined) {
+                await sheets.spreadsheets.batchUpdate({
                 spreadsheetId,
                 requestBody: {
                     requests: [
@@ -196,6 +223,7 @@ export const pushGoogleSheet = actionClient
                     ]
                 }
             });
+            }
 
             // Re-establish Links in the Database!
             if (listsToReLink.length > 0) {

@@ -62,13 +62,27 @@ export const syncGoogleSheet = actionClient
 
             const sheets = google.sheets({ version: 'v4', auth: authClient });
 
-            // Fetch the sheet data (assumes first sheet/tab)
-            const response = await sheets.spreadsheets.values.get({
-                spreadsheetId: board.googleSheetId,
-                range: 'A:Z', // Getting a wide range to capture all necessary columns
-            });
+            // Sanitize board title for tab name: Google Sheets disallows * ? : [ ] \ /
+            const tabName = board.title.replace(/[*?:\[\]\\/]/g, '').trim().substring(0, 100) || "Board Export";
 
-            const rows = response.data.values;
+            let rows: any[] = [];
+            try {
+                // Try fetching specific board tab first
+                const response = await sheets.spreadsheets.values.get({
+                    spreadsheetId: board.googleSheetId,
+                    range: `'${tabName}'!A:Z`,
+                });
+                rows = response.data.values || [];
+            } catch (err) {
+                // Fallback to default first sheet if tab doesn't exist (for older exports)
+                console.log(`Tab '${tabName}' not found. Falling back to default A:Z range.`);
+                const fallbackResponse = await sheets.spreadsheets.values.get({
+                    spreadsheetId: board.googleSheetId,
+                    range: 'A:Z', 
+                });
+                rows = fallbackResponse.data.values || [];
+            }
+
             if (!rows || rows.length === 0) {
                 return { error: "No data found in the linked Google Sheet." };
             }

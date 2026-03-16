@@ -200,8 +200,29 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
 
         // Update SET LOCATION card description with the plaintext address and URL
         if (finalType === "IFRAME" && (data.title === "SET LOCATION" || data.title.toLowerCase().includes("location"))) {
+            let searchUrl = urlFinal;
+            let extractedName = finalTitle || "";
+
+            if (urlFinal.includes("google.com/maps/embed")) {
+                const locMatch = urlFinal.match(/!2s([^!&]+)/);
+                const latMatch = urlFinal.match(/!3d([^!&]+)/);
+                const lngMatch = urlFinal.match(/!2d([^!&]+)/);
+                
+                if (locMatch && locMatch[1]) {
+                    const decodedLoc = decodeURIComponent(locMatch[1]).replace(/\+/g, ' ');
+                    if (!extractedName) extractedName = decodedLoc;
+                    // Generates a proper searchable maps URL from the embed
+                    searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(decodedLoc)}`;
+                } else if (latMatch && latMatch[1] && lngMatch && lngMatch[1]) {
+                    if (!extractedName) extractedName = `${latMatch[1]}, ${lngMatch[1]}`;
+                    searchUrl = `https://www.google.com/maps/search/?api=1&query=${latMatch[1]},${lngMatch[1]}`;
+                }
+            }
+
             const currentDesc = data.description || "";
-            const appendedDesc = `${finalTitle ? finalTitle + "\n\n" : ""}${urlFinal}`;
+            // Use markdown to create a clean hyperlink
+            const appendedDesc = `[${extractedName || "View on Google Maps"}](${searchUrl})`;
+            
             const newDescription = currentDesc ? `${currentDesc}\n\n---\n\n${appendedDesc}` : appendedDesc;
             
             // Call executeUpdateCard to sync to DB immediately
