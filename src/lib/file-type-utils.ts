@@ -2,7 +2,7 @@
  * Detects the file type from a URL based on extension and common patterns.
  * Returns a category string used for rendering the appropriate preview.
  */
-export type FileCategory = 'image' | 'pdf' | 'video' | 'audio' | 'office-word' | 'office-excel' | 'office-powerpoint' | 'svg' | 'code' | 'text' | 'link';
+export type FileCategory = 'image' | 'pdf' | 'video' | 'audio' | 'office-word' | 'office-excel' | 'office-powerpoint' | 'svg' | 'code' | 'text' | 'link' | 'iframe';
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'ico', 'avif'];
 const PDF_EXTENSIONS = ['pdf'];
@@ -60,6 +60,7 @@ export function getFileTypeLabel(category: FileCategory): string {
         case 'office-powerpoint': return 'Presentation';
         case 'code': return 'Code File';
         case 'text': return 'Text File';
+        case 'iframe': return 'Embedded Content';
         case 'link': return 'Website URL';
     }
 }

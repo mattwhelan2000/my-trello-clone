@@ -28,9 +28,13 @@ type ListWithCards = List & { cards: any[] };
 export const ListContainer = ({
     data,
     boardId,
+    listColorSwatches,
+    textColorSwatches,
 }: {
     data: ListWithCards[];
     boardId: string;
+    listColorSwatches?: string[];
+    textColorSwatches?: string[];
 }) => {
     const [orderedData, setOrderedData] = useState(data);
     const [searchQuery, setSearchQuery] = useState("");
@@ -316,6 +320,8 @@ export const ListContainer = ({
                                     searchQuery={searchQuery}
                                     searchCards={searchCards}
                                     searchLists={searchLists}
+                                    listColorSwatches={listColorSwatches}
+                                    textColorSwatches={textColorSwatches}
                                 />
                             );
                         })}

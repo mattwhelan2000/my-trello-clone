@@ -176,12 +176,21 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         const formData = new FormData(e.currentTarget);
         const url = formData.get("url") as string;
 
-        if (!url.trim()) return;
+        let urlFinal = url.trim();
+        let finalType = "";
 
-        const detectedType = detectFileType(url.trim());
-        const type = (detectedType === "image" || detectedType === "svg") ? "IMAGE" : "LINK";
+        const iframeMatch = urlFinal.match(/<iframe.*?src=["'](.*?)["']/i);
+        if (iframeMatch && iframeMatch[1]) {
+            urlFinal = iframeMatch[1];
+            finalType = "IFRAME";
+        }
 
-        executeCreateAttachment({ id: data.id, boardId, url: url.trim(), type });
+        if (!finalType) {
+            const detectedType = detectFileType(urlFinal);
+            finalType = (detectedType === "image" || detectedType === "svg") ? "IMAGE" : "LINK";
+        }
+
+        executeCreateAttachment({ id: data.id, boardId, url: urlFinal, type: finalType as "IMAGE" | "LINK" | "IFRAME" });
     };
 
     const onBlur = () => {
@@ -246,7 +255,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     if (!data) return null;
 
     const imageAttachments = data.attachments?.filter((a: any) => a.type === "IMAGE") || [];
-    const linkAttachments = data.attachments?.filter((a: any) => a.type === "LINK") || [];
+    const linkAttachments = data.attachments?.filter((a: any) => a.type === "LINK" || a.type === "IFRAME") || [];
 
     return (
         <Modal isOpen={isOpen} onClose={onClose}>
@@ -381,7 +390,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                             if (isAudio) {
                                                 return (
                                                     <div key={link.id} className="flex flex-col gap-y-2 w-full">
-                                                        <AudioPlayer url={link.url} title={link.title} />
+                                                        <AttachmentPreviewLarge url={link.url} title={link.title} type={link.type} />
                                                         <div className="flex items-center justify-end px-1">
                                                             <button
                                                                 onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
@@ -397,7 +406,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                             return (
                                                 <div key={link.id} className="flex flex-col gap-y-1 w-full">
                                                     <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full">
-                                                        <AttachmentPreview url={link.url} thumbnailUrl={link.thumbnailUrl} title={link.title} />
+                                                        <AttachmentPreview url={link.url} thumbnailUrl={link.thumbnailUrl} title={link.title} type={link.type} />
                                                         <div className="flex flex-col min-w-0 pr-2 pb-1">
                                                             <span className="font-semibold text-sm text-neutral-700 truncate">{link.title || link.url}</span>
                                                             <span className="text-xs text-neutral-500 truncate mt-1">{getFileTypeLabel(detectFileType(link.url))}</span>

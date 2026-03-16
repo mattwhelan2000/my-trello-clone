@@ -62,7 +62,14 @@ export default async function BoardIdLayout({
             <div id="board-overlay" className="fixed inset-0 z-0" />
             <div className="relative z-10 min-h-screen">
                 <BoardEnhancements boardId={board.id} />
-                <BoardOptions boardId={board.id} listsCount={listsCount} cardsCount={cardsCount} initialGoogleSheetId={board.googleSheetId} />
+                <BoardOptions 
+                    boardId={board.id} 
+                    listsCount={listsCount} 
+                    cardsCount={cardsCount} 
+                    initialGoogleSheetId={board.googleSheetId} 
+                    colorSwatches={board.colorSwatches}
+                    listColorSwatches={board.listColorSwatches}
+                />
                 <main className="relative pt-24 min-h-[calc(100vh-6rem)]">{children}</main>
             </div>
         </div>

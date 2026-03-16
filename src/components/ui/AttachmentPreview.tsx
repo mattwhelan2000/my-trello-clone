@@ -9,18 +9,19 @@ interface AttachmentPreviewProps {
     thumbnailUrl?: string | null;
     title?: string | null;
     className?: string;
+    type?: string;
 }
 
 /**
  * Renders a file-type-aware thumbnail preview for an attachment.
  * Supports: images, SVGs, PDFs, videos, audio, Office docs, code/text files, and generic links.
  */
-export const AttachmentPreview = ({ url, thumbnailUrl, title, className = "" }: AttachmentPreviewProps) => {
-    const fileType = detectFileType(url);
+export const AttachmentPreview = ({ url, thumbnailUrl, title, type, className = "" }: AttachmentPreviewProps) => {
+    const fileType = type === "IFRAME" ? "iframe" : detectFileType(url);
 
     return (
         <div className={`h-16 w-24 bg-neutral-200 rounded-sm overflow-hidden flex-shrink-0 flex items-center justify-center relative ${className}`}>
-            {renderPreview(fileType, url, thumbnailUrl, title)}
+            {renderPreview(fileType as any, url, thumbnailUrl, title)}
         </div>
     );
 };
@@ -118,7 +119,16 @@ function renderPreview(fileType: FileCategory, url: string, thumbnailUrl?: strin
             );
 
         case 'link':
+        case 'iframe':
         default:
+            if (fileType === 'iframe') {
+                return (
+                    <div className="flex flex-col items-center justify-center w-full h-full bg-neutral-100">
+                        <Globe className="h-6 w-6 text-blue-500" />
+                        <span className="text-[9px] font-bold text-blue-500 mt-0.5">IFRAME</span>
+                    </div>
+                );
+            }
             if (thumbnailUrl) {
                 return <img src={thumbnailUrl} alt={title || "Thumbnail"} className="object-cover w-full h-full" />;
             }
@@ -134,10 +144,23 @@ function renderPreview(fileType: FileCategory, url: string, thumbnailUrl?: strin
 /**
  * Larger preview for display inside a card modal - shows more detail.
  */
-export const AttachmentPreviewLarge = ({ url, title }: { url: string; title?: string | null }) => {
-    const fileType = detectFileType(url);
+export const AttachmentPreviewLarge = ({ url, title, type }: { url: string; title?: string | null; type?: string }) => {
+    const fileType = type === "IFRAME" ? "iframe" : detectFileType(url);
 
     switch (fileType) {
+        case 'iframe':
+            return (
+                <div className="w-full rounded-md overflow-hidden border bg-white">
+                    <iframe
+                        src={url}
+                        className="w-full h-[400px]"
+                        title={title || "Embedded Content"}
+                        allowFullScreen
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                    />
+                </div>
+            );
         case 'pdf':
             return (
                 <div className="w-full rounded-md overflow-hidden border bg-white">

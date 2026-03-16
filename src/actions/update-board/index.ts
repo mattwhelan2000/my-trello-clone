@@ -9,7 +9,7 @@ import { formatImageUrl } from "@/lib/format-image-url";
 
 export const updateBoard = actionClient
     .schema(UpdateBoardSchema)
-    .action(async ({ parsedInput: { id, title, bgImage, bgColor, googleSheetId } }) => {
+    .action(async ({ parsedInput: { id, title, bgImage, bgColor, googleSheetId, colorSwatches, listColorSwatches, textColorSwatches } }) => {
         try {
             const formattedBgImage = formatImageUrl(bgImage);
 
@@ -17,6 +17,15 @@ export const updateBoard = actionClient
             const updateData: any = { title, bgImage: formattedBgImage, bgColor };
             if (googleSheetId !== undefined) {
                 updateData.googleSheetId = googleSheetId;
+            }
+            if (colorSwatches !== undefined) {
+                updateData.colorSwatches = colorSwatches;
+            }
+            if (listColorSwatches !== undefined) {
+                updateData.listColorSwatches = listColorSwatches;
+            }
+            if (textColorSwatches !== undefined) {
+                updateData.textColorSwatches = textColorSwatches;
             }
 
             const board = await db.board.update({

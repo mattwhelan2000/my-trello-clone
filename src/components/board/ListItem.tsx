@@ -11,6 +11,7 @@ import { Palette, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
+import { updateBoard } from "@/actions/update-board";
 import { updateList } from "@/actions/update-list";
 import { createCard } from "@/actions/create-card";
 import { deleteList } from "@/actions/delete-list";
@@ -30,6 +31,8 @@ export const ListItem = ({
     searchQuery?: string;
     searchCards?: boolean;
     searchLists?: boolean;
+    listColorSwatches?: string[];
+    textColorSwatches?: string[];
 }) => {
     const [title, setTitle] = useState(data.title);
     const [isEditing, setIsEditing] = useState(false);
@@ -99,6 +102,40 @@ export const ListItem = ({
         "#ffffff", "#f8fafc", "#f1f5f9", "#e2e8f0", "#cbd5e1",
         "#000000", "#0f172a", "#1e293b", "#334155", "#475569"
     ];
+
+    const [currentListColors, setCurrentListColors] = useState(listColorSwatches?.length ? listColorSwatches : LIST_COLORS);
+    const [currentTextColors, setCurrentTextColors] = useState(textColorSwatches?.length ? textColorSwatches : TEXT_COLORS);
+
+    const [editingSwatch, setEditingSwatch] = useState<{ type: 'list' | 'text', index: number } | null>(null);
+    const colorInputRef = useRef<HTMLInputElement>(null);
+
+    const { execute: executeUpdateBoard } = useAction(updateBoard, {
+        onError: (error) => console.error(error)
+    });
+
+    const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!editingSwatch) return;
+        const newColor = e.target.value;
+        if (editingSwatch.type === 'list') {
+            const newColors = [...currentListColors];
+            newColors[editingSwatch.index] = newColor;
+            setCurrentListColors(newColors);
+            executeUpdateBoard({ id: data.boardId, listColorSwatches: newColors });
+        } else {
+            const newColors = [...currentTextColors];
+            newColors[editingSwatch.index] = newColor;
+            setCurrentTextColors(newColors);
+            executeUpdateBoard({ id: data.boardId, textColorSwatches: newColors });
+        }
+    };
+
+    const handleContextMenuColor = (e: React.MouseEvent, type: 'list' | 'text', index: number) => {
+        e.preventDefault();
+        setEditingSwatch({ type, index });
+        setTimeout(() => {
+            colorInputRef.current?.click();
+        }, 50);
+    };
 
     const { execute: executeUpdateList, isExecuting: isLoading } = useSafeAction(updateList, {
         onSuccess: () => {
@@ -289,6 +326,8 @@ export const ListItem = ({
         transition,
     };
 
+    const isListMatched = searchLists && searchQuery && title.toLowerCase().includes(searchQuery.toLowerCase());
+    const isListMismatched = searchQuery && !isListMatched && searchLists;
     const isListMatch = !searchQuery.trim() || (searchLists && data.title.toLowerCase().includes(searchQuery.toLowerCase()));
     const hasMatchingCards = !searchQuery.trim() || (searchCards && data.cards?.some((card: any) =>
         card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -382,12 +421,13 @@ export const ListItem = ({
                         {colorPickerTab === "bg" && (
                             <div>
                                 <div className="grid grid-cols-5 gap-1.5 cursor-default">
-                                    {LIST_COLORS.map((color) => (
+                                    {currentListColors.map((color, idx) => (
                                         <button
-                                            key={color}
-                                            onClick={(e) => { e.stopPropagation(); onBgColorSelect(color); }}
+                                            key={`list-${idx}`}
                                             className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10"
                                             style={{ backgroundColor: color }}
+                                            onClick={(e) => { e.stopPropagation(); onBgColorSelect(color); }}
+                                            onContextMenu={(e) => handleContextMenuColor(e, 'list', idx)}
                                         />
                                     ))}
                                     <button
@@ -397,38 +437,19 @@ export const ListItem = ({
                                         none
                                     </button>
                                 </div>
-                                <div className="mt-3 pt-2 border-t flex items-center gap-x-2">
-                                    <label className="text-[10px] text-neutral-500 font-medium">Custom:</label>
-                                    <input
-                                        id="bg-color-picker"
-                                        type="color"
-                                        defaultValue={data.color || "#3b82f6"}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="h-7 w-10 rounded cursor-pointer border-0 p-0 bg-transparent"
-                                    />
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const input = document.getElementById('bg-color-picker') as HTMLInputElement;
-                                            if (input) onBgColorSelect(input.value);
-                                        }}
-                                        className="text-[10px] font-medium bg-blue-600 text-white px-2 py-1 rounded-sm hover:bg-blue-700 transition"
-                                    >
-                                        Apply
-                                    </button>
-                                </div>
                             </div>
                         )}
 
                         {colorPickerTab === "text" && (
                             <div>
                                 <div className="grid grid-cols-5 gap-1.5 cursor-default">
-                                    {TEXT_COLORS.map((color) => (
+                                    {currentTextColors.map((color, idx) => (
                                         <button
-                                            key={color}
-                                            onClick={(e) => { e.stopPropagation(); onTextColorSelect(color); }}
+                                            key={`text-${idx}`}
                                             className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/20"
                                             style={{ backgroundColor: color }}
+                                            onClick={(e) => { e.stopPropagation(); onTextColorSelect(color); }}
+                                            onContextMenu={(e) => handleContextMenuColor(e, 'text', idx)}
                                         />
                                     ))}
                                     <button

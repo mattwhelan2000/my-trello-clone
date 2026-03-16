@@ -24,6 +24,9 @@ model Board {
   title         String
   bgImage       String?
   bgColor       String?
+  colorSwatches String[]
+  listColorSwatches String[]
+  textColorSwatches String[]
   googleSheetId String?
   lists         List[]
   createdAt     DateTime  @default(now())

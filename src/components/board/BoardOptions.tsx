@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Settings, Image as ImageIcon, Palette, X, Download, Info, LayoutList, CreditCard } from "lucide-react";
 import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
@@ -16,6 +16,8 @@ interface BoardOptionsProps {
     listsCount: number;
     cardsCount: number;
     initialGoogleSheetId?: string | null;
+    colorSwatches?: string[];
+    listColorSwatches?: string[];
 }
 
 const COLORS = [
@@ -50,12 +52,20 @@ function boardToCSV(board: any): string {
     return rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
 }
 
-export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleSheetId }: BoardOptionsProps) => {
+export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleSheetId, colorSwatches, listColorSwatches }: BoardOptionsProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
     const [sheetId, setSheetId] = useState(initialGoogleSheetId || "");
     const { addToast } = useToast();
+
+    // Local state for swatches so they update immediately
+    const [currentBgColors, setCurrentBgColors] = useState(colorSwatches?.length ? colorSwatches : COLORS);
+    const [currentListColors, setCurrentListColors] = useState(listColorSwatches?.length ? listColorSwatches : LIST_COLORS);
+
+    // Editing state
+    const [editingSwatch, setEditingSwatch] = useState<{ type: 'bg' | 'list', index: number } | null>(null);
+    const colorInputRef = React.useRef<HTMLInputElement>(null);
 
     const { execute, isLoading } = useAction(updateBoard, {
         onSuccess: () => { setIsOpen(false); },
@@ -99,6 +109,31 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         },
         onError: (error) => console.error("CSV Export failed", error)
     });
+
+    const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!editingSwatch) return;
+        const newColor = e.target.value;
+        if (editingSwatch.type === 'bg') {
+            const newColors = [...currentBgColors];
+            newColors[editingSwatch.index] = newColor;
+            setCurrentBgColors(newColors);
+            execute({ id: boardId, colorSwatches: newColors });
+        } else {
+            const newColors = [...currentListColors];
+            newColors[editingSwatch.index] = newColor;
+            setCurrentListColors(newColors);
+            execute({ id: boardId, listColorSwatches: newColors });
+        }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, type: 'bg' | 'list', index: number) => {
+        e.preventDefault();
+        setEditingSwatch({ type, index });
+        // Need a tiny delay for state to update before clicking the ref
+        setTimeout(() => {
+            colorInputRef.current?.click();
+        }, 50);
+    };
 
     const onColorSelect = (color: string) => {
         execute({ id: boardId, bgColor: color, bgImage: "" });
@@ -238,12 +273,13 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                     </div>
 
                     <div className="mb-4">
-                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><Palette className="h-3 w-3" /> Solid Colors</h4>
+                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><Palette className="h-3 w-3" /> Solid Colors (Right-Click to Edit)</h4>
                         <div className="grid grid-cols-7 gap-1">
-                            {COLORS.map((color) => (
+                            {currentBgColors.map((color, idx) => (
                                 <button
-                                    key={color}
+                                    key={`bg-${idx}`}
                                     onClick={() => onColorSelect(color)}
+                                    onContextMenu={(e) => handleContextMenu(e, 'bg', idx)}
                                     className="h-8 w-8 rounded-sm hover:opacity-80 transition cursor-pointer border border-black/10 shadow-sm"
                                     style={{ backgroundColor: color }}
                                     disabled={anyLoading}
@@ -253,12 +289,13 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                     </div>
 
                     <div className="mb-4">
-                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><LayoutList className="h-3 w-3" /> List Colors</h4>
+                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><LayoutList className="h-3 w-3" /> List Colors (Right-Click to Edit)</h4>
                         <div className="grid grid-cols-5 gap-1">
-                            {LIST_COLORS.map((color) => (
+                            {currentListColors.map((color, idx) => (
                                 <button
-                                    key={color}
+                                    key={`list-${idx}`}
                                     onClick={() => executeUpdateListsColors({ boardId, color })}
+                                    onContextMenu={(e) => handleContextMenu(e, 'list', idx)}
                                     className="h-8 w-full rounded-sm hover:opacity-80 transition cursor-pointer border border-black/10 shadow-sm"
                                     style={{ backgroundColor: color }}
                                     disabled={anyLoading}
@@ -266,6 +303,15 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                             ))}
                         </div>
                     </div>
+
+                    <input 
+                        type="color" 
+                        ref={colorInputRef} 
+                        onChange={handleColorChange} 
+                        className="sr-only" 
+                        tabIndex={-1} 
+                        value={editingSwatch ? (editingSwatch.type === 'bg' ? currentBgColors[editingSwatch.index] : currentListColors[editingSwatch.index]) : "#ffffff"} 
+                    />
 
                     <div>
                         <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><ImageIcon className="h-3 w-3" /> Image URL</h4>
