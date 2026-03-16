@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Settings, Image as ImageIcon, Palette, X, Download, Info, LayoutList, CreditCard } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
@@ -58,6 +59,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     const [imageUrl, setImageUrl] = useState("");
     const [sheetId, setSheetId] = useState(initialGoogleSheetId || "");
     const { addToast } = useToast();
+    const router = useRouter();
 
     // Local state for swatches so they update immediately
     const [currentBgColors, setCurrentBgColors] = useState(colorSwatches?.length ? colorSwatches : COLORS);
@@ -162,6 +164,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
             if (data && "success" in data) {
                 addToast("Google Sheet Synced successfully", "success");
                 setIsOpen(false);
+                router.refresh();
             } else if (data && "error" in data) {
                 addToast(data.error as string, "error");
             }

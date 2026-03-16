@@ -87,16 +87,20 @@ export const syncGoogleSheet = actionClient
                 return { error: "No data found in the linked Google Sheet." };
             }
 
-            // Strict V8 Mapping Headers (9 Columns)
+            // Strict V8 Mapping Headers (11 Columns)
+            // 0: SCENE, 1: INT/EXT, 2: LENGTH, 3: Scene LOCATION, 4: Scene DESCRIPTION
+            // 5: THUMBNAIL, 6: TIME, 7: SET LOCATION, 8: VFX, 9: VFX THUMBNAIL, 10: CHARACTERS
             const SCENE_IDX = 0;
             const INT_EXT_IDX = 1;
             const LENGTH_IDX = 2;
             const LOC_TITLE_IDX = 3;
             const LOC_DESC_IDX = 4;
-            const TIME_IDX = 5;
-            const SET_IDX = 6;
-            const VFX_IDX = 7;
-            const CHAR_IDX = 8;
+            const THUMBNAIL_IDX = 5;
+            const TIME_IDX = 6;
+            const SET_IDX = 7;
+            const VFX_IDX = 8;
+            const VFX_THUMBNAIL_IDX = 9;
+            const CHAR_IDX = 10;
 
             // Sync Logic
             let listOrderCounter = Math.max(...board.lists.map(l => l.order), -1) + 1;
