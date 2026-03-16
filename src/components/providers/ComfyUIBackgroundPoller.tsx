@@ -58,7 +58,8 @@ export const ComfyUIBackgroundPoller = () => {
                             url: returnData.imageUrl,
                             boardId: task.boardId,
                             id: task.cardId, 
-                            type: "IMAGE"
+                            type: "IMAGE",
+                            title: ""
                         });
                         
                         removeTask(task.taskId);

@@ -7,9 +7,9 @@ import { CreateAttachmentSchema } from "./schema";
 
 export const createAttachment = actionClient
     .schema(CreateAttachmentSchema)
-    .action(async ({ parsedInput: { id, url, type, boardId } }) => {
+    .action(async ({ parsedInput: { id, url, type, boardId, title: customTitle } }) => {
         try {
-            let title = url;
+            let title = customTitle || url;
             let thumbnailUrl = null;
 
             if (type === "LINK") {

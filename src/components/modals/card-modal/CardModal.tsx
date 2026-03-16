@@ -178,11 +178,17 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
 
         let urlFinal = url.trim();
         let finalType = "";
+        let finalTitle: string | undefined = undefined;
 
-        const iframeMatch = urlFinal.match(/<iframe.*?src=["'](.*?)["']/i);
+        const iframeMatch = url.match(/<iframe.*?src=["'](.*?)["']/i);
         if (iframeMatch && iframeMatch[1]) {
             urlFinal = iframeMatch[1];
             finalType = "IFRAME";
+            // Strip the iframe HTML and use the remaining text as the title if exists
+            const strippedText = url.replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/i, '').trim();
+            if (strippedText) {
+                finalTitle = strippedText;
+            }
         }
 
         if (!finalType) {
@@ -190,7 +196,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
             finalType = (detectedType === "image" || detectedType === "svg") ? "IMAGE" : "LINK";
         }
 
-        executeCreateAttachment({ id: data.id, boardId, url: urlFinal, type: finalType as "IMAGE" | "LINK" | "IFRAME" });
+        executeCreateAttachment({ id: data.id, boardId, url: urlFinal, type: finalType as "IMAGE" | "LINK" | "IFRAME", title: finalTitle || "" });
     };
 
     const onBlur = () => {
@@ -423,7 +429,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                             <span className="text-xs text-neutral-500 truncate mt-1">{getFileTypeLabel(detectFileType(link.url))}</span>
                                                         </div>
                                                     </a>
-                                                    {link.thumbnailUrl && (
+                                                    {(link.thumbnailUrl || link.type === "IFRAME") && (
                                                         <div className="flex items-center gap-x-2 px-1 mt-1">
                                                             {!link.isCover ? (
                                                                 <button
@@ -445,7 +451,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                             </button>
                                                         </div>
                                                     )}
-                                                    {!link.thumbnailUrl && (
+                                                    {!(link.thumbnailUrl || link.type === "IFRAME") && (
                                                         <div className="flex items-center gap-x-2 px-1 mt-1 justify-end">
                                                             <button
                                                                 onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
