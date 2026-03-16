@@ -250,9 +250,18 @@ export const ListContainer = ({
                                 placeholder='Search cards... ("/")'
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="text-sm pl-8 pr-16 py-1.5 rounded-md bg-black/30 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 outline-none focus:bg-black/50 focus:border-white/40 w-64 transition shadow-lg"
+                                className="text-sm pl-8 pr-[76px] py-1.5 rounded-md bg-black/30 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 outline-none focus:bg-black/50 focus:border-white/40 w-64 transition shadow-lg"
                             />
                             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-x-1">
+                                {searchQuery.length > 0 && (
+                                    <button
+                                        onClick={() => setSearchQuery("")}
+                                        title="Clear search"
+                                        className="text-[10px] font-bold h-5 w-5 rounded flex items-center justify-center transition border bg-red-500/80 border-red-600/50 text-white hover:bg-red-600/90"
+                                    >
+                                        X
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => setSearchCards(!searchCards)}
                                     title="Toggle Card search"
