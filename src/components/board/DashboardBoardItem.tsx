@@ -60,7 +60,7 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
     };
 
     return (
-        <div className="group relative h-64 w-full shadow-sm rounded-sm">
+        <div className="group relative h-32 w-full shadow-sm rounded-sm">
             <div
                 className="absolute inset-0 rounded-sm overflow-hidden"
                 style={{ backgroundColor: board.bgColor || "white" }}
