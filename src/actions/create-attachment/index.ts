@@ -32,8 +32,20 @@ export const createAttachment = actionClient
                     type,
                     title,
                     thumbnailUrl,
+                    isCover: type === "IFRAME",
                 },
             });
+
+            if (type === "IFRAME") {
+                // Turn off cover for other attachments on this card
+                await db.attachment.updateMany({
+                    where: {
+                        cardId: id,
+                        id: { not: attachment.id },
+                    },
+                    data: { isCover: false },
+                });
+            }
 
             revalidatePath(`/board/${boardId}`);
             return attachment;

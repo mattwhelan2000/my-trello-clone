@@ -17,7 +17,7 @@ export default async function HomePage() {
         <div className="flex items-center gap-x-2 font-semibold text-xl text-neutral-200">
           <LayoutDashboard className="h-7 w-7 text-blue-500" />
           Your Boards
-          <span className="text-xs font-mono text-neutral-500 ml-2 bg-neutral-800 px-2 py-0.5 rounded-sm">0316.09:58</span>
+          <span className="text-xs font-mono text-neutral-500 ml-2 bg-neutral-800 px-2 py-0.5 rounded-sm">0316.10:55</span>
         </div>
 
         {/* Action Buttons Row */}
@@ -32,11 +32,6 @@ export default async function HomePage() {
             <ImportScriptButton />
           </div>
         </div>
-      </div>
-
-      <div className="text-sm font-mono text-neutral-400 mb-4">
-          {/* TIMESTAMP FOR VERCEL UPDATES */}
-          0316.10:45
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
