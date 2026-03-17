@@ -13,6 +13,7 @@ model Workspace {
   name      String
   members   String[] // List of user IDs
   boards    Board[]
+  scripts   Script[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -141,4 +142,18 @@ model ComfyUIWorkflow {
   json      String   @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Script {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title       String
+  author      String?
+  jsonUrl     String?   @db.Text
+  pdfUrl      String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
 }
