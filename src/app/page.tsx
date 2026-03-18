@@ -6,6 +6,9 @@ import { ImportScriptButton } from "@/components/board/ImportScriptButton";
 import { DashboardBoardItem } from "@/components/board/DashboardBoardItem";
 import { LayoutDashboard } from "lucide-react";
 
+export const dynamic = 'force-dynamic';
+
+
 export default async function HomePage() {
   const boards = await db.board.findMany({
     orderBy: { createdAt: "desc" }
