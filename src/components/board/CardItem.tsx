@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { CardModal } from "@/components/modals/card-modal/CardModal";
 import { useAction } from "@/hooks/use-action";
@@ -41,7 +41,7 @@ const renderTitleWithLinks = (titleText: string) => {
     });
 };
 
-export const CardItem = ({ data, index, boardId }: { data: any; index: number; boardId: string }) => {
+const CardItemInner = ({ data, index, boardId }: { data: any; index: number; boardId: string }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [contextMenuAction, setContextMenuAction] = useState<string | null>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -409,13 +409,17 @@ export const CardItem = ({ data, index, boardId }: { data: any; index: number; b
                 document.body
             )}
 
-            <CardModal
-                data={data}
-                boardId={boardId}
-                isOpen={isModalOpen}
-                onClose={() => { setIsModalOpen(false); setContextMenuAction(null); }}
-                defaultMoveOpen={contextMenuAction === 'move'}
-            />
+            {isModalOpen && (
+                <CardModal
+                    data={data}
+                    boardId={boardId}
+                    isOpen={isModalOpen}
+                    onClose={() => { setIsModalOpen(false); setContextMenuAction(null); }}
+                    defaultMoveOpen={contextMenuAction === 'move'}
+                />
+            )}
         </>
     );
 };
+
+export const CardItem = React.memo(CardItemInner);

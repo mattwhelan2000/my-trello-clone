@@ -9,6 +9,7 @@ import {
     DragEndEvent,
     DragOverEvent,
     DragStartEvent,
+    DragOverlay,
     closestCenter,
     useSensor,
     useSensors,
@@ -46,7 +47,6 @@ export const ListContainer = ({
     const { execute: executeUpdateListOrder } = useAction(updateListOrder, {
         onSuccess: () => {
             console.log("List order updated successfully on server.");
-            router.refresh();
         },
         onError: (error) => {
             console.error(error);
@@ -56,7 +56,6 @@ export const ListContainer = ({
     const { execute: executeUpdateCardOrder } = useAction(updateCardOrder, {
         onSuccess: () => {
             console.log("Card order updated successfully on server.");
-            router.refresh();
         },
         onError: (error) => {
             console.error(error);
@@ -124,8 +123,12 @@ export const ListContainer = ({
         })
     );
 
+    const [activeCard, setActiveCard] = useState<any>(null);
+
     const onDragStart = (event: DragStartEvent) => {
-        // Optional: Could set active element for dragging overlays
+        if (event.active.data.current?.type === "Card") {
+            setActiveCard(event.active.data.current.card);
+        }
     };
 
     const onDragOver = (event: DragOverEvent) => {
@@ -144,7 +147,7 @@ export const ListContainer = ({
 
         if (!isActiveCard) return;
 
-        // Moving a card
+        // Optimistic local state only — no server calls during drag
         setOrderedData((prevItems) => {
             const activeList = prevItems.find((list) => list.cards.some((card: any) => card.id === activeId));
             const overList = prevItems.find((list) =>
@@ -163,23 +166,17 @@ export const ListContainer = ({
             if (activeList.id === overList.id) {
                 // Moving card within the same list
                 const newCards = arrayMove(activeList.cards, activeCardIndex, overCardIndex);
-                newCards.forEach((c: any, i) => c.order = i); // update order
+                newCards.forEach((c: any, i) => c.order = i);
 
-                const newListsArr = prevItems.map((list) => {
+                return prevItems.map((list) => {
                     if (list.id === activeList.id) {
                         return { ...list, cards: newCards };
                     }
                     return list;
                 });
-
-                // Server state
-                executeUpdateCardOrder({ boardId, items: newCards });
-
-                return newListsArr;
             } else {
                 // Moving card to a different list
-                const activeCard = activeList.cards[activeCardIndex];
-                activeCard.listId = overList.id; // update local pointer
+                const activeCard = { ...activeList.cards[activeCardIndex], listId: overList.id };
 
                 const newActiveCards = [...activeList.cards];
                 newActiveCards.splice(activeCardIndex, 1);
@@ -189,21 +186,18 @@ export const ListContainer = ({
                 newOverCards.splice(overCardIndex, 0, activeCard);
                 newOverCards.forEach((c: any, i) => c.order = i);
 
-                const newListsArr = prevItems.map((list) => {
+                return prevItems.map((list) => {
                     if (list.id === activeList.id) return { ...list, cards: newActiveCards };
                     if (list.id === overList.id) return { ...list, cards: newOverCards };
                     return list;
                 });
-
-                // Server state
-                executeUpdateCardOrder({ boardId, items: newOverCards });
-
-                return newListsArr;
             }
         });
     };
 
     const onDragEnd = (event: DragEndEvent) => {
+        setActiveCard(null);
+
         const { active, over } = event;
 
         if (!over) return;
@@ -211,11 +205,10 @@ export const ListContainer = ({
         const activeId = active.id;
         const overId = over.id;
 
-        if (activeId === overId) return;
-
         const isActiveList = active.data.current?.type === "List";
+        const isActiveCard = active.data.current?.type === "Card";
 
-        if (isActiveList) {
+        if (isActiveList && activeId !== overId) {
             setOrderedData((prevItems) => {
                 const activeIndex = prevItems.findIndex((list) => list.id === activeId);
                 const overIndex = prevItems.findIndex((list) => list.id === overId);
@@ -223,10 +216,21 @@ export const ListContainer = ({
                 const newLists = arrayMove(prevItems, activeIndex, overIndex);
                 newLists.forEach((list, index) => list.order = index);
 
-                // Server state
                 executeUpdateListOrder({ boardId, items: newLists });
 
                 return newLists;
+            });
+        }
+
+        // Persist card order to server after drop (single call)
+        if (isActiveCard) {
+            setOrderedData((currentData) => {
+                // Collect all cards that need updating (cards in affected lists)
+                const allCards = currentData.flatMap((list) => list.cards);
+                if (allCards.length > 0) {
+                    executeUpdateCardOrder({ boardId, items: allCards });
+                }
+                return currentData; // no state change, just reading
             });
         }
     };
@@ -369,6 +373,19 @@ export const ListContainer = ({
                         </div>
                     </ol>
                 </SortableContext>
+                <DragOverlay>
+                    {activeCard ? (
+                        <div
+                            className="rotate-3 shadow-xl rounded-md px-3 py-2 text-sm w-[250px] opacity-90 border border-neutral-300"
+                            style={{
+                                backgroundColor: activeCard.color || "#ffffff",
+                                color: activeCard.fontColor || "#172b4d",
+                            }}
+                        >
+                            {activeCard.title}
+                        </div>
+                    ) : null}
+                </DragOverlay>
             </DndContext>
         </div>
     );
