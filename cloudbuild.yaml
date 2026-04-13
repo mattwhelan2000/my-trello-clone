@@ -22,6 +22,7 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--set-secrets=DATABASE_URL=DATABASE_URL_US:latest,GOOGLE_SERVICE_ACCOUNT_JSON=GOOGLE_SERVICE_ACCOUNT_JSON:latest'
+      - '--set-env-vars=COMFYUI_API_URL=https://unbitten-uncontemptuously-aimee.ngrok-free.dev'
 
   # 4. Deploy to Cloud Run (Europe West)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -38,6 +39,7 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--set-secrets=DATABASE_URL=DATABASE_URL_EU:latest,GOOGLE_SERVICE_ACCOUNT_JSON=GOOGLE_SERVICE_ACCOUNT_JSON:latest'
+      - '--set-env-vars=COMFYUI_API_URL=https://unbitten-uncontemptuously-aimee.ngrok-free.dev'
 
 images:
   - 'gcr.io/trello-clone-492816/trello-clone:latest'
