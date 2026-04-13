@@ -30,17 +30,26 @@ export const importBoard = actionClient
                     workspaceId: workspace.id,
                     bgColor: boardData.bgColor,
                     bgImage: formatImageUrl(boardData.bgImage),
+                    googleSheetId: boardData.googleSheetId,
+                    colorSwatches: boardData.colorSwatches || [],
+                    listColorSwatches: boardData.listColorSwatches || [],
+                    textColorSwatches: boardData.textColorSwatches || [],
                     lists: {
                         create: boardData.lists.map(list => ({
                             title: list.title,
                             order: list.order,
                             color: list.color,
+                            fontColor: list.fontColor,
+                            isSyncedWithSheet: list.isSyncedWithSheet ?? true,
                             cards: {
                                 create: list.cards.map(card => ({
                                     title: card.title,
                                     description: card.description,
                                     order: card.order,
+                                    color: card.color,
+                                    fontColor: card.fontColor,
                                     dueDate: card.dueDate ? new Date(card.dueDate) : null,
+                                    isSyncedWithSheet: card.isSyncedWithSheet ?? true,
                                     labels: {
                                         create: card.labels?.map(l => ({ title: l.title, color: l.color })) || []
                                     },
