@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.agents
+.turbo
+*.log
+.env
+.env.local
+Dockerfile
+.dockerignore
+cloudbuild.yaml
+README.md

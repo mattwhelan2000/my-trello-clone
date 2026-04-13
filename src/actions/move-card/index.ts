@@ -9,6 +9,15 @@ export const moveCard = actionClient
     .schema(MoveCardSchema)
     .action(async ({ parsedInput: { cardId, targetListId, boardId } }) => {
         try {
+            // Verify that the target list exists and belongs to the board
+            const targetList = await db.list.findUnique({
+                where: { id: targetListId, boardId },
+            });
+
+            if (!targetList) {
+                return { error: "Target list not found on this board." };
+            }
+
             // Get the last card order in target list
             const lastCard = await db.card.findFirst({
                 where: { listId: targetListId },

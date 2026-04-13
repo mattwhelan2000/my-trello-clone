@@ -1,0 +1,46 @@
+steps:
+  # 1. Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/trello-clone-492816/trello-clone:latest', '.']
+
+  # 2. Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/trello-clone-492816/trello-clone:latest']
+
+  # 3. Deploy to Cloud Run (US Central)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'trello-clone-us'
+      - '--image'
+      - 'gcr.io/trello-clone-492816/trello-clone:latest'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-secrets=DATABASE_URL=DATABASE_URL_US:latest,GOOGLE_SERVICE_ACCOUNT_JSON=GOOGLE_SERVICE_ACCOUNT_JSON:latest'
+
+  # 4. Deploy to Cloud Run (Europe West)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'trello-clone-eu'
+      - '--image'
+      - 'gcr.io/trello-clone-492816/trello-clone:latest'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-secrets=DATABASE_URL=DATABASE_URL_EU:latest,GOOGLE_SERVICE_ACCOUNT_JSON=GOOGLE_SERVICE_ACCOUNT_JSON:latest'
+
+images:
+  - 'gcr.io/trello-clone-492816/trello-clone:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

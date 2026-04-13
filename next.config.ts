@@ -15,7 +15,8 @@ const nextConfig: NextConfig = {
         hostname: "**",
       },
     ],
-  }
+  },
+  output: 'standalone',
 };
 
 export default removeImports()(nextConfig);

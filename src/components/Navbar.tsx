@@ -61,8 +61,11 @@ export const Navbar = () => {
                             <div className="bg-blue-600 p-1 rounded-sm">
                                 <LayoutDashboard className="h-5 w-5 text-white" />
                             </div>
-                            <p className="text-lg text-white font-bold pb-1 text-center">
+                            <p className="text-lg text-white font-bold pb-1 text-center flex items-center gap-x-2">
                                 {isOnBoard && boardTitle ? boardTitle : "Trello Clone"}
+                                <span className="bg-green-500/20 text-green-400 text-[10px] px-1.5 py-0.5 rounded border border-green-500/30 font-medium tracking-wider">
+                                    GCP
+                                </span>
                             </p>
                         </div>
                     </Link>
