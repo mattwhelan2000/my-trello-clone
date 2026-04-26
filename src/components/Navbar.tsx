@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutDashboard, Plus, ChevronLeft } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { LayoutDashboard, Plus, ChevronLeft, X } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { useOnClickOutside } from "usehooks-ts";
+import { CreateBoardForm } from "@/components/board/CreateBoardForm";
 
 export const Navbar = () => {
     const pathname = usePathname();
@@ -15,6 +17,10 @@ export const Navbar = () => {
     const [bgOpacity, setBgOpacity] = useState(0.25);
     const [isOnBoard, setIsOnBoard] = useState(false);
     const [boardTitle, setBoardTitle] = useState<string | null>(null);
+
+    const [isCreating, setIsCreating] = useState(false);
+    const popoverRef = useRef<HTMLDivElement>(null);
+    useOnClickOutside(popoverRef as any, () => setIsCreating(false));
 
     useEffect(() => {
         setIsOnBoard(!!boardId);
@@ -72,15 +78,26 @@ export const Navbar = () => {
                 </div>
 
                 {!isOnBoard && (
-                    <div className="flex items-center gap-x-2">
-                        <Link href="/">
-                            <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition h-auto md:block">
-                                <span className="md:hidden">
-                                    <Plus className="h-4 w-4" />
-                                </span>
-                                <span className="hidden md:block">Create</span>
-                            </button>
-                        </Link>
+                    <div className="flex items-center gap-x-2 relative" ref={popoverRef}>
+                        <button 
+                            onClick={() => setIsCreating(!isCreating)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition h-auto md:block">
+                            <span className="md:hidden">
+                                <Plus className="h-4 w-4" />
+                            </span>
+                            <span className="hidden md:block">Create</span>
+                        </button>
+                        {isCreating && (
+                            <div className="absolute top-full left-0 mt-2 w-72 bg-white shadow-xl border rounded-md p-3 z-50">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="text-sm font-medium text-neutral-600">Create Board</div>
+                                    <button onClick={() => setIsCreating(false)} className="text-neutral-500 hover:text-neutral-800 transition">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                                <CreateBoardForm />
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
