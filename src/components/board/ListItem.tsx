@@ -26,7 +26,10 @@ export const ListItem = ({
     searchCards = true,
     searchLists = true,
     listColorSwatches,
-    textColorSwatches
+    textColorSwatches,
+    onMoveList,
+    isFirst,
+    isLast
 }: {
     data: any;
     index: number;
