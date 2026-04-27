@@ -139,33 +139,59 @@ export const pushGoogleSheet = actionClient
                 // If the list itself was unsynced (title changed locally), track it to relink
                 if (!list.isSyncedWithSheet) listsToReLink.push(list.id);
 
-                // Map specific cards by Order
+                // Map cards by keyword first, then by index fallback
                 const sortedCards = list.cards || [];
                 
-                if (sortedCards[0]) {
-                    row[3] = sortedCards[0].title;
-                    row[4] = sortedCards[0].description || "";
-                    if (sortedCards[0].attachments && sortedCards[0].attachments.length > 0) {
-                        const img = sortedCards[0].attachments.find(a => a.isCover) || sortedCards[0].attachments.find(a => a.type === "IMAGE");
-                        if (img) {
-                            const proxyUrl = `${baseUrl}/api/proxy-image?url=${encodeURIComponent(img.url)}`;
-                            row[5] = `=IMAGE("${proxyUrl}")`;
-                        }
+                const locationCard = sortedCards.find(c => {
+                    const t = c.title.toLowerCase();
+                    return t.includes("location") || t.includes("scene") || t.includes("master");
+                }) || sortedCards[0];
+
+                const vfxCard = sortedCards.find(c => {
+                    const t = c.title.toLowerCase();
+                    return t.includes("vfx") || t.includes("boards");
+                }) || sortedCards[3];
+
+                const timeCard = sortedCards.find(c => {
+                    const t = c.title.toLowerCase();
+                    return t.includes("time") || t.includes("day") || t.includes("night");
+                }) || sortedCards[1];
+
+                const setLocationCard = sortedCards[2]; // Usually the 3rd card
+                const charactersCard = sortedCards.find(c => {
+                    const t = c.title.toLowerCase();
+                    return t.includes("character") || t.includes("char");
+                }) || sortedCards[4];
+
+                // SCENE LOCATION & DESCRIPTION (from location card)
+                if (locationCard) {
+                    row[3] = locationCard.title;
+                    row[4] = locationCard.description || "";
+                    const img = locationCard.attachments.find(a => a.isCover) || locationCard.attachments.find(a => a.type === "IMAGE");
+                    if (img) {
+                        const proxyUrl = `${baseUrl}/api/proxy-image?url=${encodeURIComponent(img.url)}`;
+                        row[5] = `=IMAGE("${proxyUrl}")`;
                     }
                 }
-                if (sortedCards[1]) row[6] = sortedCards[1].title; // Time Title
-                if (sortedCards[2]) row[7] = sortedCards[2].description || "";
-                if (sortedCards[3]) {
-                    row[8] = sortedCards[3].description || "";
-                    if (sortedCards[3].attachments && sortedCards[3].attachments.length > 0) {
-                        const img = sortedCards[3].attachments.find(a => a.isCover) || sortedCards[3].attachments.find(a => a.type === "IMAGE");
-                        if (img) {
-                            const proxyUrl = `${baseUrl}/api/proxy-image?url=${encodeURIComponent(img.url)}`;
-                            row[9] = `=IMAGE("${proxyUrl}")`;
-                        }
+
+                // TIME
+                if (timeCard) row[6] = timeCard.title;
+
+                // SET LOCATION
+                if (setLocationCard) row[7] = setLocationCard.description || "";
+
+                // VFX & VFX THUMBNAIL (from vfx card)
+                if (vfxCard) {
+                    row[8] = vfxCard.description || "";
+                    const img = vfxCard.attachments.find(a => a.isCover) || vfxCard.attachments.find(a => a.type === "IMAGE");
+                    if (img) {
+                        const proxyUrl = `${baseUrl}/api/proxy-image?url=${encodeURIComponent(img.url)}`;
+                        row[9] = `=IMAGE("${proxyUrl}")`;
                     }
                 }
-                if (sortedCards[4]) row[10] = sortedCards[4].description || "";
+
+                // CHARACTERS
+                if (charactersCard) row[10] = charactersCard.description || "";
 
                 for (const card of sortedCards) {
                     if (!card.isSyncedWithSheet) cardsToReLink.push(card.id);
