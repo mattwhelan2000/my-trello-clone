@@ -51,8 +51,13 @@ async function resolveDropboxFolder(folderUrl: string): Promise<DropboxFileEntry
 
     if (!listRes.ok) {
         const errText = await listRes.text();
-        console.error(`[DropboxIngest] list_folder Error (${listRes.status}):`, errText);
-        throw new Error(`Dropbox list_folder failed: ${listRes.status}`);
+        let errorMessage = `Dropbox API failed (${listRes.status}): ${errText}`;
+        try {
+            const errJson = JSON.parse(errText);
+            if (errJson.error_summary) errorMessage = `Dropbox Error: ${errJson.error_summary}`;
+        } catch {}
+        console.error(`[DropboxIngest] list_folder Error:`, errText);
+        throw new Error(errorMessage);
     }
 
     const listData = await listRes.json();
@@ -226,7 +231,8 @@ export const bulkIngestImages = actionClient
 
             revalidatePath(`/board/${boardId}`);
             return { data: { count: ingestedCount } };
-        } catch (error) {
-            return { error: "Failed to ingest images." };
+        } catch (error: any) {
+            console.error("Bulk Ingest Error:", error);
+            return { error: error.message || "Failed to ingest images." };
         }
     });
