@@ -23,89 +23,69 @@ async function resolveDropboxFolder(folderUrl: string): Promise<DropboxFileEntry
     const token = process.env.DROPBOX_ACCESS_TOKEN;
     if (!token) throw new Error("DROPBOX_ACCESS_TOKEN is not set");
 
-    // Step 1: Get the shared folder metadata to find the shared link's folder path
-    // We use /2/sharing/get_shared_link_metadata to resolve the shared link
-    const metaRes = await fetch("https://api.dropboxapi.com/2/sharing/get_shared_link_metadata", {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url: folderUrl }),
-    });
+    console.log(`[DropboxIngest] Resolving Folder: ${folderUrl}`);
 
-    if (!metaRes.ok) {
-        const errText = await metaRes.text();
-        console.error("Dropbox metadata error:", errText);
-        throw new Error(`Failed to get Dropbox folder metadata: ${metaRes.status}`);
-    }
+    // Extract the base URL and query params
+    const urlObj = new URL(folderUrl);
+    const baseUrl = urlObj.origin + urlObj.pathname;
+    const rlkey = urlObj.searchParams.get("rlkey");
+    const st = urlObj.searchParams.get("st");
 
-    const meta = await metaRes.json();
-    console.log("Dropbox folder metadata:", JSON.stringify(meta, null, 2));
+    // Construct common header set
+    const headers = {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+    };
 
-    // Step 2: List files in the shared folder using /2/files/list_folder
-    // For shared links, we use the shared_link parameter
+    // Step 1: List files in the shared folder using /2/files/list_folder
     const listRes = await fetch("https://api.dropboxapi.com/2/files/list_folder", {
         method: "POST",
-        headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
             path: "",
             shared_link: { url: folderUrl },
-            limit: 2000,
+            limit: 1000,
+            recursive: false,
         }),
     });
 
     if (!listRes.ok) {
         const errText = await listRes.text();
-        console.error("Dropbox list_folder error:", errText);
-        throw new Error(`Failed to list Dropbox folder: ${listRes.status}`);
+        console.error(`[DropboxIngest] list_folder Error (${listRes.status}):`, errText);
+        throw new Error(`Dropbox list_folder failed: ${listRes.status}`);
     }
 
     const listData = await listRes.json();
-    const entries: DropboxFileEntry[] = [];
+    console.log(`[DropboxIngest] Found ${listData.entries?.length || 0} total entries`);
 
-    // Filter to only files (not subfolders), and only image types
-    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff"];
+    const entries: DropboxFileEntry[] = [];
+    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"];
 
     for (const entry of listData.entries || []) {
         if (entry[".tag"] !== "file") continue;
+        
         const ext = entry.name.substring(entry.name.lastIndexOf(".")).toLowerCase();
         if (!imageExtensions.includes(ext)) continue;
 
-        // Step 3: Get a temporary direct download link for each file
-        const tempLinkRes = await fetch("https://api.dropboxapi.com/2/sharing/get_shared_link_file", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Dropbox-API-Arg": JSON.stringify({
-                    url: folderUrl,
-                    path: `/${entry.name}`,
-                }),
-            },
-        });
-
-        if (tempLinkRes.ok) {
-            // The actual file content is in the response body, but we want a URL.
-            // Instead, construct a direct download URL from the shared folder link
-            const directUrl = folderUrl.split("?")[0] + `/${encodeURIComponent(entry.name)}?dl=1`;
-
-            entries.push({
-                name: entry.name,
-                path_lower: entry.path_lower,
-                temporaryLink: directUrl,
-            });
-        } else {
-            // Fallback: construct a raw URL from the folder link
-            const directUrl = folderUrl.split("?")[0] + `/${encodeURIComponent(entry.name)}?raw=1`;
-            entries.push({
-                name: entry.name,
-                path_lower: entry.path_lower,
-                temporaryLink: directUrl,
-            });
+        // Construct the direct download URL
+        // For shared folder files, we append the filename to the folder path and keep the rlkey
+        const fileUrl = new URL(baseUrl);
+        // Ensure folder path ends with slash before appending filename
+        if (!fileUrl.pathname.endsWith("/")) {
+            fileUrl.pathname += "/";
         }
+        fileUrl.pathname += entry.name;
+        
+        // Add back the auth keys
+        if (rlkey) fileUrl.searchParams.set("rlkey", rlkey);
+        if (st) fileUrl.searchParams.set("st", st);
+        fileUrl.searchParams.set("raw", "1");
+
+        entries.push({
+            name: entry.name,
+            path_lower: entry.path_lower,
+            temporaryLink: fileUrl.toString(),
+        });
     }
 
     return entries;
