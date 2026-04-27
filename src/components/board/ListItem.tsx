@@ -28,6 +28,7 @@ export const ListItem = ({
     listColorSwatches,
     textColorSwatches,
     onMoveList,
+    onMoveCard,
     isFirst,
     isLast
 }: {
@@ -39,6 +40,7 @@ export const ListItem = ({
     listColorSwatches?: string[];
     textColorSwatches?: string[];
     onMoveList?: (listId: string, direction: 'left' | 'right') => void;
+    onMoveCard?: (cardId: string, listId: string, action: 'up' | 'down' | 'position', newPosition?: number) => void;
     isFirst?: boolean;
     isLast?: boolean;
 }) => {
@@ -530,7 +532,14 @@ export const ListItem = ({
                             ));
                             return (
                                 <div key={card.id} style={{ display: matchesCardSearch ? 'block' : 'none' }}>
-                                    <CardItem index={idx} data={card} boardId={data.boardId} />
+                                    <CardItem 
+                                        index={idx} 
+                                        data={card} 
+                                        boardId={data.boardId} 
+                                        onMoveCard={onMoveCard}
+                                        isFirstCard={idx === 0}
+                                        isLastCard={idx === data.cards.length - 1}
+                                    />
                                 </div>
                             );
                         })}

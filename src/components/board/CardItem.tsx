@@ -11,7 +11,7 @@ import { copyCard } from "@/actions/copy-card";
 import { pasteCard } from "@/actions/paste-card";
 import { cloneCard } from "@/actions/clone-card";
 import { decloneCard } from "@/actions/declone-card";
-import { AlignLeft, CheckSquare, Clock, Paperclip, MessageSquare, ExternalLink } from "lucide-react";
+import { AlignLeft, CheckSquare, Clock, Paperclip, MessageSquare, ExternalLink, ChevronUp, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { detectFileType } from "@/lib/file-type-utils";
 import { MiniAudioPlayer } from "@/components/ui/MiniAudioPlayer";
@@ -41,16 +41,55 @@ const renderTitleWithLinks = (titleText: string) => {
     });
 };
 
-const CardItemInner = ({ data, index, boardId }: { data: any; index: number; boardId: string }) => {
+const CardItemInner = ({ 
+    data, 
+    index, 
+    boardId,
+    onMoveCard,
+    isFirstCard,
+    isLastCard
+}: { 
+    data: any; 
+    index: number; 
+    boardId: string;
+    onMoveCard?: (cardId: string, listId: string, action: 'up' | 'down' | 'position', newPosition?: number) => void;
+    isFirstCard?: boolean;
+    isLastCard?: boolean;
+}) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [contextMenuAction, setContextMenuAction] = useState<string | null>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [mounted, setMounted] = useState(false);
     const [isCommentsExpanded, setIsCommentsExpanded] = useState(false);
+    const [posValue, setPosValue] = useState((index + 1).toString());
 
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Sync posValue when index changes
+    useEffect(() => {
+        setPosValue((index + 1).toString());
+    }, [index]);
+
+    const onPosBlur = () => {
+        const val = parseInt(posValue);
+        if (!isNaN(val) && val !== index + 1) {
+            onMoveCard?.(data.id, data.listId, 'position', val);
+        } else {
+            setPosValue((index + 1).toString());
+        }
+    };
+
+    const onPosKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") {
+            (e.target as HTMLInputElement).blur();
+        }
+        if (e.key === "Escape") {
+            setPosValue((index + 1).toString());
+            (e.target as HTMLInputElement).blur();
+        }
+    };
 
     const { execute: executeDeleteCard } = useAction(deleteCard);
     const { execute: executeCopyCard } = useAction(copyCard);
@@ -228,6 +267,40 @@ const CardItemInner = ({ data, index, boardId }: { data: any; index: number; boa
                 onContextMenu={handleContextMenu}
                 className="group border-2 border-transparent hover:border-neutral-500 text-sm hover:brightness-110 rounded-md shadow-sm flex flex-col relative transition-all"
             >
+                {/* Manual Order Controls */}
+                <div className="absolute -left-1.5 -top-1.5 z-20 flex flex-col gap-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {!isFirstCard && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onMoveCard?.(data.id, data.listId, 'up'); }}
+                            className="bg-blue-600/90 text-white rounded-full p-0.5 shadow-md hover:bg-blue-700 active:scale-90 transition border border-white/20"
+                        >
+                            <ChevronUp className="h-3 w-3" />
+                        </button>
+                    )}
+                    {!isLastCard && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onMoveCard?.(data.id, data.listId, 'down'); }}
+                            className="bg-blue-600/90 text-white rounded-full p-0.5 shadow-md hover:bg-blue-700 active:scale-90 transition border border-white/20"
+                        >
+                            <ChevronDown className="h-3 w-3" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Editable Rank Number Badge */}
+                <div className="absolute -right-2 -top-1.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <input 
+                        type="text"
+                        value={posValue}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onChange={(e) => setPosValue(e.target.value)}
+                        onBlur={onPosBlur}
+                        onKeyDown={onPosKeyDown}
+                        className="w-7 h-5 bg-neutral-800 text-white text-[10px] font-bold text-center border border-white/30 rounded-sm shadow-lg focus:outline-none focus:ring-1 focus:ring-blue-500 flex items-center justify-center p-0"
+                    />
+                </div>
                 {renderableImageUrl && !renderableIframeUrl && (
                     <div className="w-full relative flex items-center justify-center bg-black border-b border-neutral-800 overflow-hidden rounded-t-md">
                         <img src={renderableImageUrl} alt="Card Cover" className="w-full h-auto max-h-[260px] object-cover" />

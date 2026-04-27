@@ -261,6 +261,42 @@ export const ListContainer = ({
         });
     }, [boardId]);
 
+    const handleMoveCard = useCallback((cardId: string, listId: string, action: 'up' | 'down' | 'position', newPosition?: number) => {
+        setOrderedData((prevItems) => {
+            const list = prevItems.find(l => l.id === listId);
+            if (!list) return prevItems;
+
+            const cardIndex = list.cards.findIndex(c => c.id === cardId);
+            if (cardIndex === -1) return prevItems;
+
+            let newIndex = cardIndex;
+            if (action === 'up' && cardIndex > 0) newIndex = cardIndex - 1;
+            else if (action === 'down' && cardIndex < list.cards.length - 1) newIndex = cardIndex + 1;
+            else if (action === 'position' && typeof newPosition === 'number') {
+                newIndex = Math.max(0, Math.min(newPosition - 1, list.cards.length - 1));
+            }
+
+            if (newIndex === cardIndex) return prevItems;
+
+            const newCards = arrayMove(list.cards, cardIndex, newIndex);
+            newCards.forEach((c: any, i) => c.order = i);
+
+            const newData = prevItems.map((l) => {
+                if (l.id === listId) return { ...l, cards: newCards };
+                return l;
+            });
+
+            // Persist
+            const allCards = newData.flatMap(l => l.cards);
+            executeUpdateCardOrder({ 
+                boardId, 
+                items: allCards.map((card) => ({ id: card.id, title: card.title, order: card.order, listId: card.listId })) 
+            });
+
+            return newData;
+        });
+    }, [boardId, executeUpdateCardOrder]);
+
     return (
         <div id="board-content">
             <DndContext
@@ -353,6 +389,7 @@ export const ListContainer = ({
                                     listColorSwatches={listColorSwatches}
                                     textColorSwatches={textColorSwatches}
                                     onMoveList={handleMoveList}
+                                    onMoveCard={handleMoveCard}
                                     isFirst={index === 0}
                                     isLast={index === orderedData.length - 1}
                                 />
