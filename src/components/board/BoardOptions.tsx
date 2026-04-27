@@ -10,6 +10,7 @@ import { exportBoard } from "@/actions/export-board";
 import { syncGoogleSheet } from "@/actions/sync-google-sheet";
 import { pushGoogleSheet } from "@/actions/push-google-sheet";
 import { updateListColors } from "@/actions/update-list-colors";
+import { bulkIngestImages } from "@/actions/bulk-ingest-images";
 import { useToast } from "@/components/ui/Toast";
 
 interface BoardOptionsProps {
@@ -58,6 +59,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
     const [sheetId, setSheetId] = useState(initialGoogleSheetId || "");
+    const [ingestUrls, setIngestUrls] = useState("");
     const { addToast } = useToast();
     const router = useRouter();
 
@@ -201,7 +203,31 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         }
     });
 
-    const anyLoading = isLoading || isExporting || isExportingCSV || isSyncing || isPushing || isUpdatingListsColors;
+    const { execute: executeIngest, isExecuting: isIngesting } = useSafeAction(bulkIngestImages, {
+        onSuccess: ({ data }) => {
+            if (data && !("error" in data) && data.count !== undefined) {
+                addToast(`Successfully ingested ${data.count} images!`, "success");
+                setIngestUrls("");
+                setIsOpen(false);
+                router.refresh();
+            } else if (data && "error" in data) {
+                addToast(data.error as string, "error");
+            }
+        },
+        onError: (error) => {
+            console.error("Ingest failed", error);
+            addToast("An error occurred during ingest.", "error");
+        }
+    });
+
+    const onIngestSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const urls = ingestUrls.split("\n").map(u => u.trim()).filter(u => u.length > 0);
+        if (urls.length === 0) return;
+        executeIngest({ boardId, urls });
+    };
+
+    const anyLoading = isLoading || isExporting || isExportingCSV || isSyncing || isPushing || isUpdatingListsColors || isIngesting;
 
     return (
         <div className="absolute top-4 right-4 z-[50] flex items-center gap-x-2">
@@ -328,6 +354,22 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                             />
                             <button type="submit" disabled={anyLoading} className="bg-blue-600 text-white w-full rounded-sm text-sm font-medium py-1.5 hover:bg-blue-700 transition">
                                 Set Image
+                            </button>
+                        </form>
+                    </div>
+
+                    <div>
+                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><Download className="h-3 w-3" /> Bulk Ingest Images</h4>
+                        <form onSubmit={onIngestSubmit} className="flex flex-col gap-y-2 mb-4">
+                            <textarea
+                                value={ingestUrls}
+                                onChange={(e) => setIngestUrls(e.target.value)}
+                                placeholder="Paste Dropbox URLs (one per line)...&#10;Format: List---Card.jpg"
+                                className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-orange-600 w-full min-h-[60px]"
+                                disabled={anyLoading}
+                            />
+                            <button type="submit" disabled={anyLoading || !ingestUrls.trim()} className="bg-orange-600 text-white w-full rounded-sm text-sm font-medium py-1.5 hover:bg-orange-700 transition">
+                                {isIngesting ? "Ingesting..." : "Bulk Ingest"}
                             </button>
                         </form>
                     </div>
