@@ -93,7 +93,7 @@ export const bulkIngestImages = actionClient
                         await db.attachment.create({
                             data: {
                                 url: rawUrl,
-                                originalName: filenameWithExt,
+                                title: filenameWithExt,
                                 type: "IMAGE",
                                 isCover: true,
                                 cardId: card.id
