@@ -364,7 +364,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                             <textarea
                                 value={ingestUrls}
                                 onChange={(e) => setIngestUrls(e.target.value)}
-                                placeholder={"Paste Dropbox URLs (one per line)...\nFormat: Sc007_BOARDS.jpg"}
+                                placeholder={"Paste a Dropbox folder link OR individual file URLs (one per line)...\nFiles named: Sc007_BOARDS.jpg"}
                                 className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-orange-600 w-full min-h-[60px]"
                                 disabled={anyLoading}
                             />
