@@ -205,8 +205,8 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     const { execute: executeIngest, isExecuting: isIngesting } = useSafeAction(bulkIngestImages, {
         onSuccess: ({ data }) => {
-            if (data && !("error" in data) && data.count !== undefined) {
-                addToast(`Successfully ingested ${data.count} images!`, "success");
+            if (data && "data" in data && data.data) {
+                addToast(`Successfully ingested ${data.data.count} images!`, "success");
                 setIngestUrls("");
                 setIsOpen(false);
                 router.refresh();
@@ -364,7 +364,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                             <textarea
                                 value={ingestUrls}
                                 onChange={(e) => setIngestUrls(e.target.value)}
-                                placeholder="Paste Dropbox URLs (one per line)...&#10;Format: List---Card.jpg"
+                                placeholder={"Paste Dropbox URLs (one per line)...\nFormat: Sc007_BOARDS.jpg"}
                                 className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-orange-600 w-full min-h-[60px]"
                                 disabled={anyLoading}
                             />

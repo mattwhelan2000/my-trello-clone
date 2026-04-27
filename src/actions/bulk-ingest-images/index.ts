@@ -25,35 +25,36 @@ export const bulkIngestImages = actionClient
                     // Strip extension
                     const filename = filenameWithExt.replace(/\.[^/.]+$/, "");
 
-                    // Check for the delimiter '---'
-                    const parts = filename.split('---');
-                    if (parts.length !== 2) {
-                        console.warn(`Skipping URL: Filename "${filename}" does not contain the '---' delimiter.`);
+                    // Split on the FIRST underscore: Sc007_BOARDS -> ["Sc007", "BOARDS"]
+                    const underscoreIndex = filename.indexOf('_');
+                    if (underscoreIndex === -1) {
+                        console.warn(`Skipping URL: Filename "${filename}" does not contain an underscore delimiter.`);
                         continue;
                     }
 
-                    const listName = parts[0].trim();
-                    const cardName = parts[1].trim();
+                    const scenePrefix = filename.substring(0, underscoreIndex).trim();
+                    const cardName = filename.substring(underscoreIndex + 1).trim();
 
-                    if (!listName || !cardName) continue;
+                    if (!scenePrefix || !cardName) continue;
 
-                    // 1. Find or create the List
-                    let list = await db.list.findFirst({
-                        where: { title: listName, boardId }
+                    // 1. Find the List by fuzzy-matching the scene prefix against existing list titles.
+                    //    e.g. "Sc007" matches "Sc007 EXT. -- 1+1/8 pgs"
+                    const allLists = await db.list.findMany({
+                        where: { boardId },
+                        orderBy: { order: "asc" },
                     });
 
+                    let list = allLists.find(
+                        (l) => l.title.toLowerCase().startsWith(scenePrefix.toLowerCase())
+                    ) || null;
+
                     if (!list) {
-                        const lastList = await db.list.findFirst({
-                            where: { boardId },
-                            orderBy: { order: "desc" },
-                            select: { order: true },
-                        });
-                        const newOrder = lastList ? lastList.order + 1 : 1;
-                        
+                        // No matching list found — create one with just the scene prefix
+                        const lastOrder = allLists.length > 0 ? allLists[allLists.length - 1].order : 0;
                         list = await db.list.create({
                             data: {
-                                title: listName,
-                                order: newOrder,
+                                title: scenePrefix,
+                                order: lastOrder + 1,
                                 boardId
                             }
                         });
