@@ -39,7 +39,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
     const [isLabelPickerOpen, setIsLabelPickerOpen] = useState(false);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-    const [isMovePickerOpen, setIsMovePickerOpen] = useState(false);
+    const [isMovePickerOpen, setIsMovePickerOpen] = useState(defaultMoveOpen || false);
     const [isComfyUIOpen, setIsComfyUIOpen] = useState(false);
     const [newLabelTitle, setNewLabelTitle] = useState("");
     const [selectedLabelColor, setSelectedLabelColor] = useState("");

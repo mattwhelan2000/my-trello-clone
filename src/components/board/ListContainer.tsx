@@ -216,7 +216,10 @@ export const ListContainer = ({
                 const newLists = arrayMove(prevItems, activeIndex, overIndex);
                 newLists.forEach((list, index) => list.order = index);
 
-                executeUpdateListOrder({ boardId, items: newLists });
+                executeUpdateListOrder({ 
+                    boardId, 
+                    items: newLists.map((list) => ({ id: list.id, title: list.title, order: list.order, boardId })) 
+                });
 
                 return newLists;
             });
@@ -228,12 +231,35 @@ export const ListContainer = ({
                 // Collect all cards that need updating (cards in affected lists)
                 const allCards = currentData.flatMap((list) => list.cards);
                 if (allCards.length > 0) {
-                    executeUpdateCardOrder({ boardId, items: allCards });
+                    executeUpdateCardOrder({ 
+                         boardId, 
+                         items: allCards.map((card) => ({ id: card.id, title: card.title, order: card.order, listId: card.listId })) 
+                    });
                 }
                 return currentData; // no state change, just reading
             });
         }
     };
+
+    const handleMoveList = useCallback((listId: string, direction: 'left' | 'right') => {
+        setOrderedData((prevItems) => {
+            const listIndex = prevItems.findIndex(l => l.id === listId);
+            if (listIndex === -1) return prevItems;
+            
+            if (direction === 'left' && listIndex > 0) {
+                const newLists = arrayMove(prevItems, listIndex, listIndex - 1);
+                newLists.forEach((list, index) => list.order = index);
+                executeUpdateListOrder({ boardId, items: newLists.map((list) => ({ id: list.id, title: list.title, order: list.order, boardId })) });
+                return newLists;
+            } else if (direction === 'right' && listIndex < prevItems.length - 1) {
+                const newLists = arrayMove(prevItems, listIndex, listIndex + 1);
+                newLists.forEach((list, index) => list.order = index);
+                executeUpdateListOrder({ boardId, items: newLists.map((list) => ({ id: list.id, title: list.title, order: list.order, boardId })) });
+                return newLists;
+            }
+            return prevItems;
+        });
+    }, [boardId]);
 
     return (
         <div id="board-content">
@@ -326,6 +352,9 @@ export const ListContainer = ({
                                     searchLists={searchLists}
                                     listColorSwatches={listColorSwatches}
                                     textColorSwatches={textColorSwatches}
+                                    onMoveList={handleMoveList}
+                                    isFirst={index === 0}
+                                    isLast={index === orderedData.length - 1}
                                 />
                             );
                         })}

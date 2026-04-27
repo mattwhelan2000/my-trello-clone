@@ -35,6 +35,9 @@ export const ListItem = ({
     searchLists?: boolean;
     listColorSwatches?: string[];
     textColorSwatches?: string[];
+    onMoveList?: (listId: string, direction: 'left' | 'right') => void;
+    isFirst?: boolean;
+    isLast?: boolean;
 }) => {
     const [title, setTitle] = useState(data.title);
     const [isEditing, setIsEditing] = useState(false);
@@ -494,6 +497,12 @@ export const ListItem = ({
                             style={{ top: contextMenu.y, left: contextMenu.x }}
                         >
                             <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b border-neutral-800 mb-1 uppercase tracking-wider">List Actions</span>
+                            {!isFirst && onMoveList && (
+                                <button onClick={(e) => { e.stopPropagation(); onMoveList(data.id, 'left'); handleMenuClose(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-blue-400 font-medium">Move List Left</button>
+                            )}
+                            {!isLast && onMoveList && (
+                                <button onClick={(e) => { e.stopPropagation(); onMoveList(data.id, 'right'); handleMenuClose(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-blue-400 font-medium">Move List Right</button>
+                            )}
                             <button onClick={(e) => { e.stopPropagation(); onDeleteList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-red-500 font-medium">Delete List</button>
                             <button onClick={(e) => { e.stopPropagation(); onDuplicateList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Duplicate List</button>
                             <div className="border-t border-neutral-800 my-1"></div>
