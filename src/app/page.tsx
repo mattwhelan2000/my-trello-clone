@@ -5,14 +5,27 @@ import { ImportBoardButton } from "@/components/board/ImportBoardButton";
 import { ImportScriptButton } from "@/components/board/ImportScriptButton";
 import { DashboardBoardItem } from "@/components/board/DashboardBoardItem";
 import { LayoutDashboard } from "lucide-react";
+import fs from "fs";
+import path from "path";
 
 export const dynamic = 'force-dynamic';
-
 
 export default async function HomePage() {
   const boards = await db.board.findMany({
     orderBy: { createdAt: "desc" }
   });
+
+  let buildTime = "Unknown";
+  try {
+    const stats = fs.statSync(path.join(process.cwd(), "package.json"));
+    buildTime = stats.mtime.toLocaleString("en-GB", { 
+      day: "2-digit", 
+      month: "2-digit", 
+      hour: "2-digit", 
+      minute: "2-digit",
+      timeZone: "UTC"
+    }).replace(",", "");
+  } catch (e) {}
 
   return (
     <div className="pt-24 px-4 max-w-6xl mx-auto md:px-6 min-h-full pb-10 bg-neutral-900 text-white">
@@ -20,7 +33,7 @@ export default async function HomePage() {
         <div className="flex items-center gap-x-2 font-semibold text-xl text-neutral-200">
           <LayoutDashboard className="h-7 w-7 text-blue-500" />
           Your Boards
-          <span className="text-xs font-mono text-neutral-500 ml-2 bg-neutral-800 px-2 py-0.5 rounded-sm">0502.11:52 (DEPLOYED)</span>
+          <span className="text-xs font-mono text-neutral-500 ml-2 bg-neutral-800 px-2 py-0.5 rounded-sm">{buildTime} (AUTO)</span>
         </div>
 
         {/* Action Buttons Row */}
