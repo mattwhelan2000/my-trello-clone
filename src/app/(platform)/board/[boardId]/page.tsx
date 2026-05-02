@@ -1,8 +1,6 @@
 import { db } from "@/lib/db";
-import dynamic from "next/dynamic";
-
-const BoardCanvas = dynamic(() => import("@/components/board/BoardCanvas").then((mod) => mod.BoardCanvas), { ssr: false });
-const ListContainer = dynamic(() => import("@/components/board/ListContainer").then((mod) => mod.ListContainer), { ssr: false });
+import { BoardCanvas } from "@/components/board/BoardCanvas";
+import { ListContainer } from "@/components/board/ListContainer";
 
 export default async function BoardIdPage({
     params,

@@ -105,7 +105,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         visibleListCount
     } = useBoardStore();
 
-    if (!isMounted) return null;
+
 
     const isAnyFilterActive = query.trim() !== "" || (selectedLabels.size > 0 && isFilterEnabled);
 
@@ -346,6 +346,8 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     };
 
     const anyLoading = isUpdatingBoard || isExporting || isExportingCSV || isSyncing || isPushing || isUpdatingListsColors || isIngesting || isDeletingLabel || isMigrating;
+
+    if (!isMounted) return null;
 
     return (
         <div className="absolute top-4 right-4 z-[50] flex items-center gap-x-2">

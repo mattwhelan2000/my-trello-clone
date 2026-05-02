@@ -87,8 +87,6 @@ export const ListContainer = ({
     const searchQuery = query;
     const setSearchQuery = setQuery;
 
-    if (!isMounted) return null;
-
     const { execute: executeBulkUpdate } = useAction(bulkUpdateCards, {
         onSuccess: (data) => {
             addToast(`Snapshot applied to ${data.count} cards`, "success");
@@ -97,6 +95,56 @@ export const ListContainer = ({
             addToast("Failed to apply snapshot", "error");
         }
     });
+
+    const { execute: executeUpdateListOrder, isLoading: isLoadingList } = useAction(updateListOrder, {
+        onSuccess: () => {
+            addToast("List reordered", "success");
+        },
+        onError: (error) => {
+            addToast(error, "error");
+        }
+    });
+
+    const { execute: executeUpdateCardOrder, isLoading: isLoadingCard } = useAction(updateCardOrder, {
+        onSuccess: () => {
+            addToast("Card reordered", "success");
+        },
+        onError: (error) => {
+            addToast(error, "error");
+        }
+    });
+
+    const { execute: executeAddLabels } = useSafeAction(addLabelsBatch, {
+        onSuccess: ({ data }) => {
+            if (data && "success" in data) {
+                addToast("Labels added successfully", "success");
+                setSelectedCardIds(new Set());
+                setIsMultiSelectMode(false);
+            }
+        }
+    });
+
+    const { execute: executeDeleteCards, isExecuting: isDeletingBatch } = useSafeAction(deleteCards, {
+        onSuccess: ({ data }) => {
+            if (data && "success" in data) {
+                addToast(`Successfully deleted ${data.count} cards`, "success");
+                setSelectedCardIds(new Set());
+                setIsMultiSelectMode(false);
+            }
+        }
+    });
+
+    const { execute: executeMoveCards, isExecuting: isMovingBatch } = useSafeAction(moveCardsBatch, {
+        onSuccess: ({ data }) => {
+            if (data && "success" in data) {
+                addToast(`Successfully moved ${data.count} cards`, "success");
+                setSelectedCardIds(new Set());
+                setIsMultiSelectMode(false);
+            }
+        }
+    });
+
+    if (!isMounted) return null;
 
     // Save Snapshot Logic
     useEffect(() => {
@@ -236,27 +284,6 @@ export const ListContainer = ({
     // Batch Card Properties State
     const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
 
-    const { addToast } = useToast();
-    const router = useRouter();
-    const { execute: executeUpdateListOrder } = useAction(updateListOrder, {
-        onSuccess: () => {
-            console.log("List order updated successfully on server.");
-        },
-        onError: (error) => {
-            console.error(error);
-        }
-    });
-
-    const { execute: executeUpdateCardOrder } = useAction(updateCardOrder, {
-        onSuccess: () => {
-            console.log("Card order updated successfully on server.");
-            router.refresh();
-        },
-        onError: (error) => {
-            console.error(error);
-        }
-    });
-
     // Sync state when props change
     useEffect(() => {
         setOrderedData(data);
@@ -381,6 +408,8 @@ export const ListContainer = ({
         });
     }, [boardId, executeUpdateCardOrder]);
 
+
+
     const allLabels = uniqueLabels.map(l => l.title);
 
     // Filtered Cards based on search AND labels
@@ -416,21 +445,7 @@ export const ListContainer = ({
 
     const visibleCards = getVisibleCards();
 
-    const { execute: executeDeleteCards, isExecuting: isDeleting } = useSafeAction(deleteCards, {
-        onSuccess: ({ data }) => {
-            if (data && "success" in data) {
-                addToast(`Successfully deleted ${data.count} cards`, "success");
-                setIsDeleteModalOpen(false);
-                setSelectedCardIds(new Set());
-                setSearchQuery("");
-                router.refresh();
-            }
-        },
-        onError: (error) => {
-            console.error(error);
-            addToast("Failed to delete cards", "error");
-        }
-    });
+
 
     const openDeleteModal = () => {
         setSelectedCardIds(new Set(visibleCards.map(c => c.id)));
@@ -444,51 +459,7 @@ export const ListContainer = ({
         setSelectedCardIds(next);
     };
 
-    const { execute: executeMoveCards, isExecuting: isMoving } = useSafeAction(moveCardsBatch, {
-        onExecute: () => {
-            // OPTIMISTIC UPDATE
-            const targetPos = targetPosition;
-            const idsToMove = Array.from(moveCardIds);
 
-            setOrderedData(prevData => {
-                return prevData.map(list => {
-                    const movingInThisList = list.cards.filter(c => idsToMove.includes(c.id));
-                    if (movingInThisList.length === 0) return list;
-
-                    const otherCards = list.cards.filter(c => !idsToMove.includes(c.id));
-                    const insertIdx = Math.max(0, Math.min(targetPos - 1, otherCards.length));
-
-                    const newCards = [...otherCards];
-                    newCards.splice(insertIdx, 0, ...movingInThisList);
-
-                    return {
-                        ...list,
-                        cards: newCards.map((c, i) => ({ ...c, order: i }))
-                    };
-                });
-            });
-
-            addToast(`Moving ${idsToMove.length} cards...`, "info");
-            setIsMoveModalOpen(false);
-            setSearchQuery("");
-        },
-        onSuccess: ({ data }) => {
-            if (data && "success" in data) {
-                addToast(`Successfully moved ${data.count} cards to #${targetPosition}`, "success");
-                setMoveCardIds(new Set());
-                // Small delay to ensure DB propagation and cache invalidation
-                setTimeout(() => {
-                    router.refresh();
-                }, 500);
-            }
-        },
-        onError: (error) => {
-            console.error(error);
-            addToast("Failed to move cards. Reverting...", "error");
-            // Revert state on error
-            router.refresh();
-        }
-    });
 
     const openMoveModal = () => {
         setMoveCardIds(new Set(visibleCards.map(c => c.id)));
@@ -502,22 +473,7 @@ export const ListContainer = ({
         setMoveCardIds(next);
     };
 
-    const { execute: executeAddLabels, isExecuting: isLabeling } = useSafeAction(addLabelsBatch, {
-        onSuccess: ({ data }) => {
-            if (data && "success" in data) {
-                addToast(`Successfully added label to ${data.count} cards`, "success");
-                setIsLabelModalOpen(false);
-                setLabelCardIds(new Set());
-                setNewLabelTitle("");
-                router.refresh();
-            }
-        },
-        onError: (error) => {
-            console.error("[BATCH_LABEL_ERROR]", error);
-            const msg = error.serverError || "Failed to add labels. The batch might be too large or timed out.";
-            addToast(msg, "error");
-        }
-    });
+
 
     const openLabelModal = () => {
         setLabelCardIds(new Set(visibleCards.map(c => c.id)));
