@@ -346,7 +346,6 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     };
 
     const anyLoading = isUpdatingBoard || isExporting || isExportingCSV || isSyncing || isPushing || isUpdatingListsColors || isIngesting || isDeletingLabel || isMigrating;
-
     if (!isMounted) return null;
 
     return (

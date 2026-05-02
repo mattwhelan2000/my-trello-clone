@@ -2,7 +2,7 @@
 
 import { Modal } from "@/components/modals/Modal";
 import { useState, useRef, ElementRef, useEffect } from "react";
-import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Sparkles, Plus } from "lucide-react";
+import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction } from "@/hooks/use-action";
 import { updateCard } from "@/actions/update-card";
@@ -26,7 +26,6 @@ import { AttachmentPreview, AttachmentPreviewLarge } from "@/components/ui/Attac
 import { AudioPlayer } from "@/components/ui/AudioPlayer";
 import { detectFileType, getFileTypeLabel } from "@/lib/file-type-utils";
 import Image from "next/image";
-import { ComfyUIPopover } from "./ComfyUIPopover";
 import { Trash2, Copy, Layers, Share2, MoreHorizontal, Eye, EyeOff, MinusSquare, Maximize2 } from "lucide-react";
 
 interface CardModalProps {
@@ -47,7 +46,6 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [isLabelPickerOpen, setIsLabelPickerOpen] = useState(false);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [isMovePickerOpen, setIsMovePickerOpen] = useState(defaultMoveOpen || false);
-    const [isComfyUIOpen, setIsComfyUIOpen] = useState(false);
     const [isInstanceModalOpen, setIsInstanceModalOpen] = useState(false);
     const [newLabelTitle, setNewLabelTitle] = useState("");
     const [selectedLabelColor, setSelectedLabelColor] = useState("");
@@ -1047,23 +1045,6 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                             )}
                         </div>
 
-                        {/* ComfyUI AI Generation Button */}
-                        <div className="relative mt-2">
-                            <button
-                                onClick={() => setIsComfyUIOpen(!isComfyUIOpen)}
-                                className="w-full text-left text-sm px-3 py-2 rounded-sm flex items-center gap-x-2 bg-gradient-to-r from-pink-600/10 to-red-600/10 hover:from-pink-600/20 hover:to-red-600/20 border border-pink-500/20 text-pink-700 transition"
-                            >
-                                <Sparkles className="h-4 w-4 text-pink-600" /> AI Image Gen
-                            </button>
-                            {isComfyUIOpen && (
-                                <ComfyUIPopover
-                                    cardId={data.id}
-                                    boardId={boardId}
-                                    defaultPrompt={`${data.title || ""} ${data.description || ""}`.trim()}
-                                    onClose={() => setIsComfyUIOpen(false)}
-                                />
-                            )}
-                        </div>
 
                         <div className="pt-2">
                             <h4 className="text-xs font-semibold text-neutral-600 mb-2">Actions</h4>

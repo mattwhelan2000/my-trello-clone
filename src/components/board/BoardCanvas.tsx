@@ -67,7 +67,6 @@ export const BoardCanvas = ({
 
     useEventListener("keydown", onKeyDown);
 
-    if (!isMounted) return null;
 
     const handleMouseDown = (e: React.MouseEvent) => {
         // Don't start drag if a modal is open
@@ -131,6 +130,8 @@ export const BoardCanvas = ({
         return "cursor-default";
     };
 
+    if (!isMounted) return null;
+
     return (
         <div
             ref={scrollContainerRef}
@@ -147,4 +148,4 @@ export const BoardCanvas = ({
             {children}
         </div>
     );
-}
+};

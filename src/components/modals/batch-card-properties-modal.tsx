@@ -65,7 +65,6 @@ export const BatchCardPropertiesModal = ({
         }
     });
 
-    if (!isOpen) return null;
 
     const onApply = (options: any = {}) => {
         execute({
@@ -82,6 +81,8 @@ export const BatchCardPropertiesModal = ({
         else next.add(label);
         setSelectedLabels(next);
     };
+
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">

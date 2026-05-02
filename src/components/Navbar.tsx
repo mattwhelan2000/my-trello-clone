@@ -134,11 +134,7 @@ export const Navbar = () => {
                         </button>
                     </div>
                 )}
-                <Link href="/workflows">
-                    <button className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-md text-sm font-medium transition backdrop-blur-sm">
-                        Workflows
-                    </button>
-                </Link>
+
                 {isOnBoard && (
                     <div className="flex items-center gap-x-2">
                         <span className="text-white/60 text-xs font-medium whitespace-nowrap">BG Opacity</span>

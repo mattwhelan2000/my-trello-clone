@@ -358,7 +358,7 @@ export const ListItem = ({
         return <span className="truncate">{text}</span>;
     };
 
-    if (!mounted) return null;
+
 
     return (
         <li

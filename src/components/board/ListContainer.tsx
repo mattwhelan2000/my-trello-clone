@@ -25,7 +25,6 @@ import {
     X, 
     Search,
     Layout,
-    Sparkles,
     AlignLeft,
     CheckSquare,
     Clock,
@@ -114,7 +113,7 @@ export const ListContainer = ({
         }
     });
 
-    const { execute: executeAddLabels } = useSafeAction(addLabelsBatch, {
+    const { execute: executeAddLabels, isExecuting: isLabeling } = useSafeAction(addLabelsBatch, {
         onSuccess: ({ data }) => {
             if (data && "success" in data) {
                 addToast("Labels added successfully", "success");
@@ -144,7 +143,7 @@ export const ListContainer = ({
         }
     });
 
-    if (!isMounted) return null;
+
 
     // Save Snapshot Logic
     useEffect(() => {
@@ -503,6 +502,9 @@ export const ListContainer = ({
         }
     });
 
+
+    if (!isMounted) return null;
+
     return (
         <div id="board-content" className="relative pb-20">
             {/* Batch Card Properties Button - Fixed Bottom Center */}
@@ -629,10 +631,10 @@ export const ListContainer = ({
                             </button>
                             <button
                                 onClick={() => executeDeleteCards({ ids: Array.from(selectedCardIds), boardId })}
-                                disabled={isDeleting || selectedCardIds.size === 0}
+                                disabled={isDeletingBatch || selectedCardIds.size === 0}
                                 className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-md transition shadow-md shadow-red-200 flex items-center justify-center gap-x-2"
                             >
-                                {isDeleting ? "Deleting..." : <><Trash2 className="h-4 w-4" /> Delete Selected</>}
+                                {isDeletingBatch ? "Deleting..." : <><Trash2 className="h-4 w-4" /> Delete Selected</>}
                             </button>
                         </div>
                     </div>
@@ -700,10 +702,10 @@ export const ListContainer = ({
                             </button>
                             <button
                                 onClick={() => executeMoveCards({ ids: Array.from(moveCardIds), boardId, targetPosition })}
-                                disabled={isMoving || moveCardIds.size === 0}
+                                disabled={isMovingBatch || moveCardIds.size === 0}
                                 className="flex-1 px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-md transition shadow-md shadow-blue-200 flex items-center justify-center gap-x-2"
                             >
-                                {isMoving ? "Moving..." : <><Move className="h-4 w-4" /> Move to #{targetPosition}</>}
+                                {isMovingBatch ? "Moving..." : <><Move className="h-4 w-4" /> Move to #{targetPosition}</>}
                             </button>
                         </div>
                     </div>
@@ -851,7 +853,6 @@ export const ListContainer = ({
                     </div>
                 </div>
             )}
-            {/* Batch Card Properties Modal */}
             <BatchCardPropertiesModal 
                 isOpen={isBatchModalOpen}
                 onClose={() => setIsBatchModalOpen(false)}
