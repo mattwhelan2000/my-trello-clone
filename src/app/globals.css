@@ -35,22 +35,61 @@ body {
   transform: scale(0.98);
 }
 
-/* Custom scrollbar for list columns */
+/* Scrollbar styling for Lists (vertical) */
+ol {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+}
+
 ol::-webkit-scrollbar {
-  width: 6px;
+  width: 8px; /* Slightly wider for touch */
 }
 
 ol::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 ol::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.4); /* High opacity for visibility */
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 ol::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.6);
+  background-clip: padding-box;
+}
+
+/* Board Canvas scrollbar (horizontal) */
+.board-canvas-scroller {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(255, 255, 255, 0.5) rgba(0, 0, 0, 0.2);
+  /* Force scrollbar to be always visible on iOS */
+  -webkit-overflow-scrolling: touch;
+}
+
+.board-canvas-scroller::-webkit-scrollbar {
+  height: 14px; /* Clearly visible height for horizontal scroll */
+  width: 14px;
+  display: block;
+}
+
+.board-canvas-scroller::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 7px;
+}
+
+.board-canvas-scroller::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.5); /* Semi-transparent white for contrast */
+  border-radius: 7px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.board-canvas-scroller::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.75);
+  background-clip: padding-box;
 }
 
 /* Disable background interaction when modal is open */

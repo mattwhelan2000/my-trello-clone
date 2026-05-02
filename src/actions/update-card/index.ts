@@ -7,7 +7,7 @@ import { UpdateCardSchema } from "./schema";
 
 export const updateCard = actionClient
     .schema(UpdateCardSchema)
-    .action(async ({ parsedInput: { id, title, description, boardId, color, fontColor, dueDate } }) => {
+    .action(async ({ parsedInput: { id, title, description, boardId, color, fontColor, dueDate, displayThumbnails, isSlim } }) => {
         try {
             const existingCard = await db.card.findUnique({
                 where: { id },
@@ -22,6 +22,8 @@ export const updateCard = actionClient
                 ...(color !== undefined && { color }),
                 ...(fontColor !== undefined && { fontColor }),
                 ...(dueDate !== undefined && { dueDate }),
+                ...(displayThumbnails !== undefined && { displayThumbnails }),
+                ...(isSlim !== undefined && { isSlim }),
                 isSyncedWithSheet: false, // Break the link!
             };
 

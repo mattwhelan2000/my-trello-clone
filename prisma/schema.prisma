@@ -4,8 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model Workspace {
@@ -64,6 +62,8 @@ model Card {
   fontColor         String?
   syncGroupId       String?
   isSyncedWithSheet Boolean     @default(true)
+  displayThumbnails Boolean     @default(true)
+  isSlim            Boolean     @default(false)
   labels      Label[]
   checklists  Checklist[]
   attachments Attachment[]

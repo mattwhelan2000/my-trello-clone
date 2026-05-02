@@ -134,8 +134,11 @@ export const BoardCanvas = ({
     return (
         <div
             ref={scrollContainerRef}
-            className={`flex flex-row overflow-x-auto overflow-y-auto ${getCursorClass()}`}
-            style={{ minHeight: 'calc(100vh - 6rem)' }}
+            className={`flex flex-row overflow-x-scroll overflow-y-auto board-canvas-scroller ${getCursorClass()}`}
+            style={{ 
+                minHeight: 'calc(100vh - 6rem)',
+                overscrollBehaviorX: 'contain'
+            }}
             onMouseDown={handleMouseDown}
             onMouseLeave={handleMouseLeave}
             onMouseUp={handleMouseUp}
@@ -144,4 +147,4 @@ export const BoardCanvas = ({
             {children}
         </div>
     );
-};
+}

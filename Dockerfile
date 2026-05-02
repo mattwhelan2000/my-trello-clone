@@ -22,7 +22,7 @@ COPY . .
 # ENV NEXT_TELEMETRY_DISABLED 1
 
 RUN npx prisma generate
-ENV NODE_OPTIONS="--max_old_space_size=4096"
+ENV NODE_OPTIONS="--max_old_space_size=8192"
 RUN npm run build
 
 # Production image, copy all the files and run next

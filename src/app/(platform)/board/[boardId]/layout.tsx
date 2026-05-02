@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
-import { BoardOptions } from "@/components/board/BoardOptions";
-import { BoardEnhancements } from "@/components/board/BoardEnhancements";
+import dynamic from "next/dynamic";
+
+const BoardOptions = dynamic(() => import("@/components/board/BoardOptions").then((mod) => mod.BoardOptions), { ssr: false });
+const BoardEnhancements = dynamic(() => import("@/components/board/BoardEnhancements").then((mod) => mod.BoardEnhancements), { ssr: false });
 
 export async function generateMetadata({
     params,

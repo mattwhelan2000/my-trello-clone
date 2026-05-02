@@ -2,7 +2,7 @@
 
 import { Modal } from "@/components/modals/Modal";
 import { useState, useRef, ElementRef, useEffect } from "react";
-import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Sparkles } from "lucide-react";
+import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Sparkles, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction } from "@/hooks/use-action";
 import { updateCard } from "@/actions/update-card";
@@ -14,6 +14,10 @@ import { createLabel } from "@/actions/create-label";
 import { deleteLabel } from "@/actions/delete-label";
 import { createComment } from "@/actions/create-comment";
 import { moveCard } from "@/actions/move-card";
+import { cloneCard } from "@/actions/clone-card";
+import { decloneCard } from "@/actions/declone-card";
+import { deleteCard } from "@/actions/delete-card";
+import { InstanceModal } from "@/components/modals/instance-modal";
 import { format } from "date-fns";
 import { useToast } from "@/components/ui/Toast";
 import { Description } from "./description";
@@ -23,6 +27,7 @@ import { AudioPlayer } from "@/components/ui/AudioPlayer";
 import { detectFileType, getFileTypeLabel } from "@/lib/file-type-utils";
 import Image from "next/image";
 import { ComfyUIPopover } from "./ComfyUIPopover";
+import { Trash2, Copy, Layers, Share2, MoreHorizontal, Eye, EyeOff, MinusSquare, Maximize2 } from "lucide-react";
 
 interface CardModalProps {
     data: any;
@@ -31,9 +36,11 @@ interface CardModalProps {
     onClose: () => void;
     lists?: { id: string; title: string }[];
     defaultMoveOpen?: boolean;
+    index?: number;
+    onMoveCard?: (cardId: string, listId: string, action: 'up' | 'down' | 'position', newPosition?: number) => void;
 }
 
-export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [], defaultMoveOpen }: CardModalProps) => {
+export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [], defaultMoveOpen, index, onMoveCard }: CardModalProps) => {
     const [title, setTitle] = useState(data?.title || "");
     const [isAddingImage, setIsAddingImage] = useState(false);
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -41,16 +48,32 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
     const [isMovePickerOpen, setIsMovePickerOpen] = useState(defaultMoveOpen || false);
     const [isComfyUIOpen, setIsComfyUIOpen] = useState(false);
+    const [isInstanceModalOpen, setIsInstanceModalOpen] = useState(false);
     const [newLabelTitle, setNewLabelTitle] = useState("");
     const [selectedLabelColor, setSelectedLabelColor] = useState("");
     const [boardLabels, setBoardLabels] = useState<{ id: string; title: string; color: string }[]>([]);
     const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
     const [commentText, setCommentText] = useState("");
     const [fetchedLists, setFetchedLists] = useState<{ id: string; title: string }[]>(propLists);
+    const [posValue, setPosValue] = useState((index !== undefined ? index + 1 : 0).toString());
     const inputRef = useRef<ElementRef<"input">>(null);
     const imageInputRef = useRef<ElementRef<"input">>(null);
+    const customColorInputRef = useRef<ElementRef<"input">>(null);
+    const [customColors, setCustomColors] = useState<string[]>([]);
+    const [isMounted, setIsMounted] = useState(false);
     const { addToast } = useToast();
     const router = useRouter();
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    // Sync posValue when index changes
+    useEffect(() => {
+        if (index !== undefined) {
+            setPosValue((index + 1).toString());
+        }
+    }, [index]);
 
     // Fetch lists for move-card dropdown when modal opens
     useEffect(() => {
@@ -61,6 +84,24 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                 .catch(() => { });
         }
     }, [isOpen, boardId, fetchedLists.length]);
+
+    // Load custom color memory
+    useEffect(() => {
+        const saved = localStorage.getItem("trello_card_custom_colors");
+        if (saved) {
+            try {
+                setCustomColors(JSON.parse(saved));
+            } catch (e) {
+                console.error("Failed to load color memory", e);
+            }
+        }
+    }, []);
+
+    const saveCustomColor = (color: string) => {
+        const updated = [color, ...customColors.filter(c => c !== color)].slice(0, 16);
+        setCustomColors(updated);
+        localStorage.setItem("trello_card_custom_colors", JSON.stringify(updated));
+    };
 
     // Fetch existing board labels when label picker opens
     useEffect(() => {
@@ -157,6 +198,32 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onError: (error) => console.error(error)
     });
 
+    const { execute: executeCloneCard } = useAction(cloneCard, {
+        onSuccess: () => {
+            addToast("Card duplicated", "success");
+            router.refresh();
+            onClose();
+        },
+        onError: (error) => console.error(error)
+    });
+
+    const { execute: executeDecloneCard } = useAction(decloneCard, {
+        onSuccess: () => {
+            addToast("Card is now unique", "success");
+            router.refresh();
+        },
+        onError: (error) => console.error(error)
+    });
+
+    const { execute: executeDeleteCard } = useAction(deleteCard, {
+        onSuccess: () => {
+            addToast("Card deleted", "success");
+            router.refresh();
+            onClose();
+        },
+        onError: (error) => console.error(error)
+    });
+
     // Keyboard shortcut: Esc to close modal
     useEffect(() => {
         if (!isOpen) return;
@@ -167,8 +234,41 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         return () => window.removeEventListener("keydown", handleEsc);
     }, [isOpen, onClose]);
 
+    const onPosBlur = () => {
+        const val = parseInt(posValue);
+        if (!isNaN(val) && index !== undefined && val !== index + 1) {
+            onMoveCard?.(data.id, data.listId, 'position', val);
+        } else if (index !== undefined) {
+            setPosValue((index + 1).toString());
+        }
+    };
+
+    const onPosKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") {
+            (e.target as HTMLInputElement).blur();
+        }
+        if (e.key === "Escape") {
+            if (index !== undefined) {
+                setPosValue((index + 1).toString());
+            }
+            (e.target as HTMLInputElement).blur();
+        }
+    };
+
     const onAddChecklist = () => {
         executeCreateChecklist({ title: "Checklist", cardId: data.id, boardId });
+    };
+
+    const onDuplicateCard = () => {
+        executeCloneCard({ id: data.id, boardId });
+    };
+
+    const onDecloneCard = () => {
+        executeDecloneCard({ id: data.id, boardId });
+    };
+
+    const onDeleteCard = () => {
+        executeDeleteCard({ id: data.id, boardId });
     };
 
     const onImageSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -277,24 +377,42 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [optimisticColor, setOptimisticColor] = useState(data.color);
     const [optimisticFontColor, setOptimisticFontColor] = useState(data.fontColor);
     const [optimisticDueDate, setOptimisticDueDate] = useState(data.dueDate);
+    const [optimisticDisplayThumbnails, setOptimisticDisplayThumbnails] = useState(data.displayThumbnails ?? true);
+    const [optimisticIsSlim, setOptimisticIsSlim] = useState(data.isSlim ?? false);
 
     useEffect(() => {
         setOptimisticColor(data.color);
         setOptimisticFontColor(data.fontColor);
         setOptimisticDueDate(data.dueDate);
-    }, [data.color, data.fontColor, data.dueDate]);
+        setOptimisticDisplayThumbnails(data.displayThumbnails ?? true);
+        setOptimisticIsSlim(data.isSlim ?? false);
+    }, [data.color, data.fontColor, data.dueDate, data.displayThumbnails, data.isSlim]);
 
-    const onBgColorSelect = (color: string) => {
+    const onBgColorSelect = (color: string, isCustom = false) => {
         setOptimisticColor(color);
+        if (isCustom && color) saveCustomColor(color);
         executeUpdateCard({ title: data.title, id: data.id, boardId, color });
     };
 
-    const onTextColorSelect = (color: string) => {
+    const onTextColorSelect = (color: string, isCustom = false) => {
         setOptimisticFontColor(color);
+        if (isCustom && color) saveCustomColor(color);
         executeUpdateCard({ title: data.title, id: data.id, boardId, fontColor: color });
     };
 
-    if (!data) return null;
+    const onToggleThumbnails = () => {
+        const newValue = !optimisticDisplayThumbnails;
+        setOptimisticDisplayThumbnails(newValue);
+        executeUpdateCard({ id: data.id, boardId, displayThumbnails: newValue });
+    };
+
+    const onToggleSlim = () => {
+        const newValue = !optimisticIsSlim;
+        setOptimisticIsSlim(newValue);
+        executeUpdateCard({ id: data.id, boardId, isSlim: newValue });
+    };
+
+    if (!isMounted || !data) return null;
 
     const imageAttachments = data.attachments?.filter((a: any) => a.type === "IMAGE") || [];
     const linkAttachments = data.attachments?.filter((a: any) => a.type === "LINK" || a.type === "IFRAME") || [];
@@ -383,7 +501,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                 )}
 
                 {/* Header */}
-                <div className="flex items-start gap-x-3 w-full mb-8">
+                <div className="flex items-start gap-x-3 w-full mb-8 relative px-1">
                     <Layout className="h-6 w-6 text-neutral-700 mt-1" />
                     <div className="w-full">
                         <form onSubmit={onSubmit}>
@@ -396,6 +514,23 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                 className="font-semibold text-xl text-neutral-700 px-1 border-transparent hover:border-input focus:border-input transition bg-transparent focus:bg-white w-[95%]"
                             />
                         </form>
+                        
+                        {/* Rank Number Badge */}
+                        <div className="absolute top-0 right-0 z-20">
+                            <div className="flex flex-col items-center">
+                                <span className="text-[10px] font-bold text-neutral-400 uppercase mb-1">Rank</span>
+                                <input 
+                                    type="text"
+                                    value={posValue}
+                                    onChange={(e) => setPosValue(e.target.value)}
+                                    onBlur={onPosBlur}
+                                    onKeyDown={onPosKeyDown}
+                                    title="Enter position to move card"
+                                    className="w-10 h-7 bg-white shadow-sm text-neutral-800 text-xs font-bold text-center border-2 border-neutral-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center p-0 hover:border-neutral-300 transition-all font-sans"
+                                />
+                            </div>
+                        </div>
+
                         <div className="flex items-center gap-x-6 mt-1 px-1">
                             <p className="text-sm text-neutral-500">
                                 in list <span className="underline">{fetchedLists.find((l: any) => l.id === data.listId)?.title || "..."}</span>
@@ -600,42 +735,112 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                     </div>
 
                                     {colorPickerTab === "bg" && (
-                                        <div className="grid grid-cols-5 gap-1.5">
-                                            {CARD_COLORS.map((color) => (
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-5 gap-1.5">
+                                                {CARD_COLORS.map((color) => (
+                                                    <button
+                                                        key={color}
+                                                        onClick={() => onBgColorSelect(color)}
+                                                        className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10"
+                                                        style={{ backgroundColor: color }}
+                                                    />
+                                                ))}
                                                 <button
-                                                    key={color}
-                                                    onClick={() => onBgColorSelect(color)}
-                                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10"
-                                                    style={{ backgroundColor: color }}
-                                                />
-                                            ))}
-                                            <button
-                                                onClick={() => onBgColorSelect("")}
-                                                className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
-                                            >
-                                                none
-                                            </button>
+                                                    onClick={() => onBgColorSelect("")}
+                                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
+                                                >
+                                                    none
+                                                </button>
+                                            </div>
+
+                                            {/* Custom & Memory */}
+                                            <div className="border-t pt-2 mt-2">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <span className="text-[10px] font-bold text-neutral-400 uppercase">Custom & Memory</span>
+                                                    <button 
+                                                        onClick={() => customColorInputRef.current?.click()}
+                                                        className="h-5 w-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition shadow-sm"
+                                                    >
+                                                        <Plus className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                                <div className="grid grid-cols-8 gap-1">
+                                                    {customColors.map((color, idx) => (
+                                                        <button
+                                                            key={`${color}-${idx}`}
+                                                            onClick={() => onBgColorSelect(color)}
+                                                            className="h-5 w-5 rounded-full border border-black/10 shadow-sm hover:scale-110 transition"
+                                                            style={{ backgroundColor: color }}
+                                                            title={color}
+                                                        />
+                                                    ))}
+                                                    {customColors.length === 0 && (
+                                                        <span className="col-span-8 text-[9px] text-neutral-400 italic py-1">No custom colors yet</span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
 
                                     {colorPickerTab === "text" && (
-                                        <div className="grid grid-cols-5 gap-1.5">
-                                            {TEXT_COLORS.map((color) => (
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-5 gap-1.5">
+                                                {TEXT_COLORS.map((color) => (
+                                                    <button
+                                                        key={color}
+                                                        onClick={() => onTextColorSelect(color)}
+                                                        className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/20"
+                                                        style={{ backgroundColor: color }}
+                                                    />
+                                                ))}
                                                 <button
-                                                    key={color}
-                                                    onClick={() => onTextColorSelect(color)}
-                                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/20"
-                                                    style={{ backgroundColor: color }}
-                                                />
-                                            ))}
-                                            <button
-                                                onClick={() => onTextColorSelect("")}
-                                                className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
-                                            >
-                                                auto
-                                            </button>
+                                                    onClick={() => onTextColorSelect("")}
+                                                    className="h-6 w-6 rounded-sm hover:opacity-80 transition shadow-sm border border-black/10 bg-neutral-200 flex items-center justify-center text-[10px] text-neutral-500 font-medium"
+                                                >
+                                                    auto
+                                                </button>
+                                            </div>
+
+                                             {/* Custom & Memory */}
+                                             <div className="border-t pt-2 mt-2">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <span className="text-[10px] font-bold text-neutral-400 uppercase">Custom & Memory</span>
+                                                    <button 
+                                                        onClick={() => customColorInputRef.current?.click()}
+                                                        className="h-5 w-5 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition shadow-sm"
+                                                    >
+                                                        <Plus className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                                <div className="grid grid-cols-8 gap-1">
+                                                    {customColors.map((color, idx) => (
+                                                        <button
+                                                            key={`${color}-${idx}`}
+                                                            onClick={() => onTextColorSelect(color)}
+                                                            className="h-5 w-5 rounded-full border border-black/10 shadow-sm hover:scale-110 transition"
+                                                            style={{ backgroundColor: color }}
+                                                            title={color}
+                                                        />
+                                                    ))}
+                                                    {customColors.length === 0 && (
+                                                        <span className="col-span-8 text-[9px] text-neutral-400 italic py-1">No custom colors yet</span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
+
+                                    {/* Hidden Color Input */}
+                                    <input 
+                                        type="color"
+                                        ref={customColorInputRef}
+                                        className="sr-only"
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (colorPickerTab === "bg") onBgColorSelect(val, true);
+                                            else onTextColorSelect(val, true);
+                                        }}
+                                    />
                                 </div>
                             )}
                         </div>
@@ -859,9 +1064,68 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                 />
                             )}
                         </div>
+
+                        <div className="pt-2">
+                            <h4 className="text-xs font-semibold text-neutral-600 mb-2">Actions</h4>
+                            <div className="space-y-2">
+                                <button
+                                    onClick={onDuplicateCard}
+                                    className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"
+                                >
+                                    <Copy className="h-4 w-4" /> Duplicate
+                                </button>
+                                <button
+                                    onClick={() => setIsInstanceModalOpen(true)}
+                                    className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2 text-blue-600 font-medium"
+                                >
+                                    <Layers className="h-4 w-4" /> Instance Card
+                                </button>
+                                {data.syncGroupId && (
+                                    <button
+                                        onClick={onDecloneCard}
+                                        className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2 text-yellow-600 font-medium"
+                                    >
+                                        <Share2 className="h-4 w-4" /> Make Unique
+                                    </button>
+                                )}
+                                <button
+                                    onClick={onDeleteCard}
+                                    className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2 text-red-600 font-medium"
+                                >
+                                    <Trash2 className="h-4 w-4" /> Delete
+                                </button>
+
+                                <div className="border-t border-neutral-200 my-2"></div>
+
+                                <button
+                                    onClick={onToggleThumbnails}
+                                    className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"
+                                >
+                                    {optimisticDisplayThumbnails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    {optimisticDisplayThumbnails ? "Hide Thumbnails" : "Display Thumbnails"}
+                                </button>
+
+                                <button
+                                    onClick={onToggleSlim}
+                                    className="bg-[#e9eaec] w-full text-left text-sm px-3 py-1.5 rounded-sm hover:bg-[#dcdfe4] flex items-center gap-x-2"
+                                >
+                                    {optimisticIsSlim ? <Maximize2 className="h-4 w-4" /> : <MinusSquare className="h-4 w-4" />}
+                                    {optimisticIsSlim ? "Exit Slim Mode" : "Slim Mode"}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {isInstanceModalOpen && (
+                <InstanceModal
+                    card={data}
+                    boardId={boardId}
+                    isOpen={isInstanceModalOpen}
+                    onClose={() => setIsInstanceModalOpen(false)}
+                />
+            )}
         </Modal>
     );
 };

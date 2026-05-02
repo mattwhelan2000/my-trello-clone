@@ -8,4 +8,6 @@ export const UpdateCardSchema = z.object({
     color: z.string().optional(),
     fontColor: z.string().optional(),
     dueDate: z.coerce.date().nullable().optional(),
+    displayThumbnails: z.boolean().optional(),
+    isSlim: z.boolean().optional(),
 });

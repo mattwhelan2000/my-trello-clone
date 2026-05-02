@@ -139,29 +139,39 @@ export const pushGoogleSheet = actionClient
                 // If the list itself was unsynced (title changed locally), track it to relink
                 if (!list.isSyncedWithSheet) listsToReLink.push(list.id);
 
-                // Map cards by keyword first, then by index fallback
+                // Map cards by keyword first
                 const sortedCards = list.cards || [];
                 
-                const locationCard = sortedCards.find(c => {
+                // 1. Identify VFX Card (High Priority for 'boards' or 'vfx')
+                const vfxCardCandidate = sortedCards.find(c => {
                     const t = c.title.toLowerCase();
-                    return t.includes("location") || t.includes("scene") || t.includes("master");
-                }) || sortedCards[0];
+                    return t.includes("vfx") || t.includes("boards") || t.includes("visual") || t.includes("storyboard");
+                });
 
-                const vfxCard = sortedCards.find(c => {
+                // 2. Identify Location Card (High Priority for 'location' or 'master', but EXCLUDE 'set location')
+                const locationCardCandidate = sortedCards.find(c => {
                     const t = c.title.toLowerCase();
-                    return t.includes("vfx") || t.includes("boards");
-                }) || sortedCards[3];
+                    return (t.includes("location") || t.includes("master") || t.includes("scene head")) && !t.includes("set location");
+                });
+
+                // 3. Resolve overlaps and fallbacks
+                const locationCard = locationCardCandidate || (sortedCards[0]?.id !== vfxCardCandidate?.id ? sortedCards[0] : (sortedCards[1] || sortedCards[0]));
+                const vfxCard = vfxCardCandidate || sortedCards.find(c => (c.attachments?.length || 0) > 0 && c.id !== locationCard?.id) || (sortedCards.length > 3 ? sortedCards[3] : null);
 
                 const timeCard = sortedCards.find(c => {
                     const t = c.title.toLowerCase();
                     return t.includes("time") || t.includes("day") || t.includes("night");
-                }) || sortedCards[1];
+                }) || (sortedCards.length > 1 ? sortedCards[1] : null);
 
-                const setLocationCard = sortedCards[2]; // Usually the 3rd card
+                const setLocationCard = sortedCards.find(c => {
+                    const t = c.title.toLowerCase();
+                    return t.includes("set location") || t.includes("address");
+                }) || (sortedCards.length > 2 ? sortedCards[2] : null);
+
                 const charactersCard = sortedCards.find(c => {
                     const t = c.title.toLowerCase();
-                    return t.includes("character") || t.includes("char");
-                }) || sortedCards[4];
+                    return t.includes("character") || t.includes("char") || t.includes("cast");
+                }) || (sortedCards.length > 4 ? sortedCards[4] : null);
 
                 // SCENE LOCATION & DESCRIPTION (from location card)
                 if (locationCard) {
@@ -178,7 +188,18 @@ export const pushGoogleSheet = actionClient
                 if (timeCard) row[6] = timeCard.title;
 
                 // SET LOCATION
-                if (setLocationCard) row[7] = setLocationCard.description || "";
+                if (setLocationCard) {
+                    // Try to find a link (Google Maps etc) in attachments
+                    const mapLink = setLocationCard.attachments.find(a => a.type === "LINK") || 
+                                   setLocationCard.attachments.find(a => a.url.includes("google.com/maps") || a.url.includes("goo.gl/maps"));
+                    
+                    if (mapLink) {
+                        const label = setLocationCard.description?.slice(0, 50) || "Google Maps";
+                        row[7] = `=HYPERLINK("${mapLink.url}", "${label}")`;
+                    } else {
+                        row[7] = setLocationCard.description || setLocationCard.title || "";
+                    }
+                }
 
                 // VFX & VFX THUMBNAIL (from vfx card)
                 if (vfxCard) {

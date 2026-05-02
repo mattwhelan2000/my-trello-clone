@@ -1,13 +1,10 @@
 "use client";
 
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CardItem } from "./CardItem";
 import { useState, useRef, ElementRef, KeyboardEventHandler, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useEventListener, useOnClickOutside } from "usehooks-ts";
-import { Palette, X } from "lucide-react";
+import { Palette, X, GripHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
@@ -30,7 +27,8 @@ export const ListItem = ({
     onMoveList,
     onMoveCard,
     isFirst,
-    isLast
+    isLast,
+    selectedLabels = new Set(),
 }: {
     data: any;
     index: number;
@@ -43,6 +41,7 @@ export const ListItem = ({
     onMoveCard?: (cardId: string, listId: string, action: 'up' | 'down' | 'position', newPosition?: number) => void;
     isFirst?: boolean;
     isLast?: boolean;
+    selectedLabels?: Set<string>;
 }) => {
     const [title, setTitle] = useState(data.title);
     const [isEditing, setIsEditing] = useState(false);
@@ -71,36 +70,51 @@ export const ListItem = ({
 
     const listHeightKey = `board_list_height_${data.boardId}`;
 
-    const onResizeMouseDown = useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
+    const onResizeStart = useCallback((clientY: number) => {
         const currentHeight = parseInt(
             getComputedStyle(document.documentElement).getPropertyValue("--list-max-height") || "600",
             10
         );
-        resizeStartY.current = e.clientY;
+        resizeStartY.current = clientY;
         resizeStartHeight.current = currentHeight;
         setIsResizing(true);
 
-        const onMouseMove = (moveEvent: MouseEvent) => {
-            const delta = moveEvent.clientY - resizeStartY.current;
+        const onMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
+            const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : (moveEvent as MouseEvent).clientY;
+            const delta = currentY - resizeStartY.current;
             const newHeight = Math.max(200, resizeStartHeight.current + delta);
             document.documentElement.style.setProperty("--list-max-height", `${newHeight}px`);
         };
 
-        const onMouseUp = (upEvent: MouseEvent) => {
-            const delta = upEvent.clientY - resizeStartY.current;
-            const newHeight = Math.max(200, resizeStartHeight.current + delta);
-            document.documentElement.style.setProperty("--list-max-height", `${newHeight}px`);
-            localStorage.setItem(listHeightKey, String(newHeight));
+        const onMouseUp = () => {
+            const currentHeight = parseInt(
+                getComputedStyle(document.documentElement).getPropertyValue("--list-max-height") || "600",
+                10
+            );
+            localStorage.setItem(listHeightKey, String(currentHeight));
             setIsResizing(false);
-            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mousemove", onMouseMove as any);
             window.removeEventListener("mouseup", onMouseUp);
+            window.removeEventListener("touchmove", onMouseMove as any);
+            window.removeEventListener("touchend", onMouseUp);
         };
 
-        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mousemove", onMouseMove as any);
         window.addEventListener("mouseup", onMouseUp);
+        window.addEventListener("touchmove", onMouseMove as any, { passive: false });
+        window.addEventListener("touchend", onMouseUp);
     }, [listHeightKey]);
+
+    const onResizeMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onResizeStart(e.clientY);
+    }, [onResizeStart]);
+
+    const onResizeTouchStart = useCallback((e: React.TouchEvent) => {
+        // Don't preventDefault here to allow scrolling if needed, but we want to start resize
+        onResizeStart(e.touches[0].clientY);
+    }, [onResizeStart]);
 
     const LIST_COLORS = [
         "#f87171", "#fb923c", "#fbbf24", "#a3e635", "#4ade80",
@@ -323,21 +337,7 @@ export const ListItem = ({
         handleMenuClose();
     };
 
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-        id: data.id,
-        data: {
-            type: "List",
-            list: data,
-        },
-    });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-    };
-
     const isListMatched = searchLists && searchQuery && title.toLowerCase().includes(searchQuery.toLowerCase());
-    const isListMismatched = searchQuery && !isListMatched && searchLists;
     const isListMatch = !searchQuery.trim() || (searchLists && data.title.toLowerCase().includes(searchQuery.toLowerCase()));
     const hasMatchingCards = !searchQuery.trim() || (searchCards && data.cards?.some((card: any) =>
         card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -358,12 +358,12 @@ export const ListItem = ({
         return <span className="truncate">{text}</span>;
     };
 
+    if (!mounted) return null;
+
     return (
         <li
-            ref={setNodeRef}
-            style={{ ...style, display: showList ? 'block' : 'none' }}
-            {...attributes}
-            className={`shrink-0 h-full w-[272px] select-none ${isDragging ? "opacity-30" : ""}`}
+            style={{ display: showList ? 'block' : 'none' }}
+            className="shrink-0 h-full w-[272px] select-none"
         >
             <div
                 onMouseEnter={() => setIsHovered(true)}
@@ -373,9 +373,8 @@ export const ListItem = ({
             >
                 {/* List Header */}
                 <div
-                    {...listeners}
                     onContextMenu={handleContextMenu}
-                    className="pt-2 px-3 pb-1 text-sm font-semibold flex justify-between items-center gap-x-2 rounded-t-md cursor-grab active:cursor-grabbing"
+                    className="pt-2 px-3 pb-1 text-sm font-semibold flex justify-between items-center gap-x-2 rounded-t-md"
                 >
                     {isEditing ? (
                         <form ref={formRef} onSubmit={onSubmit} className="flex-1 px-[2px]">
@@ -520,31 +519,33 @@ export const ListItem = ({
                 )}
 
                 {/* Cards Wrapper */}
-                <SortableContext
-                    items={data.cards.map((c: any) => c.id)}
-                    strategy={verticalListSortingStrategy}
-                >
-                    <ol className="mx-1 px-1 py-2 flex flex-col gap-y-2 mt-2 min-h-[2px] flex-1 overflow-y-scroll">
-                        {data.cards.map((card: any, idx: number) => {
-                            const matchesCardSearch = !searchQuery.trim() || isListMatch || (searchCards && (
-                                card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                (card.description && card.description.toLowerCase().includes(searchQuery.toLowerCase()))
-                            ));
-                            return (
-                                <div key={card.id} style={{ display: matchesCardSearch ? 'block' : 'none' }}>
-                                    <CardItem 
-                                        index={idx} 
-                                        data={card} 
-                                        boardId={data.boardId} 
-                                        onMoveCard={onMoveCard}
-                                        isFirstCard={idx === 0}
-                                        isLastCard={idx === data.cards.length - 1}
-                                    />
-                                </div>
-                            );
-                        })}
-                    </ol>
-                </SortableContext>
+                <ol className="mx-1 px-1 py-2 flex flex-col gap-y-2 mt-2 min-h-[2px] flex-1 overflow-y-scroll">
+                    {data.cards.map((card: any, idx: number) => {
+                        // 1. Label Filter Check
+                        const matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
+                        
+                        // 2. Search Filter Check
+                        const matchesCardSearch = !searchQuery.trim() || isListMatched || (searchCards && (
+                            card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (card.description && card.description.toLowerCase().includes(searchQuery.toLowerCase()))
+                        ));
+
+                        const isVisible = matchesLabels && matchesCardSearch;
+
+                        return (
+                            <div key={card.id} style={{ display: isVisible ? 'block' : 'none' }}>
+                                <CardItem 
+                                    index={idx} 
+                                    data={card} 
+                                    boardId={data.boardId} 
+                                    onMoveCard={onMoveCard}
+                                    isFirstCard={idx === 0}
+                                    isLastCard={idx === data.cards.length - 1}
+                                />
+                            </div>
+                        );
+                    })}
+                </ol>
                 {/* Add Card Button or Form */}
                 <div className="pt-2 px-2 pb-2">
                     {isEditingCard ? (
@@ -572,13 +573,17 @@ export const ListItem = ({
                     )}
                 </div>
 
-                {/* Resize Handle */}
+                {/* Resize Handle - iPad Friendly */}
                 <div
                     onMouseDown={onResizeMouseDown}
-                    className={`w-full h-3 flex items-center justify-center cursor-ns-resize group rounded-b-md transition-colors ${isResizing ? 'bg-blue-500/40' : 'hover:bg-black/20'}`}
+                    onTouchStart={onResizeTouchStart}
+                    className={`w-full h-6 flex items-center justify-center cursor-ns-resize group rounded-b-md transition-all active:bg-blue-500/20 ${isResizing ? 'bg-blue-500/40 h-10' : 'hover:bg-black/10'}`}
                     title="Drag to resize all lists"
                 >
-                    <div className={`w-8 h-0.5 rounded-full transition-colors ${isResizing ? 'bg-blue-400' : 'bg-black/20 group-hover:bg-white/60'}`} />
+                    <div className={`flex flex-col items-center gap-y-0.5 transition-all ${isResizing ? 'scale-125' : 'group-hover:scale-110 opacity-40 group-hover:opacity-100'}`}>
+                        <GripHorizontal className={`h-4 w-4 ${data.color ? 'text-white' : 'text-neutral-600'}`} />
+                        <div className={`w-12 h-1 rounded-full transition-colors ${isResizing ? 'bg-blue-400' : (data.color ? 'bg-white/40' : 'bg-black/20')}`} />
+                    </div>
                 </div>
             </div>
         </li>

@@ -5,234 +5,153 @@ import { db } from "@/lib/db";
 import { actionClient } from "@/lib/create-safe-action";
 import { BulkIngestSchema } from "./schema";
 
-// ── Dropbox API helpers ──────────────────────────────────────────────
-// Resolves a Dropbox shared folder link into individual file entries with temporary download URLs.
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"];
+const DRIVE_API = "https://www.googleapis.com/drive/v3";
 
-interface DropboxFileEntry {
-    name: string;
-    path_lower: string;
-    temporaryLink: string;
-}
+async function listDriveFolder(folderId: string): Promise<{ name: string; url: string; id: string }[]> {
+    const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
+    if (!apiKey) throw new Error("GOOGLE_DRIVE_API_KEY is not set.");
 
-async function isDropboxFolderUrl(url: string): Promise<boolean> {
-    // Dropbox shared folder links contain /scl/fo/ or /sh/ in the path
-    return /dropbox\.com\/(scl\/fo|sh)\//.test(url);
-}
+    const results: { name: string; url: string; id: string }[] = [];
+    let pageToken: string | undefined;
 
-async function resolveDropboxFolder(folderUrl: string): Promise<DropboxFileEntry[]> {
-    const token = process.env.DROPBOX_ACCESS_TOKEN;
-    if (!token) throw new Error("DROPBOX_ACCESS_TOKEN is not set");
+    do {
+        const params = new URLSearchParams({
+            q: `'${folderId}' in parents and trashed=false`,
+            fields: "nextPageToken,files(id,name,mimeType,thumbnailLink)",
+            pageSize: "1000",
+            key: apiKey,
+        });
+        if (pageToken) params.set("pageToken", pageToken);
 
-    console.log(`[DropboxIngest] Resolving Folder: ${folderUrl}`);
+        const res = await fetch(`${DRIVE_API}/files?${params}`);
+        if (!res.ok) throw new Error(`Google Drive API error: ${res.status}`);
 
-    // Extract the base URL and query params
-    const urlObj = new URL(folderUrl);
-    const baseUrl = urlObj.origin + urlObj.pathname;
-    const rlkey = urlObj.searchParams.get("rlkey");
-    const st = urlObj.searchParams.get("st");
+        const data = await res.json();
+        for (const file of data.files || []) {
+            if (!file.mimeType.startsWith("image/")) continue;
+            const ext = `.${file.name.split(".").pop()?.toLowerCase()}`;
+            if (!IMAGE_EXTENSIONS.includes(ext)) continue;
 
-    // Construct common header set
-    const headers = {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-    };
-
-    // Step 1: List files in the shared folder using /2/files/list_folder
-    const listRes = await fetch("https://api.dropboxapi.com/2/files/list_folder", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-            path: "",
-            shared_link: { url: folderUrl },
-            limit: 1000,
-            recursive: false,
-        }),
-    });
-
-    if (!listRes.ok) {
-        const errText = await listRes.text();
-        let errorMessage = `Dropbox API failed (${listRes.status}): ${errText}`;
-        try {
-            const errJson = JSON.parse(errText);
-            if (errJson.error_summary) errorMessage = `Dropbox Error: ${errJson.error_summary}`;
-        } catch {}
-        console.error(`[DropboxIngest] list_folder Error:`, errText);
-        throw new Error(errorMessage);
-    }
-
-    const listData = await listRes.json();
-    console.log(`[DropboxIngest] Found ${listData.entries?.length || 0} total entries`);
-
-    const entries: DropboxFileEntry[] = [];
-    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"];
-
-    for (const entry of listData.entries || []) {
-        if (entry[".tag"] !== "file") continue;
-        
-        const ext = entry.name.substring(entry.name.lastIndexOf(".")).toLowerCase();
-        if (!imageExtensions.includes(ext)) continue;
-
-        // Construct the direct download URL
-        // For shared folder files, we append the filename to the folder path and keep the rlkey
-        const fileUrl = new URL(baseUrl);
-        // Ensure folder path ends with slash before appending filename
-        if (!fileUrl.pathname.endsWith("/")) {
-            fileUrl.pathname += "/";
+            const url = `/api/drive-image?id=${file.id}`;
+            results.push({ name: file.name, url, id: file.id });
         }
-        fileUrl.pathname += entry.name;
-        
-        // Add back the auth keys
-        if (rlkey) fileUrl.searchParams.set("rlkey", rlkey);
-        if (st) fileUrl.searchParams.set("st", st);
-        fileUrl.searchParams.set("raw", "1");
+        pageToken = data.nextPageToken;
+    } while (pageToken);
 
-        entries.push({
-            name: entry.name,
-            path_lower: entry.path_lower,
-            temporaryLink: fileUrl.toString(),
-        });
-    }
-
-    return entries;
+    return results;
 }
 
-// ── Core ingest logic for a single file ──────────────────────────────
-
-async function ingestSingleFile(
-    boardId: string,
-    filename: string,
-    imageUrl: string
-): Promise<boolean> {
-    // Strip extension
-    const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
-
-    // Split on the FIRST underscore: Sc007_BOARDS -> ["Sc007", "BOARDS"]
-    const underscoreIndex = nameWithoutExt.indexOf('_');
-    if (underscoreIndex === -1) {
-        console.warn(`Skipping: Filename "${filename}" does not contain an underscore delimiter.`);
-        return false;
-    }
-
-    const scenePrefix = nameWithoutExt.substring(0, underscoreIndex).trim();
-    const cardName = nameWithoutExt.substring(underscoreIndex + 1).trim();
-
-    if (!scenePrefix || !cardName) return false;
-
-    // 1. Find the List by fuzzy-matching the scene prefix against existing list titles.
-    //    e.g. "Sc007" matches "Sc007 EXT. -- 1+1/8 pgs"
-    const allLists = await db.list.findMany({
-        where: { boardId },
-        orderBy: { order: "asc" },
-    });
-
-    let list = allLists.find(
-        (l) => l.title.toLowerCase().startsWith(scenePrefix.toLowerCase())
-    ) || null;
-
-    if (!list) {
-        // No matching list found — create one with just the scene prefix
-        const lastOrder = allLists.length > 0 ? allLists[allLists.length - 1].order : 0;
-        list = await db.list.create({
-            data: {
-                title: scenePrefix,
-                order: lastOrder + 1,
-                boardId
-            }
-        });
-    }
-
-    // 2. Find or create the Card
-    let card = await db.card.findFirst({
-        where: { title: cardName, listId: list.id }
-    });
-
-    if (!card) {
-        const lastCard = await db.card.findFirst({
-            where: { listId: list.id },
-            orderBy: { order: "desc" },
-            select: { order: true },
-        });
-        const newOrder = lastCard ? lastCard.order + 1 : 1;
-
-        card = await db.card.create({
-            data: {
-                title: cardName,
-                order: newOrder,
-                listId: list.id
-            }
-        });
-    }
-
-    // 3. Attach image to card as cover (skip if already attached)
-    const rawUrl = imageUrl.replace('dl=0', 'raw=1').replace('dl=1', 'raw=1');
-
-    const existingAttachment = await db.attachment.findFirst({
-        where: { cardId: card.id, url: rawUrl }
-    });
-
-    if (!existingAttachment) {
-        await db.attachment.create({
-            data: {
-                url: rawUrl,
-                title: filename,
-                type: "IMAGE",
-                isCover: true,
-                cardId: card.id
-            }
-        });
-        return true;
-    }
-
-    return false;
+function extractNumbers(str: string): number[] {
+    return (str.match(/\d+/g) || []).map(Number);
 }
 
-// ── Main action ──────────────────────────────────────────────────────
+function fuzzyMatchList(prefix: string, listTitle: string): boolean {
+    const prefixNums = extractNumbers(prefix);
+    const listNums = extractNumbers(listTitle);
+    if (prefixNums.length === 0 || listNums.length === 0) return false;
+    return prefixNums[0] === listNums[0];
+}
+
+function parseFilename(name: string) {
+    const nameWithoutExt = name.replace(/\.[^/.]+$/, "");
+    const delimiter = nameWithoutExt.includes("_") ? "_" : " ";
+    const parts = nameWithoutExt.split(delimiter);
+    if (parts.length > 1) {
+        return { scenePrefix: parts[0].trim(), cardName: parts.slice(1).join(delimiter).trim() };
+    }
+    return { scenePrefix: "Drive Ingest", cardName: nameWithoutExt.trim() };
+}
 
 export const bulkIngestImages = actionClient
     .schema(BulkIngestSchema)
-    .action(async ({ parsedInput: { boardId, urls } }) => {
+    .action(async ({ parsedInput: { boardId, urls, isAnalysis, resolutions, defaultResolution, resolvedFiles } }) => {
         try {
-            let ingestedCount = 0;
+            console.log(`[BulkIngest] Optimized Transaction Start (${boardId})`);
 
-            for (const url of urls) {
-                try {
-                    const trimmedUrl = url.trim();
-                    if (!trimmedUrl) continue;
-
-                    // Check if this is a Dropbox folder link
-                    if (await isDropboxFolderUrl(trimmedUrl)) {
-                        console.log(`Resolving Dropbox folder: ${trimmedUrl}`);
-                        const files = await resolveDropboxFolder(trimmedUrl);
-                        console.log(`Found ${files.length} image files in Dropbox folder`);
-
-                        for (const file of files) {
-                            try {
-                                const success = await ingestSingleFile(boardId, file.name, file.temporaryLink);
-                                if (success) ingestedCount++;
-                            } catch (e) {
-                                console.error(`Failed processing Dropbox file: ${file.name}`, e);
-                            }
-                        }
-                    } else {
-                        // Individual file URL — extract filename from URL path
-                        const urlObj = new URL(trimmedUrl);
-                        const pathname = decodeURIComponent(urlObj.pathname);
-                        const segments = pathname.split('/');
-                        const filenameWithExt = segments[segments.length - 1];
-                        if (!filenameWithExt) continue;
-
-                        const success = await ingestSingleFile(boardId, filenameWithExt, trimmedUrl);
-                        if (success) ingestedCount++;
-                    }
-                } catch (e) {
-                    console.error("Failed processing URL:", url, e);
+            let allFiles = resolvedFiles || [];
+            if (allFiles.length === 0) {
+                for (const url of urls) {
+                    const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+                    if (match) allFiles.push(...(await listDriveFolder(match[1])));
                 }
             }
+            if (allFiles.length === 0) return { count: 0 };
+
+            const existingLists = await db.list.findMany({ where: { boardId } });
+            const existingCards = await db.card.findMany({ 
+                where: { listId: { in: existingLists.map(l => l.id) } }
+            });
+            const cardMap = new Map(existingCards.map(c => [`${c.listId}_${c.title.toLowerCase()}`, c]));
+
+            if (isAnalysis) {
+                const conflicts: any[] = [];
+                for (const file of allFiles) {
+                    const { scenePrefix, cardName } = parseFilename(file.name);
+                    const list = existingLists.find(l => fuzzyMatchList(scenePrefix, l.title));
+                    if (list && cardMap.has(`${list.id}_${cardName.toLowerCase()}`)) {
+                        conflicts.push({ name: file.name, cardName, listTitle: list.title });
+                    }
+                }
+                if (conflicts.length === 0) { isAnalysis = false; }
+                else { return { conflicts, totalFiles: allFiles.length, resolvedFiles: allFiles }; }
+            }
+
+            let ingestedCount = 0;
+            let listOrder = Math.max(...existingLists.map(l => l.order), -1) + 1;
+            const listRef = [...existingLists];
+
+            // Perform all operations in a single Transaction for speed
+            await db.$transaction(async (tx) => {
+                for (const file of allFiles) {
+                    const { scenePrefix, cardName } = parseFilename(file.name);
+                    if (!cardName) continue;
+
+                    let list = listRef.find(l => fuzzyMatchList(scenePrefix, l.title));
+                    if (!list) {
+                        list = await tx.list.create({
+                            data: { title: scenePrefix, order: listOrder++, boardId }
+                        });
+                        listRef.push(list);
+                    }
+
+                    const cardKey = `${list.id}_${cardName.toLowerCase()}`;
+                    let card = cardMap.get(cardKey);
+
+                    if (card) {
+                        const res = resolutions?.[file.name] || defaultResolution || "ignore";
+                        if (res === "ignore") continue;
+                        if (res === "replace") {
+                            await tx.attachment.deleteMany({ where: { cardId: card.id } });
+                        }
+                    } else {
+                        const lastOrder = existingCards.filter(c => c.listId === list!.id).reduce((max, c) => Math.max(max, c.order), -1);
+                        card = await tx.card.create({
+                            data: { title: cardName, order: lastOrder + 1, listId: list.id }
+                        });
+                        cardMap.set(cardKey, card);
+                        existingCards.push(card);
+                    }
+
+                    await tx.attachment.create({
+                        data: {
+                            url: file.url,
+                            title: file.name,
+                            type: "IMAGE",
+                            isCover: true,
+                            cardId: card.id,
+                        }
+                    });
+                    ingestedCount++;
+                }
+            }, {
+                timeout: 30000 // Increase timeout to 30s for large batches
+            });
 
             revalidatePath(`/board/${boardId}`);
-            return { data: { count: ingestedCount } };
+            return { count: ingestedCount };
         } catch (error: any) {
-            console.error("Bulk Ingest Error:", error);
-            return { error: error.message || "Failed to ingest images." };
+            console.error("[BulkIngest] Fatal Error:", error);
+            return { error: error.message || "Failed to process folder." };
         }
     });

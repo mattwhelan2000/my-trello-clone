@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { MoreHorizontal, X, Palette, Image as ImageIcon, Type, Trash2 } from "lucide-react";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
@@ -23,6 +23,11 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
     const [imageUrl, setImageUrl] = useState("");
     const [title, setTitle] = useState(board.title);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     const { execute, isExecuting } = useSafeAction(updateBoard, {
         onSuccess: () => {
@@ -58,6 +63,8 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
         if (!title || title === board.title) return;
         execute({ id: board.id, title });
     };
+
+    if (!isMounted) return null;
 
     return (
         <div className="group relative h-32 w-full shadow-sm rounded-sm">

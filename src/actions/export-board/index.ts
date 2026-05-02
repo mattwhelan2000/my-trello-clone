@@ -25,7 +25,8 @@ export const exportBoard = actionClient
                                                 orderBy: { createdAt: "asc" }
                                             }
                                         }
-                                    }
+                                    },
+                                    activities: true
                                 }
                             }
                         }

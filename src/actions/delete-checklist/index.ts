@@ -9,11 +9,33 @@ export const deleteChecklist = actionClient
     .schema(DeleteChecklistSchema)
     .action(async ({ parsedInput: { id, boardId } }) => {
         try {
-            const checklist = await db.checklist.delete({
+            const checklistToDelete = await db.checklist.findUnique({
                 where: { id },
+                include: { card: { select: { syncGroupId: true } } }
             });
+
+            if (!checklistToDelete) return { error: "Checklist not found" };
+
+            if (checklistToDelete.card?.syncGroupId) {
+                const syncedCards = await db.card.findMany({
+                    where: { syncGroupId: checklistToDelete.card.syncGroupId },
+                    select: { id: true }
+                });
+
+                await db.checklist.deleteMany({
+                    where: {
+                        cardId: { in: syncedCards.map(c => c.id) },
+                        title: checklistToDelete.title
+                    }
+                });
+            } else {
+                await db.checklist.delete({
+                    where: { id },
+                });
+            }
+
             revalidatePath(`/board/${boardId}`);
-            return checklist;
+            return { success: true };
         } catch (error) {
             return { error: "Failed to delete checklist." };
         }

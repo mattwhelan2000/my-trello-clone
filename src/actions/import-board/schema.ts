@@ -22,6 +22,9 @@ export const ImportBoardSchema = z.object({
             fontColor: z.string().nullable().optional(),
             dueDate: z.string().nullable().optional(), // Date fields serialized as strings in JSON
             isSyncedWithSheet: z.boolean().optional(),
+            syncGroupId: z.string().nullable().optional(),
+            displayThumbnails: z.boolean().optional(),
+            isSlim: z.boolean().optional(),
             labels: z.array(z.object({
                 title: z.string(),
                 color: z.string()
@@ -39,6 +42,11 @@ export const ImportBoardSchema = z.object({
                 title: z.string().nullable().optional(),
                 thumbnailUrl: z.string().nullable().optional(),
                 isCover: z.boolean()
+            })).optional(),
+            activities: z.array(z.object({
+                userId: z.string(),
+                action: z.string(),
+                createdAt: z.string()
             })).optional()
         }))
     }))

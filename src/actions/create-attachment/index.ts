@@ -25,30 +25,52 @@ export const createAttachment = actionClient
                 }
             }
 
-            const attachment = await db.attachment.create({
-                data: {
-                    cardId: id,
-                    url,
-                    type,
-                    title,
-                    thumbnailUrl,
-                    isCover: type === "IFRAME",
-                },
+            const card = await db.card.findUnique({
+                where: { id },
+                select: { syncGroupId: true }
             });
 
-            if (type === "IFRAME") {
-                // Turn off cover for other attachments on this card
-                await db.attachment.updateMany({
-                    where: {
-                        cardId: id,
-                        id: { not: attachment.id },
-                    },
-                    data: { isCover: false },
+            if (card?.syncGroupId) {
+                const syncedCards = await db.card.findMany({
+                    where: { syncGroupId: card.syncGroupId },
+                    select: { id: true }
                 });
+
+                await db.attachment.createMany({
+                    data: syncedCards.map(c => ({
+                        cardId: c.id,
+                        url,
+                        type,
+                        title,
+                        thumbnailUrl,
+                        isCover: type === "IFRAME",
+                    }))
+                });
+            } else {
+                const attachment = await db.attachment.create({
+                    data: {
+                        cardId: id,
+                        url,
+                        type,
+                        title,
+                        thumbnailUrl,
+                        isCover: type === "IFRAME",
+                    },
+                });
+
+                if (type === "IFRAME") {
+                    await db.attachment.updateMany({
+                        where: {
+                            cardId: id,
+                            id: { not: attachment.id },
+                        },
+                        data: { isCover: false },
+                    });
+                }
             }
 
             revalidatePath(`/board/${boardId}`);
-            return attachment;
+            return { success: true };
         } catch (error) {
             return { error: "Failed to create attachment." };
         }

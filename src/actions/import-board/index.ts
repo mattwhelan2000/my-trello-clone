@@ -50,6 +50,9 @@ export const importBoard = actionClient
                                     fontColor: card.fontColor,
                                     dueDate: card.dueDate ? new Date(card.dueDate) : null,
                                     isSyncedWithSheet: card.isSyncedWithSheet ?? true,
+                                    syncGroupId: card.syncGroupId,
+                                    displayThumbnails: card.displayThumbnails ?? true,
+                                    isSlim: card.isSlim ?? false,
                                     labels: {
                                         create: card.labels?.map(l => ({ title: l.title, color: l.color })) || []
                                     },
@@ -71,6 +74,13 @@ export const importBoard = actionClient
                                             title: a.title,
                                             thumbnailUrl: a.thumbnailUrl,
                                             isCover: a.isCover
+                                        })) || []
+                                    },
+                                    activities: {
+                                        create: card.activities?.map(act => ({
+                                            userId: act.userId,
+                                            action: act.action,
+                                            createdAt: new Date(act.createdAt)
                                         })) || []
                                     }
                                 }))

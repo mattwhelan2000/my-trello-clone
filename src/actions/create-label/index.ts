@@ -9,11 +9,32 @@ export const createLabel = actionClient
     .schema(CreateLabelSchema)
     .action(async ({ parsedInput: { cardId, boardId, title, color } }) => {
         try {
-            const label = await db.label.create({
-                data: { cardId, title, color },
+            const card = await db.card.findUnique({
+                where: { id: cardId },
+                select: { syncGroupId: true }
             });
+
+            if (card?.syncGroupId) {
+                const syncedCards = await db.card.findMany({
+                    where: { syncGroupId: card.syncGroupId },
+                    select: { id: true }
+                });
+
+                await db.label.createMany({
+                    data: syncedCards.map(c => ({
+                        cardId: c.id,
+                        title,
+                        color
+                    })),
+                    skipDuplicates: true
+                });
+            } else {
+                await db.label.create({
+                    data: { cardId, title, color },
+                });
+            }
             revalidatePath(`/board/${boardId}`);
-            return label;
+            return { success: true };
         } catch (error) {
             return { error: "Failed to create label." };
         }
