@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { BoardOptions } from "@/components/board/BoardOptions";
 import { BoardEnhancements } from "@/components/board/BoardEnhancements";
+import { formatImageUrl } from "@/lib/format-image-url";
 
 export async function generateMetadata({
     params,
@@ -44,6 +45,7 @@ export default async function BoardIdLayout({
         where: { list: { boardId: p.boardId } }
     });
 
+
     return (
         <div
             className="relative min-h-screen"
@@ -51,7 +53,7 @@ export default async function BoardIdLayout({
         >
             {board.bgImage && (
                 <img
-                    src={board.bgImage}
+                    src={formatImageUrl(board.bgImage)!}
                     alt=""
                     referrerPolicy="no-referrer"
                     crossOrigin="anonymous"

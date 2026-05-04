@@ -5,4 +5,5 @@ export const UpdateListColors = z.object({
   color: z.string().min(1, {
     message: "Color is required",
   }),
+  listIds: z.array(z.string()).optional(),
 });

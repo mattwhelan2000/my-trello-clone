@@ -14,7 +14,7 @@ export const deleteChecklist = actionClient
                 include: { card: { select: { syncGroupId: true } } }
             });
 
-            if (!checklistToDelete) return { error: "Checklist not found" };
+            if (!checklistToDelete) throw new Error("Checklist not found");
 
             if (checklistToDelete.card?.syncGroupId) {
                 const syncedCards = await db.card.findMany({
@@ -37,6 +37,6 @@ export const deleteChecklist = actionClient
             revalidatePath(`/board/${boardId}`);
             return { success: true };
         } catch (error) {
-            return { error: "Failed to delete checklist." };
+            throw new Error("Failed to delete checklist.");
         }
     });

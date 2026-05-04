@@ -14,6 +14,6 @@ export const deleteCard = actionClient
             revalidatePath(`/board/${boardId}`);
             return card;
         } catch (error) {
-            return { error: "Failed to delete card." };
+            throw new Error("Failed to delete card.");
         }
     });

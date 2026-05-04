@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useEventListener } from "usehooks-ts";
 
 export const BoardCanvas = ({
@@ -52,7 +52,7 @@ export const BoardCanvas = ({
         }
     }, [isModalVisible]);
 
-    const onKeyDown = (e: KeyboardEvent) => {
+    const onKeyDown = useCallback((e: KeyboardEvent) => {
         if (["INPUT", "TEXTAREA", "FORM"].includes((e.target as HTMLElement).tagName)) {
             return;
         }
@@ -63,12 +63,12 @@ export const BoardCanvas = ({
         } else if (e.key === " ") {
             console.log("Triggered 'Space' shortcut");
         }
-    };
+    }, []);
 
     useEventListener("keydown", onKeyDown);
 
 
-    const handleMouseDown = (e: React.MouseEvent) => {
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
         // Don't start drag if a modal is open
         if (isModalVisible) return;
 
@@ -93,21 +93,21 @@ export const BoardCanvas = ({
         if (!scrollContainerRef.current) return;
         startXRef.current = e.pageX - scrollContainerRef.current.offsetLeft;
         scrollLeftRef.current = scrollContainerRef.current.scrollLeft;
-    };
+    }, [isModalVisible]);
 
-    const handleMouseLeave = () => {
+    const handleMouseLeave = useCallback(() => {
         isDraggingRef.current = false;
         if (!isModalVisible) setCursorStyle("grab");
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
+    }, [isModalVisible]);
 
-    const handleMouseUp = () => {
+    const handleMouseUp = useCallback(() => {
         isDraggingRef.current = false;
         if (!isModalVisible) setCursorStyle("grab");
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
+    }, [isModalVisible]);
 
-    const handleMouseMove = (e: React.MouseEvent) => {
+    const handleMouseMove = useCallback((e: React.MouseEvent) => {
         if (!isDraggingRef.current || !scrollContainerRef.current || isModalVisible) return;
         e.preventDefault();
 
@@ -122,7 +122,7 @@ export const BoardCanvas = ({
             // Reversed direction: '+' instead of '-'
             scrollContainerRef.current.scrollLeft = scrollLeftRef.current + walkX;
         });
-    };
+    }, [isModalVisible]);
 
     const getCursorClass = () => {
         if (cursorStyle === "grabbing") return "cursor-grabbing";

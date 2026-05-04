@@ -59,10 +59,12 @@ export const importBoard = actionClient
                                     checklists: {
                                         create: card.checklists?.map(c => ({
                                             title: c.title,
+                                            createdAt: c.createdAt ? new Date(c.createdAt) : undefined,
                                             items: {
                                                 create: c.items.map(i => ({
                                                     title: i.title,
-                                                    isCompleted: i.isCompleted
+                                                    isCompleted: i.isCompleted,
+                                                    createdAt: i.createdAt ? new Date(i.createdAt) : undefined
                                                 }))
                                             }
                                         })) || []
@@ -95,6 +97,6 @@ export const importBoard = actionClient
             return board;
         } catch (error) {
             console.error("IMPORT ERROR", error);
-            return { error: "Failed to import board." };
+            throw new Error("Failed to import board.");
         }
     });

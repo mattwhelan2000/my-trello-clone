@@ -15,7 +15,7 @@ export const moveCard = actionClient
             });
 
             if (!targetList) {
-                return { error: "Target list not found on this board." };
+                throw new Error("Target list not found on this board.");
             }
 
             // Get the last card order in target list
@@ -38,6 +38,6 @@ export const moveCard = actionClient
             revalidatePath(`/board/${boardId}`);
             return card;
         } catch (error) {
-            return { error: "Failed to move card." };
+            throw new Error("Failed to move card.");
         }
     });

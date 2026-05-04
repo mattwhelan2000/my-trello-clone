@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Settings, Image as ImageIcon, Palette, X, Download, Info, LayoutList, CreditCard, AlertTriangle, CheckCircle2, Search, Filter, Tag, Trash, ChevronDown } from "lucide-react";
+import { Settings, Image as ImageIcon, Palette, X, Download, Info, LayoutList, CreditCard, AlertTriangle, CheckCircle2, Search, Filter, Tag, Trash, ChevronDown, Pencil, Check } from "lucide-react";
 import { useBoardStore } from "@/hooks/use-board-store";
 import { deleteLabelBatch } from "@/actions/delete-label-batch";
+import { updateLabelBatch } from "@/actions/update-label-batch";
 import { useRouter } from "next/navigation";
-import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
 import { exportBoard } from "@/actions/export-board";
@@ -15,7 +15,9 @@ import { updateListColors } from "@/actions/update-list-colors";
 import { bulkIngestImages } from "@/actions/bulk-ingest-images";
 import { migrateDriveUrls } from "@/actions/migrate-drive-urls";
 import { useToast } from "@/components/ui/Toast";
+import { formatImageUrl } from "@/lib/format-image-url";
 
+import { SnapshotSelector } from \"./SnapshotSelector\";
 interface BoardOptionsProps {
     boardId: string;
     listsCount: number;
@@ -98,11 +100,14 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         selectedLabels,
         setSelectedLabels,
         toggleLabelFilter,
+        searchInvert, 
+        setSearchInvert,
         isFilterEnabled,
         setIsFilterEnabled,
         uniqueLabels,
         visibleCardCount,
-        visibleListCount
+        visibleListCount,
+        visibleListIds
     } = useBoardStore();
 
 
@@ -112,6 +117,9 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isLabelFilterOpen, setIsLabelFilterOpen] = useState(false);
     const [labelToDelete, setLabelToDelete] = useState<string | null>(null);
+    const [editingLabel, setEditingLabel] = useState<{ oldTitle: string; title: string; color: string } | null>(null);
+    const labelColorInputRef = React.useRef<HTMLInputElement>(null);
+    const labelColorTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
     const { execute, isExecuting: isUpdatingBoard } = useSafeAction(updateBoard, {
         onSuccess: () => {},
@@ -120,7 +128,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     const { execute: executeExport, isExecuting: isExporting } = useSafeAction(exportBoard, {
         onSuccess: ({ data }) => {
-            if (data && !("error" in data) && data.title) {
+            if (data?.title) {
                 const jsonString = JSON.stringify(data, null, 2);
                 const blob = new Blob([jsonString], { type: "application/json" });
                 const href = URL.createObjectURL(blob);
@@ -139,7 +147,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     const { execute: executeExportCSV, isExecuting: isExportingCSV } = useSafeAction(exportBoard, {
         onSuccess: ({ data }) => {
-            if (data && !("error" in data) && data.title) {
+            if (data?.title) {
                 const csv = boardToCSV(data);
                 const blob = new Blob([csv], { type: "text/csv" });
                 const href = URL.createObjectURL(blob);
@@ -181,6 +189,26 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         }, 50);
     };
 
+    const handleLabelColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!editingLabel) return;
+        const newColor = e.target.value;
+        
+        // Update local state immediately for UI feedback
+        setEditingLabel({ ...editingLabel, color: newColor });
+
+        // Debounce the server update
+        if (labelColorTimeoutRef.current) clearTimeout(labelColorTimeoutRef.current);
+        
+        labelColorTimeoutRef.current = setTimeout(() => {
+            executeUpdateLabel({ 
+                boardId, 
+                oldTitle: editingLabel.oldTitle, 
+                newTitle: editingLabel.title, 
+                newColor 
+            });
+        }, 500);
+    };
+
     const onColorSelect = (color: string) => {
         execute({ id: boardId, bgColor: color, bgImage: "" });
     };
@@ -188,7 +216,8 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     const onImageSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!imageUrl) return;
-        execute({ id: boardId, bgImage: imageUrl, bgColor: "" });
+        const formattedUrl = formatImageUrl(imageUrl);
+        execute({ id: boardId, bgImage: formattedUrl, bgColor: "" });
     };
 
     const onSheetSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -236,7 +265,8 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     const { execute: executeUpdateListsColors, isExecuting: isUpdatingListsColors } = useSafeAction(updateListColors, {
         onSuccess: (data) => {
-            addToast("All list colors updated", "success");
+            const count = data.count || 0;
+            addToast(`${count} list colors updated`, "success");
             setIsOpen(false);
         },
         onError: (error) => {
@@ -329,6 +359,18 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         }
     });
 
+    const { execute: executeUpdateLabel, isExecuting: isUpdatingLabel } = useSafeAction(updateLabelBatch, {
+        onSuccess: ({ data }) => {
+            if (data && "success" in data) {
+                router.refresh();
+            }
+        },
+        onError: (error) => {
+            console.error(error);
+            addToast("Failed to update label", "error");
+        }
+    });
+
     const { execute: executeMigrate, isExecuting: isMigrating } = useSafeAction(migrateDriveUrls, {
         onSuccess: ({ data }) => {
             if (data && "count" in data) {
@@ -352,6 +394,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         <div className="absolute top-4 right-4 z-[50] flex items-center gap-x-2">
             {/* Search and Filter UI Relocated Here */}
             <div className="flex items-center gap-x-2 mr-2">
+                <SnapshotSelector boardId={boardId} />
                 {/* ShotGrid-style Label Filter Split Button */}
                 <div className="relative flex items-center shadow-lg">
                     <button
@@ -397,27 +440,93 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                                     uniqueLabels.map(label => (
                                         <div 
                                             key={`filter-${label.title}`}
-                                            className="px-3 py-2 hover:bg-neutral-100 cursor-pointer flex items-center justify-between group border-b border-neutral-50 last:border-0"
+                                            className="px-3 py-2 hover:bg-neutral-100 cursor-pointer border-b border-neutral-50 last:border-0 group"
                                         >
-                                            <div 
-                                                onClick={() => toggleLabelFilter(label.title)}
-                                                className="flex items-center gap-x-3 flex-1"
-                                            >
-                                                <div className={`h-4 w-4 rounded-md border transition flex items-center justify-center ${selectedLabels.has(label.title) ? 'bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-200' : 'bg-white border-neutral-300'}`}>
-                                                    {selectedLabels.has(label.title) && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                                            {editingLabel?.oldTitle === label.title ? (
+                                                <div className="flex flex-col gap-y-2 py-1" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center gap-x-2">
+                                                        <div 
+                                                            className="h-6 w-6 rounded-md border shadow-sm cursor-pointer hover:scale-105 transition"
+                                                            style={{ backgroundColor: editingLabel.color }}
+                                                            onClick={() => labelColorInputRef.current?.click()}
+                                                            title="Change Color"
+                                                        />
+                                                        <input 
+                                                            autoFocus
+                                                            className="flex-1 text-xs px-2 py-1 border rounded-md outline-none focus:ring-1 focus:ring-blue-500 font-bold uppercase"
+                                                            value={editingLabel.title}
+                                                            onChange={(e) => setEditingLabel({ ...editingLabel, title: e.target.value.toUpperCase() })}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter") {
+                                                                    executeUpdateLabel({ boardId, oldTitle: editingLabel.oldTitle, newTitle: editingLabel.title, newColor: editingLabel.color });
+                                                                    setEditingLabel(null);
+                                                                }
+                                                                if (e.key === "Escape") setEditingLabel(null);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-x-1 justify-end">
+                                                        <button 
+                                                            onClick={() => setEditingLabel(null)}
+                                                            className="p-1.5 rounded-md hover:bg-neutral-200 text-neutral-500 transition"
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                executeUpdateLabel({ boardId, oldTitle: editingLabel.oldTitle, newTitle: editingLabel.title, newColor: editingLabel.color });
+                                                                setEditingLabel(null);
+                                                            }}
+                                                            disabled={isUpdatingLabel}
+                                                            className="p-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition shadow-sm"
+                                                        >
+                                                            <Check className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-x-2">
-                                                    <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
-                                                    <span className={`text-xs ${selectedLabels.has(label.title) ? 'font-bold text-blue-700' : 'text-neutral-700'}`}>{label.title}</span>
+                                            ) : (
+                                                <div className="flex items-center justify-between">
+                                                    <div 
+                                                        onClick={() => toggleLabelFilter(label.title)}
+                                                        className="flex items-center gap-x-3 flex-1"
+                                                    >
+                                                        <div className={`h-4 w-4 rounded-md border transition flex items-center justify-center ${selectedLabels.has(label.title) ? 'bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-200' : 'bg-white border-neutral-300'}`}>
+                                                            {selectedLabels.has(label.title) && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
+                                                        </div>
+                                                        <div className="flex items-center gap-x-2">
+                                                            <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
+                                                            <span className={`text-xs ${selectedLabels.has(label.title) ? 'font-bold text-blue-700' : 'text-neutral-700'}`}>{label.title}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-x-1 opacity-0 group-hover:opacity-100 transition">
+                                                        <button 
+                                                            onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                setEditingLabel({ oldTitle: label.title, title: label.title, color: label.color });
+                                                                setTimeout(() => labelColorInputRef.current?.click(), 50);
+                                                            }}
+                                                            className="p-1 rounded-md hover:bg-neutral-200 transition"
+                                                            title="Change Color"
+                                                        >
+                                                            <div className="h-3.5 w-3.5 rounded-full border border-black/10 shadow-sm" style={{ backgroundColor: label.color }} />
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setEditingLabel({ oldTitle: label.title, title: label.title, color: label.color }); }}
+                                                            className="p-1.5 rounded-md hover:bg-blue-50 text-neutral-400 hover:text-blue-600 transition"
+                                                            title="Edit Label Name"
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setLabelToDelete(label.title); }}
+                                                            className="p-1.5 rounded-md hover:bg-red-50 text-neutral-400 hover:text-red-600 transition"
+                                                            title="Delete from Board"
+                                                        >
+                                                            <Trash className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); setLabelToDelete(label.title); }}
-                                                className="p-1.5 rounded-md hover:bg-red-50 text-neutral-300 hover:text-red-600 transition opacity-0 group-hover:opacity-100"
-                                                title="Delete from Board"
-                                            >
-                                                <Trash className="h-3.5 w-3.5" />
-                                            </button>
+                                            )}
                                         </div>
                                     ))
                                 )}
@@ -492,6 +601,15 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                                             className="h-3.5 w-3.5 rounded border-neutral-300 text-blue-600 focus:ring-blue-600"
                                         />
                                         <span className="text-[10px] font-bold text-neutral-600 group-hover:text-neutral-900 transition uppercase tracking-tighter">Lists</span>
+                                    </label>
+                                    <label className="flex items-center gap-x-2 cursor-pointer group text-neutral-800">
+                                        <input
+                                            type="checkbox"
+                                            checked={searchInvert}
+                                            onChange={(e) => setSearchInvert(e.target.checked)}
+                                            className="h-3.5 w-3.5 rounded border-neutral-300 text-red-600 focus:ring-red-600"
+                                        />
+                                        <span className="text-[10px] font-bold text-red-600 group-hover:text-red-700 transition uppercase tracking-tighter">Invert</span>
                                     </label>
                                 </div>
                             </div>
@@ -626,7 +744,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                             {currentListColors.map((color, idx) => (
                                 <button
                                     key={`list-${idx}`}
-                                    onClick={() => executeUpdateListsColors({ boardId, color })}
+                                    onClick={() => executeUpdateListsColors({ boardId, color, listIds: visibleListIds })}
                                     onContextMenu={(e) => handleContextMenu(e, 'list', idx)}
                                     className="h-8 w-full rounded-sm hover:opacity-80 transition cursor-pointer border border-black/10 shadow-sm"
                                     style={{ backgroundColor: color }}
@@ -635,15 +753,6 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                             ))}
                         </div>
                     </div>
-
-                    <input 
-                        type="color" 
-                        ref={colorInputRef} 
-                        onChange={handleColorChange} 
-                        className="sr-only" 
-                        tabIndex={-1} 
-                        value={editingSwatch ? (editingSwatch.type === 'bg' ? currentBgColors[editingSwatch.index] : currentListColors[editingSwatch.index]) : "#ffffff"} 
-                    />
 
                     <div>
                         <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><ImageIcon className="h-3 w-3" /> Image URL</h4>
@@ -837,6 +946,22 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                     </div>
                 </div>
             )}
+            <input 
+                type="color" 
+                ref={colorInputRef} 
+                onChange={handleColorChange} 
+                className="sr-only" 
+                tabIndex={-1} 
+                value={editingSwatch ? (editingSwatch.type === 'bg' ? currentBgColors[editingSwatch.index] : currentListColors[editingSwatch.index]) : "#ffffff"} 
+            />
+
+            <input 
+                type="color"
+                ref={labelColorInputRef}
+                onChange={handleLabelColorChange}
+                className="sr-only"
+                value={editingLabel?.color || "#3b82f6"}
+            />
         </div>
     );
 };

@@ -152,6 +152,6 @@ export const bulkIngestImages = actionClient
             return { count: ingestedCount };
         } catch (error: any) {
             console.error("[BulkIngest] Fatal Error:", error);
-            return { error: error.message || "Failed to process folder." };
+            throw new Error(error.message || "Failed to process folder.");
         }
     });

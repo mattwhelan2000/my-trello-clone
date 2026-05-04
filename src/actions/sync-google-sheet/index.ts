@@ -23,15 +23,15 @@ export const syncGoogleSheet = actionClient
             });
 
             if (!board) {
-                return { error: "Board not found." };
+                throw new Error("Board not found.");
             }
 
             if (!board.googleSheetId) {
-                return { error: "No Google Sheet linked to this board. Please link a Sheet ID in the Board Settings." };
+                throw new Error("No Google Sheet linked to this board. Please link a Sheet ID in the Board Settings.");
             }
 
             if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON && !process.env.GOOGLE_API_KEY) {
-                return { error: "Server is missing GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_API_KEY environment variables." };
+                throw new Error("Server is missing GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_API_KEY environment variables.");
             }
 
             let authClient: any;
@@ -53,7 +53,7 @@ export const syncGoogleSheet = actionClient
                     });
                 } catch (err) {
                     console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON", err);
-                    return { error: "Failed to parse Google Service Account credentials. Check your .env file." };
+                    throw new Error("Failed to parse Google Service Account credentials. Check your .env file.");
                 }
             } else {
                 // Fallback to simple API key if provided instead
@@ -84,7 +84,7 @@ export const syncGoogleSheet = actionClient
             }
 
             if (!rows || rows.length === 0) {
-                return { error: "No data found in the linked Google Sheet." };
+                throw new Error("No data found in the linked Google Sheet.");
             }
 
             // Strict V8 Mapping Headers (11 Columns)
@@ -204,6 +204,6 @@ export const syncGoogleSheet = actionClient
             
         } catch (error: any) {
             console.error("Google Sheets Sync Error:", error);
-            return { error: "Failed to sync with Google Sheets. Please ensure the Sheet is 'Viewable by anyone with the link' and the ID is correct." };
+            throw new Error("Failed to sync with Google Sheets. Please ensure the Sheet is 'Viewable by anyone with the link' and the ID is correct.");
         }
     });

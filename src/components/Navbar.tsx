@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutDashboard, Plus, ChevronLeft, X, Camera } from "lucide-react";
+import { LayoutDashboard, Plus, ChevronLeft, X } from "lucide-react";
 import { useBoardStore } from "@/hooks/use-board-store";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
@@ -17,9 +17,6 @@ export const Navbar = () => {
     useEffect(() => {
         setIsMounted(true);
     }, []);
-    const { triggerSnapshotSave, triggerSnapshotLoad } = useBoardStore();
-
-    if (!isMounted) return null;
 
     const bgOpacityKey = boardId ? `board_bg_opacity_${boardId}` : null;
 
@@ -56,6 +53,8 @@ export const Navbar = () => {
             localStorage.setItem(bgOpacityKey, String(val));
         }
     }, [bgOpacityKey]);
+
+    if (!isMounted) return null;
 
     return (
         <nav className="fixed z-50 top-0 px-4 w-full h-14 border-b border-white/10 shadow-sm bg-black/60 backdrop-blur-sm flex items-center">
@@ -111,29 +110,6 @@ export const Navbar = () => {
                 )}
             </div>
             <div className="ml-auto flex items-center gap-x-3">
-                {isOnBoard && (
-                    <div className="flex items-center gap-x-1 mr-1">
-                        <button
-                            onClick={triggerSnapshotSave}
-                            title="Save Slim Mode Snapshot"
-                            className="flex flex-col items-center gap-y-0.5 p-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition group"
-                        >
-                            <Camera className="h-4 w-4" />
-                            <span className="text-[8px] font-bold uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition">Save</span>
-                        </button>
-                        <button
-                            onClick={triggerSnapshotLoad}
-                            title="Load Slim Mode Snapshot"
-                            className="flex flex-col items-center gap-y-0.5 p-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition border border-white/20 group"
-                        >
-                            <div className="relative">
-                                <Camera className="h-4 w-4" />
-                                <div className="absolute -top-1 -right-1 h-2 w-2 bg-blue-500 rounded-full border border-black/50" />
-                            </div>
-                            <span className="text-[8px] font-bold uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition">Load</span>
-                        </button>
-                    </div>
-                )}
 
                 {isOnBoard && (
                     <div className="flex items-center gap-x-2">

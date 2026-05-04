@@ -14,7 +14,7 @@ export const decloneCard = actionClient
             });
 
             if (!cardToDeclone || !cardToDeclone.syncGroupId) {
-                return { error: "Card is not cloned. Cannot declone." };
+                throw new Error("Card is not cloned. Cannot declone.");
             }
 
             const card = await db.card.update({
@@ -27,6 +27,6 @@ export const decloneCard = actionClient
             revalidatePath(`/board/${boardId}`);
             return card;
         } catch (error) {
-            return { error: "Failed to declone card." };
+            throw new Error("Failed to declone card.");
         }
     });

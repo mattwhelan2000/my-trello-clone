@@ -7,16 +7,22 @@ import { UpdateListColors } from "./schema";
 
 export const updateListColors = actionClient
     .schema(UpdateListColors)
-    .action(async ({ parsedInput: { boardId, color } }) => {
+    .action(async ({ parsedInput: { boardId, color, listIds } }) => {
         try {
+            const whereClause: any = { boardId };
+            
+            if (listIds && listIds.length > 0) {
+                whereClause.id = { in: listIds };
+            }
+
             const updatedLists = await db.list.updateMany({
-                where: { boardId },
+                where: whereClause,
                 data: { color },
             });
 
             revalidatePath(`/board/${boardId}`);
             return { count: updatedLists.count };
         } catch (error) {
-            return { error: "Failed to update list colors." };
+            throw new Error("Failed to update list colors.");
         }
     });

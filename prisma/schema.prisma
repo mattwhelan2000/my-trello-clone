@@ -28,6 +28,7 @@ model Board {
   textColorSwatches String[]
   googleSheetId String?
   lists         List[]
+  snapshots     BoardSnapshot[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -156,4 +157,16 @@ model Script {
   updatedAt   DateTime  @updatedAt
 
   @@index([workspaceId])
+}
+
+model BoardSnapshot {
+  id        String   @id @default(uuid())
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  title     String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([boardId])
 }

@@ -24,6 +24,6 @@ export const bulkUpdateCards = actionClient
             return { count: items.length };
         } catch (error) {
             console.error("BULK UPDATE ERROR", error);
-            return { error: "Failed to perform bulk update." };
+            throw new Error("Failed to perform bulk update.");
         }
     });

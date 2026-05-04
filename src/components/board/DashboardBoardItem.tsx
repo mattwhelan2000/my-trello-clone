@@ -7,6 +7,7 @@ import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
 import { deleteBoard } from "@/actions/delete-board";
 import { Board } from "@prisma/client";
+import { formatImageUrl } from "@/lib/format-image-url";
 
 interface DashboardBoardItemProps {
     board: Board;
@@ -74,7 +75,7 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
             >
                 {board.bgImage && (
                     <img
-                        src={board.bgImage}
+                        src={formatImageUrl(board.bgImage)!}
                         alt=""
                         referrerPolicy="no-referrer"
                         crossOrigin="anonymous"
@@ -167,7 +168,7 @@ export const DashboardBoardItem = ({ board }: DashboardBoardItemProps) => {
                                     {board.bgImage && (
                                         <div className="w-full h-12 rounded-sm border overflow-hidden relative" style={{ backgroundColor: board.bgColor || "white" }}>
                                             <img
-                                                src={board.bgImage}
+                                                src={formatImageUrl(board.bgImage)!}
                                                 alt=""
                                                 referrerPolicy="no-referrer"
                                                 crossOrigin="anonymous"

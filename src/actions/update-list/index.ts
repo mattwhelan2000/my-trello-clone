@@ -22,6 +22,6 @@ export const updateList = actionClient
             revalidatePath(`/board/${boardId}`);
             return list;
         } catch (error) {
-            return { error: "Failed to update list." };
+            throw new Error("Failed to update list.");
         }
     });

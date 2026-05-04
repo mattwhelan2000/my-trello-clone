@@ -18,7 +18,7 @@ export const instanceCard = actionClient
                     checklists: { include: { items: true } } 
                 },
             });
-            if (!sourceCard) return { error: "Source card not found" };
+            if (!sourceCard) throw new Error("Source card not found");
 
             // 2. Ensure syncGroupId exists
             let syncGroupId = sourceCard.syncGroupId;
@@ -119,6 +119,6 @@ export const instanceCard = actionClient
             return { success: true, count: results.length };
         } catch (error: any) {
             console.error("[InstanceCard] Error:", error);
-            return { error: "Failed to instance card." };
+            throw new Error("Failed to instance card.");
         }
     });

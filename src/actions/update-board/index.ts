@@ -37,6 +37,6 @@ export const updateBoard = actionClient
             revalidatePath(`/`); // Revalidate dashboard list as well
             return board;
         } catch (error) {
-            return { error: "Failed to update board background." };
+            throw new Error("Failed to update board background.");
         }
     });

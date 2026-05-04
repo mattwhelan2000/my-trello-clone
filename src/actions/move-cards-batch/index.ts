@@ -74,6 +74,6 @@ export const moveCardsBatch = actionClient
             return { success: true, count: ids.length, boardId };
         } catch (error: any) {
             console.error("[MoveCardsBatch] Fatal Error:", error);
-            return { error: error.message || "Failed to move cards." };
+            throw new Error(error.message || "Failed to move cards.");
         }
     });

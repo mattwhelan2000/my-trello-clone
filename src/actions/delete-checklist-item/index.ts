@@ -15,6 +15,6 @@ export const deleteChecklistItem = actionClient
             revalidatePath(`/board/${boardId}`);
             return checklistItem;
         } catch (error) {
-            return { error: "Failed to delete checklist item." };
+            throw new Error("Failed to delete checklist item.");
         }
     });

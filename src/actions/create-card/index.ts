@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { actionClient } from "@/lib/create-safe-action";
 import { CreateCardSchema } from "./schema";
+import { formatImageUrl } from "@/lib/format-image-url";
 
 /**
  * Checks if a string is a valid URL
@@ -45,17 +46,7 @@ function getYoutubeVideoId(url: string): string | null {
  * Converts Dropbox share links to direct download links
  */
 function getDropboxDirectUrl(url: string): string {
-    try {
-        const urlObj = new URL(url);
-        if (urlObj.hostname.includes('dropbox.com')) {
-            urlObj.searchParams.set('raw', '1');
-            urlObj.searchParams.delete('dl');
-            return urlObj.toString();
-        }
-        return url;
-    } catch {
-        return url;
-    }
+    return formatImageUrl(url) || url;
 }
 
 /**
@@ -186,7 +177,7 @@ export const createCard = actionClient
             });
 
             if (!list) {
-                return { error: "List not found" };
+                throw new Error("List not found");
             }
 
             const lastCard = await db.card.findFirst({
@@ -283,6 +274,6 @@ export const createCard = actionClient
             revalidatePath(`/board/${boardId}`);
             return card;
         } catch (error) {
-            return { error: "Failed to create card." };
+            throw new Error("Failed to create card.");
         }
     });

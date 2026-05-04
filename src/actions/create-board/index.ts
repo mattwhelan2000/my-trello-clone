@@ -35,6 +35,6 @@ export const createBoard = actionClient
 
             return board;
         } catch (error) {
-            return { error: "Failed to create board." };
+            throw new Error("Failed to create board.");
         }
     });

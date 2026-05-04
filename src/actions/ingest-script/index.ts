@@ -12,7 +12,7 @@ export const ingestScriptAction = actionClient
         try {
             const file = formData.get("file") as File;
             if (!file) {
-                return { error: "No PDF file uploaded" };
+                throw new Error("No PDF file uploaded");
             }
 
             const arrayBuffer = await file.arrayBuffer();

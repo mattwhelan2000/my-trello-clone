@@ -14,7 +14,7 @@ export const updateCard = actionClient
                 select: { syncGroupId: true }
             });
 
-            if (!existingCard) return { error: "Card not found" };
+            if (!existingCard) throw new Error("Card not found");
 
             const dataToUpdate = {
                 ...(title !== undefined && { title }),
@@ -46,6 +46,6 @@ export const updateCard = actionClient
             revalidatePath(`/board/${boardId}`);
             return card;
         } catch (error) {
-            return { error: "Failed to update card." };
+            throw new Error("Failed to update card.");
         }
     });

@@ -30,8 +30,8 @@ export const pushGoogleSheet = actionClient
                 }
             });
 
-            if (!board) return { error: "Board not found." };
-            if (!board.googleSheetId) return { error: "No Google Sheet linked." };
+            if (!board) throw new Error("Board not found.");
+            if (!board.googleSheetId) throw new Error("No Google Sheet linked.");
 
             let authClient: any;
             if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
@@ -47,7 +47,7 @@ export const pushGoogleSheet = actionClient
                         scopes: ['https://www.googleapis.com/auth/spreadsheets'], // Write access required
                     });
                 } catch (err) {
-                    return { error: "Failed to parse Google Service Account credentials." };
+                    throw new Error("Failed to parse Google Service Account credentials.");
                 }
             } else {
                 authClient = process.env.GOOGLE_API_KEY;
@@ -291,8 +291,8 @@ export const pushGoogleSheet = actionClient
         } catch (error: any) {
             console.error("Google Sheets Push Error:", error);
             if (error?.message?.includes('permission')) {
-                 return { error: "Permission denied. Ensure the service account email is added as an 'Editor'." };
+                 throw new Error("Permission denied. Ensure the service account email is added as an 'Editor'.");
             }
-            return { error: "Failed to push to Google Sheet. Check server logs." };
+            throw new Error("Failed to push to Google Sheet. Check server logs.");
         }
     });

@@ -23,6 +23,6 @@ export const updateAttachmentCover = actionClient
             revalidatePath(`/board/${boardId}`);
             return attachment;
         } catch (error) {
-            return { error: "Failed to update attachment cover." };
+            throw new Error("Failed to update attachment cover.");
         }
     });

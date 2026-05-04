@@ -15,6 +15,6 @@ export const deleteBoard = actionClient
             revalidatePath("/");
             return board;
         } catch (error) {
-            return { error: "Failed to delete board." };
+            throw new Error("Failed to delete board.");
         }
     });

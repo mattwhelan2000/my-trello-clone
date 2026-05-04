@@ -15,7 +15,8 @@ import {
     Layout,
     AlertTriangle,
     CheckCircle2,
-    Move
+    Move,
+    Palette
 } from "lucide-react";
 
 import { useAction } from "next-safe-action/hooks";
@@ -51,6 +52,10 @@ export const BatchCardPropertiesModal = ({
     const [displayThumbnails, setDisplayThumbnails] = useState<boolean | null>(null);
     const [isSlim, setIsSlim] = useState<boolean | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    
+    // Appearance state
+    const [cardColor, setCardColor] = useState<string>("");
+    const [fontColor, setFontColor] = useState<string>("#ffffff");
 
     const { execute, isExecuting: isLoading } = useAction(updateCardsBatch, {
         onSuccess: ({ data }) => {
@@ -142,7 +147,7 @@ export const BatchCardPropertiesModal = ({
                                         const isSelected = Array.from(selectedLabels).some(l => l.title === label.title && l.color === label.color);
                                         return (
                                             <button
-                                                key={label.title}
+                                                key={`${label.title}-${label.color}`}
                                                 onClick={() => toggleLabel(label)}
                                                 className={`text-[10px] font-bold px-2 py-1 rounded border transition flex items-center gap-x-1.5 ${isSelected ? 'ring-2 ring-indigo-500 border-indigo-500 bg-white' : 'bg-white/50 border-neutral-200 hover:border-neutral-300'}`}
                                             >
@@ -196,6 +201,57 @@ export const BatchCardPropertiesModal = ({
 
                     {/* Right Column: Actions */}
                     <div className="space-y-6">
+                        {/* Appearance Settings */}
+                        <div>
+                            <div className="flex items-center gap-x-2 mb-2">
+                                <Palette className="h-4 w-4 text-neutral-500" />
+                                <h3 className="text-sm font-bold text-neutral-700 uppercase tracking-wider">Appearance</h3>
+                            </div>
+                            <div className="bg-neutral-50 p-3 rounded-lg border space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Background Color</label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="color" 
+                                            value={cardColor || "#ffffff"} 
+                                            onChange={(e) => setCardColor(e.target.value)}
+                                            className="h-8 w-12 cursor-pointer rounded border-0 p-0 bg-transparent"
+                                        />
+                                        <button 
+                                            onClick={() => setCardColor("")}
+                                            className="text-[10px] bg-neutral-200 hover:bg-neutral-300 px-2 py-1 rounded transition"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Text Color</label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="color" 
+                                            value={fontColor} 
+                                            onChange={(e) => setFontColor(e.target.value)}
+                                            className="h-8 w-12 cursor-pointer rounded border-0 p-0 bg-transparent"
+                                        />
+                                        <button 
+                                            onClick={() => setFontColor("")}
+                                            className="text-[10px] bg-neutral-200 hover:bg-neutral-300 px-2 py-1 rounded transition"
+                                        >
+                                            Auto
+                                        </button>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => onApply({ color: cardColor, fontColor: fontColor })}
+                                    disabled={isLoading}
+                                    className="w-full bg-neutral-900 text-white text-[10px] font-bold py-2 rounded-md hover:bg-black transition"
+                                >
+                                    APPLY COLORS
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Display Controls */}
                         <div>
                             <div className="flex items-center gap-x-2 mb-2">

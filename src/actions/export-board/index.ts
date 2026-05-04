@@ -20,6 +20,7 @@ export const exportBoard = actionClient
                                     attachments: true,
                                     labels: true,
                                     checklists: {
+                                        orderBy: { createdAt: "asc" },
                                         include: {
                                             items: {
                                                 orderBy: { createdAt: "asc" }
@@ -35,11 +36,11 @@ export const exportBoard = actionClient
             });
 
             if (!board) {
-                return { error: "Board not found" };
+                throw new Error("Board not found");
             }
 
             return board;
         } catch (error) {
-            return { error: "Failed to export board." };
+            throw new Error("Failed to export board.");
         }
     });

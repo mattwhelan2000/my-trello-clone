@@ -13,7 +13,7 @@ export const cloneCard = actionClient
                 where: { id },
                 include: { attachments: true, checklists: { include: { items: true } } },
             });
-            if (!cardToCopy) return { error: "Card not found" };
+            if (!cardToCopy) throw new Error("Card not found");
 
             let syncGroupId = cardToCopy.syncGroupId;
             if (!syncGroupId) {
@@ -79,6 +79,6 @@ export const cloneCard = actionClient
             revalidatePath(`/board/${boardId}`);
             return card;
         } catch (error) {
-            return { error: "Failed to clone card." };
+            throw new Error("Failed to clone card.");
         }
     });

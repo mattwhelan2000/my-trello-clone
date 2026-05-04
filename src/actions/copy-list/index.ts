@@ -18,7 +18,7 @@ export const copyList = actionClient
                     }
                 },
             });
-            if (!listToCopy) return { error: "List not found" };
+            if (!listToCopy) throw new Error("List not found");
 
             const newOrder = listToCopy.order + 1;
 
@@ -96,6 +96,6 @@ export const copyList = actionClient
             return list;
         } catch (error) {
             console.error("copyList error:", error);
-            return { error: "Failed to copy list." };
+            throw new Error("Failed to copy list.");
         }
     });

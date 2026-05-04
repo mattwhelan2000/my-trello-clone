@@ -6,7 +6,6 @@ import { createPortal } from "react-dom";
 import { useEventListener, useOnClickOutside } from "usehooks-ts";
 import { Palette, X, GripHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "@/hooks/use-action";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
 import { updateList } from "@/actions/update-list";
@@ -15,6 +14,9 @@ import { deleteList } from "@/actions/delete-list";
 import { copyList } from "@/actions/copy-list";
 import { pasteList } from "@/actions/paste-list";
 import { pasteCard } from "@/actions/paste-card";
+import { ImportCardsModal } from "../modals/ImportCardsModal";
+import { CopyCardsModal } from "../modals/CopyCardsModal";
+import { Copy, FileJson } from "lucide-react";
 
 export const ListItem = ({
     data,
@@ -28,6 +30,7 @@ export const ListItem = ({
     onMoveCard,
     isFirst,
     isLast,
+    searchInvert = false,
     selectedLabels = new Set(),
 }: {
     data: any;
@@ -35,9 +38,10 @@ export const ListItem = ({
     searchQuery?: string;
     searchCards?: boolean;
     searchLists?: boolean;
+    searchInvert?: boolean;
     listColorSwatches?: string[];
     textColorSwatches?: string[];
-    onMoveList?: (listId: string, direction: 'left' | 'right') => void;
+    onMoveList?: (listId: string, direction: 'left' | 'right' | 'position', newPosition?: number) => void;
     onMoveCard?: (cardId: string, listId: string, action: 'up' | 'down' | 'position', newPosition?: number) => void;
     isFirst?: boolean;
     isLast?: boolean;
@@ -64,6 +68,10 @@ export const ListItem = ({
     const [isResizing, setIsResizing] = useState(false);
 
     useEffect(() => { setMounted(true); }, []);
+    const [isMovingList, setIsMovingList] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isCopyCardsModalOpen, setIsCopyCardsModalOpen] = useState(false);
+    const moveInputRef = useRef<HTMLInputElement>(null);
     const resizeStartY = useRef(0);
     const resizeStartHeight = useRef(600);
     const router = useRouter();
@@ -133,7 +141,7 @@ export const ListItem = ({
     const [editingSwatch, setEditingSwatch] = useState<{ type: 'list' | 'text', index: number } | null>(null);
     const colorInputRef = useRef<HTMLInputElement>(null);
 
-    const { execute: executeUpdateBoard } = useAction(updateBoard, {
+    const { execute: executeUpdateBoard } = useSafeAction(updateBoard, {
         onError: (error) => console.error(error)
     });
 
@@ -171,20 +179,21 @@ export const ListItem = ({
         }
     });
 
-    const { execute: executeCreateCard, isLoading: isCardLoading } = useAction(createCard, {
+    const { execute: executeCreateCard, isExecuting: isCardLoading } = useSafeAction(createCard, {
         onSuccess: () => {
             disableCardEditing();
-            router.refresh();
+            addToast("Card created", "success");
         },
         onError: (error) => {
             console.error(error);
+            addToast("Failed to create card", "error");
         }
     });
 
-    const { execute: executeDeleteList } = useAction(deleteList, { onSuccess: () => router.refresh() });
-    const { execute: executeCopyList } = useAction(copyList, { onSuccess: () => router.refresh() });
-    const { execute: executePasteList } = useAction(pasteList, { onSuccess: () => router.refresh() });
-    const { execute: executePasteCard } = useAction(pasteCard, { onSuccess: () => router.refresh() });
+    const { execute: executeDeleteList } = useSafeAction(deleteList, { onSuccess: () => addToast("List deleted", "success") });
+    const { execute: executeCopyList } = useSafeAction(copyList, { onSuccess: () => addToast("List copied", "success") });
+    const { execute: executePasteList } = useSafeAction(pasteList, { onSuccess: () => addToast("List pasted", "success") });
+    const { execute: executePasteCard } = useSafeAction(pasteCard, { onSuccess: () => addToast("Card pasted", "success") });
 
     const enableEditing = () => {
         setIsEditing(true);
@@ -304,6 +313,17 @@ export const ListItem = ({
 
     const handleMenuClose = () => {
         setContextMenu(null);
+        setIsMovingList(false);
+    };
+
+    const onMoveSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const value = parseInt(moveInputRef.current?.value || "");
+        if (!isNaN(value) && onMoveList) {
+            onMoveList(data.id, 'position', value);
+            setIsMovingList(false);
+            handleMenuClose();
+        }
     };
 
     const onDeleteList = () => {
@@ -501,11 +521,31 @@ export const ListItem = ({
                             style={{ top: contextMenu.y, left: contextMenu.x }}
                         >
                             <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 border-b border-neutral-800 mb-1 uppercase tracking-wider">List Actions</span>
-                            {!isFirst && onMoveList && (
-                                <button onClick={(e) => { e.stopPropagation(); onMoveList(data.id, 'left'); handleMenuClose(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-blue-400 font-medium">Move List Left</button>
-                            )}
-                            {!isLast && onMoveList && (
-                                <button onClick={(e) => { e.stopPropagation(); onMoveList(data.id, 'right'); handleMenuClose(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-blue-400 font-medium">Move List Right</button>
+                            {onMoveList && (
+                                <div className="px-3 py-1.5 border-b border-neutral-800/50 mb-1">
+                                    {!isMovingList ? (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setIsMovingList(true); setTimeout(() => moveInputRef.current?.focus(), 50); }} 
+                                            className="w-full text-left py-1 text-blue-400 font-bold hover:text-blue-300 transition flex items-center justify-between"
+                                        >
+                                            Move List
+                                            <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300">Pos: {index + 1}</span>
+                                        </button>
+                                    ) : (
+                                        <form onSubmit={onMoveSubmit} onClick={(e) => e.stopPropagation()} className="flex items-center gap-x-2 py-1">
+                                            <input 
+                                                ref={moveInputRef}
+                                                type="number" 
+                                                min="1"
+                                                defaultValue={index + 1}
+                                                className="w-16 bg-[#2a2a2a] border border-neutral-700 rounded px-2 py-1 text-xs outline-none focus:border-blue-500 transition"
+                                                onKeyDown={(e) => { if (e.key === "Escape") setIsMovingList(false); }}
+                                            />
+                                            <button type="submit" className="bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-[10px] font-bold transition">Go</button>
+                                            <button type="button" onClick={() => setIsMovingList(false)} className="text-neutral-500 hover:text-neutral-300"><X className="h-3 w-3" /></button>
+                                        </form>
+                                    )}
+                                </div>
                             )}
                             <button onClick={(e) => { e.stopPropagation(); onDeleteList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-red-500 font-medium">Delete List</button>
                             <button onClick={(e) => { e.stopPropagation(); onDuplicateList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Duplicate List</button>
@@ -513,6 +553,15 @@ export const ListItem = ({
                             <button onClick={(e) => { e.stopPropagation(); onCopyList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Copy List</button>
                             <button onClick={(e) => { e.stopPropagation(); onPasteList(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste List</button>
                             <button onClick={(e) => { e.stopPropagation(); onPasteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste Card Here</button>
+                            <div className="border-t border-neutral-800 my-1"></div>
+                            <button onClick={(e) => { e.stopPropagation(); setIsImportModalOpen(true); handleMenuClose(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition flex items-center gap-x-2 text-blue-400">
+                                <FileJson className="h-3.5 w-3.5" />
+                                Import Card(s) JSON
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); setIsCopyCardsModalOpen(true); handleMenuClose(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition flex items-center gap-x-2 text-purple-400">
+                                <Copy className="h-3.5 w-3.5" />
+                                Copy Cards (JSON)
+                            </button>
                         </div>
                     </div>,
                     document.body
@@ -522,15 +571,27 @@ export const ListItem = ({
                 <ol className="mx-1 px-1 py-2 flex flex-col gap-y-2 mt-2 min-h-[2px] flex-1 overflow-y-scroll">
                     {data.cards.map((card: any, idx: number) => {
                         // 1. Label Filter Check
-                        const matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
+                        let matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
                         
                         // 2. Search Filter Check
-                        const matchesCardSearch = !searchQuery.trim() || isListMatched || (searchCards && (
-                            card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            (card.description && card.description.toLowerCase().includes(searchQuery.toLowerCase()))
-                        ));
+                        const query = (searchQuery || "").trim().toLowerCase();
+                        const terms = query.split(',').map(t => t.trim()).filter(t => t !== "");
+                        const isListMatched = (terms.length > 0 && searchLists && terms.every(term => data.title.toLowerCase().includes(term))) || false;
+                        
+                        let matchesCardSearch = true;
+                        if (terms.length > 0) {
+                            const isCardMatch = searchCards && terms.every(term => 
+                                card.title.toLowerCase().includes(term) ||
+                                (card.description && card.description.toLowerCase().includes(term))
+                            );
+                            matchesCardSearch = isListMatched || isCardMatch;
+                        }
 
-                        const isVisible = matchesLabels && matchesCardSearch;
+                        let isVisible = matchesLabels && matchesCardSearch;
+                        
+                        if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
+                            isVisible = !isVisible;
+                        }
 
                         return (
                             <div key={card.id} style={{ display: isVisible ? 'block' : 'none' }}>
@@ -586,6 +647,23 @@ export const ListItem = ({
                     </div>
                 </div>
             </div>
+            {isImportModalOpen && (
+                <ImportCardsModal 
+                    boardId={data.boardId}
+                    listId={data.id}
+                    isOpen={isImportModalOpen}
+                    onClose={() => setIsImportModalOpen(false)}
+                />
+            )}
+
+            {isCopyCardsModalOpen && (
+                <CopyCardsModal 
+                    listTitle={data.title}
+                    cards={data.cards}
+                    isOpen={isCopyCardsModalOpen}
+                    onClose={() => setIsCopyCardsModalOpen(false)}
+                />
+            )}
         </li>
     );
 };

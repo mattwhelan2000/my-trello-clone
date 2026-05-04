@@ -17,25 +17,39 @@ export const createLabel = actionClient
             if (card?.syncGroupId) {
                 const syncedCards = await db.card.findMany({
                     where: { syncGroupId: card.syncGroupId },
-                    select: { id: true }
+                    select: { 
+                        id: true,
+                        labels: {
+                            where: { title, color }
+                        }
+                    }
                 });
 
-                await db.label.createMany({
-                    data: syncedCards.map(c => ({
-                        cardId: c.id,
-                        title,
-                        color
-                    })),
-                    skipDuplicates: true
-                });
+                const cardsWithoutLabel = syncedCards.filter(c => c.labels.length === 0);
+
+                if (cardsWithoutLabel.length > 0) {
+                    await db.label.createMany({
+                        data: cardsWithoutLabel.map(c => ({
+                            cardId: c.id,
+                            title,
+                            color
+                        }))
+                    });
+                }
             } else {
-                await db.label.create({
-                    data: { cardId, title, color },
+                const existing = await db.label.findFirst({
+                    where: { cardId, title, color }
                 });
+
+                if (!existing) {
+                    await db.label.create({
+                        data: { cardId, title, color },
+                    });
+                }
             }
             revalidatePath(`/board/${boardId}`);
             return { success: true };
         } catch (error) {
-            return { error: "Failed to create label." };
+            throw new Error("Failed to create label.");
         }
     });

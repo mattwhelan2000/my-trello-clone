@@ -61,7 +61,7 @@ export const deleteCards = actionClient
                 return { success: true, count: result.count };
             } catch (innerError: any) {
                 console.error("[DeleteCards] Fallback Error:", innerError);
-                return { error: "Failed to delete cards. Some cards might have dependencies." };
+                throw new Error("Failed to delete cards. Some cards might have dependencies.");
             }
         }
     });

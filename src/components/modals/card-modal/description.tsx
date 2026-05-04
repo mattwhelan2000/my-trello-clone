@@ -5,8 +5,9 @@ import { AlignLeft } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useEventListener, useOnClickOutside } from "usehooks-ts";
-import { useAction } from "@/hooks/use-action";
+import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateCardDescription } from "@/actions/update-card-description";
+import { useToast } from "@/components/ui/Toast";
 import MDEditor from "@uiw/react-md-editor";
 
 interface DescriptionProps {
@@ -21,12 +22,15 @@ export const Description = ({ data, boardId }: DescriptionProps) => {
     const formRef = useRef<ElementRef<"form">>(null);
     const textareaRef = useRef<ElementRef<"textarea">>(null);
 
-    const { execute, fieldErrors } = useAction(updateCardDescription, {
-        onSuccess: (data) => {
+    const { addToast } = useToast();
+    const { execute, isExecuting: isLoading } = useSafeAction(updateCardDescription, {
+        onSuccess: () => {
+            addToast("Description updated", "success");
             disableEditing();
         },
         onError: (error) => {
             console.error(error);
+            addToast("Failed to update description", "error");
         }
     });
 
@@ -84,7 +88,13 @@ export const Description = ({ data, boardId }: DescriptionProps) => {
                             />
                         </div>
                         <div className="flex items-center gap-x-2 mt-2">
-                            <button type="submit" className="bg-blue-600 text-white rounded-md text-sm font-medium px-4 py-2 hover:bg-blue-700 transition">Save</button>
+                            <button 
+                                type="submit" 
+                                disabled={isLoading}
+                                className="bg-blue-600 text-white rounded-md text-sm font-medium px-4 py-2 hover:bg-blue-700 transition disabled:opacity-50"
+                            >
+                                {isLoading ? "Saving..." : "Save"}
+                            </button>
                             <button type="button" onClick={disableEditing} className="px-3 py-2 text-sm hover:bg-neutral-100 rounded-md">Cancel</button>
                         </div>
                     </form>

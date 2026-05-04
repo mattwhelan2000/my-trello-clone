@@ -19,6 +19,6 @@ export const createChecklistItem = actionClient
             revalidatePath(`/board/${boardId}`);
             return item;
         } catch (error) {
-            return { error: "Failed to create checklist item." };
+            throw new Error("Failed to create checklist item.");
         }
     });

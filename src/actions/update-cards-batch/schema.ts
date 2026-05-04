@@ -14,4 +14,6 @@ export const UpdateCardsBatchSchema = z.object({
   displayThumbnails: z.boolean().optional().nullable(),
   isSlim: z.boolean().optional().nullable(),
   addChecklist: z.boolean().optional(),
+  color: z.string().optional().nullable(),
+  fontColor: z.string().optional().nullable(),
 });

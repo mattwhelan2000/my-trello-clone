@@ -26,7 +26,8 @@ export const addLabelsBatch = actionClient
                             title: {
                                 equals: labelTitle,
                                 mode: 'insensitive'
-                            }
+                            },
+                            color: labelColor
                         },
                         select: { cardId: true }
                     });
@@ -66,6 +67,6 @@ export const addLabelsBatch = actionClient
             return { success: true, count: cardIds.length };
         } catch (error: any) {
             console.error("[AddLabelsBatch] Fatal Error:", error);
-            return { error: error.message || "Failed to add labels." };
+            throw new Error(error.message || "Failed to add labels.");
         }
     });

@@ -2,9 +2,8 @@
 
 import { List } from "@prisma/client";
 import { ListItem } from "./ListItem";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useAction } from "@/hooks/use-action";
 import { updateListOrder, updateCardOrder } from "@/actions/update-order";
 import { createList } from "@/actions/create-list";
 import { useRef, ElementRef } from "react";
@@ -59,6 +58,10 @@ export const ListContainer = ({
     useEffect(() => {
         setIsMounted(true);
     }, []);
+
+    useEffect(() => {
+        setOrderedData(data);
+    }, [data]);
     
     // Use Global Board Store
     const { 
@@ -68,6 +71,7 @@ export const ListContainer = ({
         setSearchCards,
         searchLists, 
         setSearchLists,
+        searchInvert,
         selectedLabels, 
         isFilterEnabled, 
         setIsFilterEnabled,
@@ -79,37 +83,41 @@ export const ListContainer = ({
         setVisibleCardCount,
         visibleListCount,
         setVisibleListCount,
-        snapshotSaveTrigger,
-        snapshotLoadTrigger
+        visibleListIds,
+        setVisibleListIds,
     } = useBoardStore();
 
+    const { addToast } = useToast();
+    const router = useRouter();
     const searchQuery = query;
     const setSearchQuery = setQuery;
 
-    const { execute: executeBulkUpdate } = useAction(bulkUpdateCards, {
-        onSuccess: (data) => {
-            addToast(`Snapshot applied to ${data.count} cards`, "success");
+    const { execute: executeBulkUpdate } = useSafeAction(bulkUpdateCards, {
+        onSuccess: ({ data }) => {
+            if (data?.count) addToast(`Successfully updated ${data.count} cards`, "success");
         },
         onError: (error) => {
-            addToast("Failed to apply snapshot", "error");
+            addToast("Failed to bulk update cards", "error");
         }
     });
 
-    const { execute: executeUpdateListOrder, isLoading: isLoadingList } = useAction(updateListOrder, {
+    const { execute: executeUpdateListOrder, isExecuting: isLoadingList } = useSafeAction(updateListOrder, {
         onSuccess: () => {
             addToast("List reordered", "success");
+            router.refresh();
         },
         onError: (error) => {
-            addToast(error, "error");
+            addToast("Failed to reorder lists", "error");
         }
     });
 
-    const { execute: executeUpdateCardOrder, isLoading: isLoadingCard } = useAction(updateCardOrder, {
+    const { execute: executeUpdateCardOrder, isExecuting: isLoadingCard } = useSafeAction(updateCardOrder, {
         onSuccess: () => {
             addToast("Card reordered", "success");
+            router.refresh();
         },
         onError: (error) => {
-            addToast(error, "error");
+            addToast("Failed to reorder cards", "error");
         }
     });
 
@@ -145,119 +153,8 @@ export const ListContainer = ({
 
 
 
-    // Save Snapshot Logic
-    useEffect(() => {
-        if (snapshotSaveTrigger === 0) return;
 
-        const snapshot: Record<string, boolean> = {};
-        orderedData.forEach(list => {
-            list.cards.forEach(card => {
-                const key = `${card.title}::${list.title}`;
-                snapshot[key] = card.isSlim;
-            });
-        });
-
-        localStorage.setItem(`snapshot_slim_${boardId}`, JSON.stringify(snapshot));
-        addToast("Slim Mode Snapshot saved locally", "success");
-    }, [snapshotSaveTrigger, orderedData, boardId, addToast]);
-
-    // Load Snapshot Logic
-    useEffect(() => {
-        if (snapshotLoadTrigger === 0) return;
-
-        const saved = localStorage.getItem(`snapshot_slim_${boardId}`);
-        if (!saved) {
-            addToast("No snapshot found for this board", "error");
-            return;
-        }
-
-        const snapshot = JSON.parse(saved);
-        const updates: { id: string, isSlim: boolean }[] = [];
-
-        orderedData.forEach(list => {
-            list.cards.forEach(card => {
-                const key = `${card.title}::${list.title}`;
-                if (snapshot[key] !== undefined && snapshot[key] !== card.isSlim) {
-                    updates.push({ id: card.id, isSlim: snapshot[key] });
-                }
-            });
-        });
-
-        if (updates.length > 0) {
-            executeBulkUpdate({ boardId, items: updates });
-            
-            // Optimistic update
-            setOrderedData(prev => prev.map(list => ({
-                ...list,
-                cards: list.cards.map(card => {
-                    const key = `${card.title}::${list.title}`;
-                    if (snapshot[key] !== undefined) {
-                        return { ...card, isSlim: snapshot[key] };
-                    }
-                    return card;
-                })
-            })));
-        } else {
-            addToast("No changes needed - cards already match snapshot", "info");
-        }
-    }, [snapshotLoadTrigger, orderedData, boardId, executeBulkUpdate, addToast]);
-
-    // Sync visible counts to store for global display
-    useEffect(() => {
-        const query = searchQuery.toLowerCase().trim();
-        let vCards = 0;
-        let vLists = 0;
-
-        orderedData.forEach(list => {
-            const isListMatch = searchLists && query && list.title.toLowerCase().includes(query);
-            
-            let hasVisibleCard = false;
-            list.cards.forEach(card => {
-                let matchesSearch = true;
-                if (query) {
-                    const isCardMatch = searchCards && (
-                        card.title.toLowerCase().includes(query) ||
-                        (card.description && card.description.toLowerCase().includes(query))
-                    );
-                    matchesSearch = isListMatch || isCardMatch;
-                }
-                const matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
-
-                if (matchesSearch && matchesLabels) {
-                    vCards++;
-                    hasVisibleCard = true;
-                }
-            });
-
-            // A list is "visible" if it matches search OR has visible cards OR there is no search/filter active
-            const isFilterActive = query || (selectedLabels.size > 0 && isFilterEnabled);
-            if (!isFilterActive || isListMatch || hasVisibleCard) {
-                vLists++;
-            }
-        });
-
-        if (vCards !== visibleCardCount) setVisibleCardCount(vCards);
-        if (vLists !== visibleListCount) setVisibleListCount(vLists);
-    }, [orderedData, searchQuery, searchCards, searchLists, selectedLabels, isFilterEnabled, visibleCardCount, visibleListCount, setVisibleCardCount, setVisibleListCount]);
-
-    // Sync labels to store for the global filter UI
-    useEffect(() => {
-        const labelMap = new Map<string, string>();
-        orderedData.forEach(l => l.cards.forEach(c => c.labels.forEach((lab: any) => {
-            if (!labelMap.has(lab.title)) labelMap.set(lab.title, lab.color);
-        })));
-        const labels = Array.from(labelMap.entries()).map(([title, color]) => ({ title, color })).sort((a,b) => a.title.localeCompare(b.title));
-        
-        if (JSON.stringify(labels) !== JSON.stringify(uniqueLabels)) {
-            setUniqueLabels(labels);
-        }
-        
-        const currentLists = orderedData.map(l => ({ id: l.id, title: l.title }));
-        if (JSON.stringify(currentLists) !== JSON.stringify(boardLists)) {
-            setBoardLists(currentLists);
-        }
-    }, [orderedData, uniqueLabels, boardLists, setUniqueLabels, setBoardLists]);
-
+    const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
     const searchInputRef = useRef<ElementRef<"input">>(null);
 
     // Batch Delete State
@@ -269,13 +166,11 @@ export const ListContainer = ({
     const [moveCardIds, setMoveCardIds] = useState<Set<string>>(new Set());
     const [targetPosition, setTargetPosition] = useState(1);
 
-    // Label Filter State moved to Store
-
     // Batch Label State
     const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
     const [labelCardIds, setLabelCardIds] = useState<Set<string>>(new Set());
     const [newLabelTitle, setNewLabelTitle] = useState("");
-    const [newLabelColor, setNewLabelColor] = useState("#3b82f6"); // Default blue
+    const [newLabelColor, setNewLabelColor] = useState("#3b82f6");
 
     // Label Delete State
     const [labelToDelete, setLabelToDelete] = useState<string | null>(null);
@@ -283,7 +178,126 @@ export const ListContainer = ({
     // Batch Card Properties State
     const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
 
-    // Sync state when props change
+
+    // --- Optimized Filtering & Ordering Logic ---
+
+    // 1. Compute which cards are visible based on search and label filters
+    const visibleCards = useMemo(() => {
+        const query = (searchQuery || "").toLowerCase().trim();
+        const terms = query.split(',').map(t => t.trim()).filter(t => t !== "");
+        const results: any[] = [];
+        
+        orderedData.forEach(list => {
+            const isListMatch = searchLists && terms.length > 0 && terms.every(term => list.title.toLowerCase().includes(term));
+            
+            list.cards.forEach(card => {
+                let matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
+                let matchesSearch = true;
+                
+                if (terms.length > 0) {
+                    const isCardMatch = searchCards && terms.every(term => 
+                        card.title.toLowerCase().includes(term) ||
+                        (card.description && card.description.toLowerCase().includes(term))
+                    );
+                    matchesSearch = isListMatch || isCardMatch;
+                }
+
+                let isVisible = matchesLabels && matchesSearch;
+                
+                if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
+                    isVisible = !isVisible;
+                }
+
+                if (isVisible) {
+                    results.push({ ...card, listTitle: list.title });
+                }
+            });
+        });
+        
+        return results;
+    }, [orderedData, searchQuery, searchCards, searchLists, selectedLabels, searchInvert]);
+
+
+    // 2. Compute which lists should be visible (if they match search or have visible cards)
+    const visibleLists = useMemo(() => {
+        const query = (searchQuery || "").toLowerCase().trim();
+        const terms = query.split(',').map(t => t.trim()).filter(t => t !== "");
+        const isFilterActive = terms.length > 0 || (selectedLabels.size > 0 && isFilterEnabled);
+        
+        if (!isFilterActive) return orderedData;
+
+        return orderedData.filter(list => {
+            const isListMatch = searchLists && terms.length > 0 && terms.every(term => list.title.toLowerCase().includes(term));
+            
+            // Re-evaluate list visibility considering inverted logic for cards
+            const hasVisibleCard = list.cards.some(card => {
+                let matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
+                let matchesSearch = true;
+                if (terms.length > 0) {
+                    const isCardMatch = searchCards && terms.every(term => 
+                        card.title.toLowerCase().includes(term) ||
+                        (card.description && card.description.toLowerCase().includes(term))
+                    );
+                    matchesSearch = isListMatch || isCardMatch;
+                }
+                
+                let isVisible = matchesLabels && matchesSearch;
+                if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
+                    isVisible = !isVisible;
+                }
+                return isVisible;
+            });
+
+            // If inverted, we want to show the list if it has a visible card.
+            if (searchInvert) {
+                 return hasVisibleCard;
+            }
+
+            return isListMatch || hasVisibleCard;
+        });
+    }, [orderedData, searchQuery, searchCards, searchLists, selectedLabels, isFilterEnabled, searchInvert]);
+
+
+    // 3. Sync counts to store (with equality check to prevent loops)
+    useEffect(() => {
+        const vCardsCount = visibleCards.length;
+        const vListsCount = visibleLists.length;
+        const vListIds = visibleLists.map(l => l.id);
+        
+        if (vCardsCount !== visibleCardCount) setVisibleCardCount(vCardsCount);
+        if (vListsCount !== visibleListCount) setVisibleListCount(vListsCount);
+        
+        // Use JSON.stringify for quick array comparison
+        if (JSON.stringify(vListIds) !== JSON.stringify(visibleListIds)) {
+            setVisibleListIds(vListIds);
+        }
+    }, [visibleCards.length, visibleLists, visibleCardCount, visibleListCount, visibleListIds, setVisibleCardCount, setVisibleListCount, setVisibleListIds]);
+
+
+    // 4. Sync unique labels and lists to store
+    useEffect(() => {
+        // Collect labels
+        const labelMap = new Map<string, string>();
+        data.forEach(l => l.cards.forEach(c => c.labels?.forEach((lab: any) => {
+            if (!labelMap.has(lab.title)) labelMap.set(lab.title, lab.color);
+        })));
+        
+        const labels = Array.from(labelMap.entries()).map(([title, color]) => ({ title, color })).sort((a,b) => a.title.localeCompare(b.title));
+        const labelsJson = JSON.stringify(labels);
+        if (labelsJson !== JSON.stringify(uniqueLabels)) {
+            setUniqueLabels(labels);
+        }
+        
+        // Collect list metadata
+        const lists = data.map(l => ({ id: l.id, title: l.title }));
+        const listsJson = JSON.stringify(lists);
+        if (listsJson !== JSON.stringify(boardLists)) {
+            setBoardLists(lists);
+        }
+    }, [data, uniqueLabels, boardLists, setUniqueLabels, setBoardLists]);
+
+
+    // 5. Sync state when props change
     useEffect(() => {
         setOrderedData(data);
     }, [data]);
@@ -316,13 +330,15 @@ export const ListContainer = ({
     useEventListener("keydown", onKeyDown);
     useOnClickOutside(formRef as React.RefObject<HTMLElement>, disableEditing);
 
-    const { execute: executeCreateList, isLoading: isListLoading } = useAction(createList, {
-        onSuccess: (data) => {
+    const { execute: executeCreateList, isExecuting: isListLoading } = useSafeAction(createList, {
+        onSuccess: () => {
             disableEditing();
+            addToast("List created", "success");
             router.refresh();
         },
         onError: (error) => {
             console.error(error);
+            addToast("Failed to create list", "error");
         },
     });
 
@@ -343,106 +359,77 @@ export const ListContainer = ({
         return newArray;
     };
 
-    const handleMoveList = useCallback((listId: string, direction: 'left' | 'right') => {
-        setOrderedData((prevItems) => {
-            const listIndex = prevItems.findIndex(l => l.id === listId);
-            if (listIndex === -1) return prevItems;
+    const handleMoveList = useCallback((listId: string, direction: 'left' | 'right' | 'position', newPosition?: number) => {
+        const listIndex = orderedData.findIndex(l => l.id === listId);
+        if (listIndex === -1) return;
 
-            if (direction === 'left' && listIndex > 0) {
-                const newLists = arrayMove(prevItems, listIndex, listIndex - 1);
-                newLists.forEach((list, index) => list.order = index);
-                executeUpdateListOrder({ boardId, items: newLists.map((list) => ({ id: list.id, title: list.title, order: list.order, boardId })) });
-                return newLists;
-            } else if (direction === 'right' && listIndex < prevItems.length - 1) {
-                const newLists = arrayMove(prevItems, listIndex, listIndex + 1);
-                newLists.forEach((list, index) => list.order = index);
-                executeUpdateListOrder({ boardId, items: newLists.map((list) => ({ id: list.id, title: list.title, order: list.order, boardId })) });
-                return newLists;
-            }
-            return prevItems;
-        });
-    }, [boardId, executeUpdateListOrder]);
+        let targetIndex = listIndex;
+        if (direction === 'left' && listIndex > 0) {
+            targetIndex = listIndex - 1;
+        } else if (direction === 'right' && listIndex < orderedData.length - 1) {
+            targetIndex = listIndex + 1;
+        } else if (direction === 'position' && typeof newPosition === 'number') {
+            targetIndex = Math.max(0, Math.min(newPosition - 1, orderedData.length - 1));
+        }
+
+        if (targetIndex === listIndex) return;
+
+        const newLists = arrayMove(orderedData, listIndex, targetIndex).map((list, index) => ({
+            ...list,
+            order: index
+        }));
+
+        setOrderedData(newLists);
+        
+        console.log(`[ListContainer] Executing updateListOrder for board ${boardId} with ${newLists.length} items`);
+        executeUpdateListOrder({ boardId, items: newLists.map((list) => ({ id: list.id, title: list.title, order: list.order, boardId })) });
+    }, [boardId, executeUpdateListOrder, orderedData, router]);
 
     const handleMoveCard = useCallback((cardId: string, listId: string, action: 'up' | 'down' | 'position', newPosition?: number) => {
-        setOrderedData((prevItems) => {
-            const list = prevItems.find(l => l.id === listId);
-            if (!list) return prevItems;
+        const list = orderedData.find(l => l.id === listId);
+        if (!list) return;
 
-            const cardIndex = list.cards.findIndex(c => c.id === cardId);
-            if (cardIndex === -1) return prevItems;
+        const cardIndex = list.cards.findIndex(c => c.id === cardId);
+        if (cardIndex === -1) return;
 
-            let newIndex = cardIndex;
-            if (action === 'up' && cardIndex > 0) newIndex = cardIndex - 1;
-            else if (action === 'down' && cardIndex < list.cards.length - 1) newIndex = cardIndex + 1;
-            else if (action === 'position' && typeof newPosition === 'number') {
-                newIndex = Math.max(0, Math.min(newPosition - 1, list.cards.length - 1));
-            }
+        let newIndex = cardIndex;
+        if (action === 'up' && cardIndex > 0) newIndex = cardIndex - 1;
+        else if (action === 'down' && cardIndex < list.cards.length - 1) newIndex = cardIndex + 1;
+        else if (action === 'position' && typeof newPosition === 'number') {
+            newIndex = Math.max(0, Math.min(newPosition - 1, list.cards.length - 1));
+        }
 
-            if (newIndex === cardIndex) return prevItems;
+        if (newIndex === cardIndex) return;
 
-            // Avoid in-place mutation of state objects
-            const newCards = arrayMove(list.cards, cardIndex, newIndex).map((card, i) => ({
-                ...card,
-                order: i
-            }));
+        // Avoid in-place mutation of state objects
+        const newCards = arrayMove(list.cards, cardIndex, newIndex).map((card, i) => ({
+            ...card,
+            order: i
+        }));
 
-            const newData = prevItems.map((l) => {
-                if (l.id === listId) return { ...l, cards: newCards };
-                return l;
-            });
-
-            // Persist ONLY the cards in the affected list
-            const itemsToUpdate = newCards.map((card) => ({
-                id: card.id,
-                order: card.order,
-                listId: card.listId
-            }));
-
-            executeUpdateCardOrder({
-                boardId,
-                items: itemsToUpdate
-            });
-
-            return newData;
+        const newData = orderedData.map((l) => {
+            if (l.id === listId) return { ...l, cards: newCards };
+            return l;
         });
-    }, [boardId, executeUpdateCardOrder]);
 
+        setOrderedData(newData);
 
+        // Persist ONLY the cards in the affected list
+        const itemsToUpdate = newCards.map((card) => ({
+            id: card.id,
+            order: card.order,
+            listId: card.listId
+        }));
 
-    const allLabels = uniqueLabels.map(l => l.title);
-
-    // Filtered Cards based on search AND labels
-    const getVisibleCards = () => {
-        const query = searchQuery.toLowerCase().trim();
-        const results: any[] = [];
-
-        orderedData.forEach(list => {
-            const isListMatch = searchLists && query && list.title.toLowerCase().includes(query);
-
-            list.cards.forEach(card => {
-                // 1. Label Filter (Only apply if isFilterEnabled AND labels are selected)
-                // 1. Search filter
-                let matchesSearch = true;
-                if (query) {
-                    const isCardMatch = searchCards && (
-                        card.title.toLowerCase().includes(query) ||
-                        (card.description && card.description.toLowerCase().includes(query))
-                    );
-                    matchesSearch = isListMatch || isCardMatch;
-                }
-
-                // 2. Label filter
-                const matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
-
-                if (matchesSearch && matchesLabels) {
-                    results.push({ ...card, listTitle: list.title });
-                }
-            });
+        executeUpdateCardOrder({
+            boardId,
+            items: itemsToUpdate
         });
-        return results;
-    };
+    }, [boardId, executeUpdateCardOrder, orderedData]);
 
-    const visibleCards = getVisibleCards();
+
+
+
 
 
 
@@ -533,6 +520,7 @@ export const ListContainer = ({
                             searchQuery={searchQuery}
                             searchCards={searchCards}
                             searchLists={searchLists}
+                            searchInvert={searchInvert}
                             selectedLabels={selectedLabels}
                             listColorSwatches={listColorSwatches}
                             textColorSwatches={textColorSwatches}

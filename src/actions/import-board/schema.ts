@@ -31,9 +31,11 @@ export const ImportBoardSchema = z.object({
             })).optional(),
             checklists: z.array(z.object({
                 title: z.string(),
+                createdAt: z.string().optional(),
                 items: z.array(z.object({
                     title: z.string(),
-                    isCompleted: z.boolean()
+                    isCompleted: z.boolean(),
+                    createdAt: z.string().optional()
                 }))
             })).optional(),
             attachments: z.array(z.object({

@@ -12,7 +12,7 @@ export const copyCard = actionClient
                 where: { id },
                 include: { attachments: true, checklists: { include: { items: true } } },
             });
-            if (!cardToCopy) return { error: "Card not found" };
+            if (!cardToCopy) throw new Error("Card not found");
 
             const lastCard = await db.card.findFirst({
                 where: { listId: cardToCopy.listId },
@@ -44,6 +44,6 @@ export const copyCard = actionClient
             revalidatePath(`/board/${boardId}`);
             return card;
         } catch (error) {
-            return { error: "Failed to copy card." };
+            throw new Error("Failed to copy card.");
         }
     });

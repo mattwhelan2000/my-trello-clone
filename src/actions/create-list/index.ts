@@ -14,7 +14,7 @@ export const createList = actionClient
             });
 
             if (!board) {
-                return { error: "Board not found" };
+                throw new Error("Board not found");
             }
 
             const lastList = await db.list.findFirst({
@@ -36,6 +36,6 @@ export const createList = actionClient
             revalidatePath(`/board/${boardId}`);
             return list;
         } catch (error) {
-            return { error: "Failed to create list." };
+            throw new Error("Failed to create list.");
         }
     });

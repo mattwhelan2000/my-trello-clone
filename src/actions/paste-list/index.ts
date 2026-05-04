@@ -12,7 +12,7 @@ export const pasteList = actionClient
                 where: { id: sourceListId },
                 include: { cards: { include: { attachments: true } } },
             });
-            if (!listToCopy) return { error: "Source list not found" };
+            if (!listToCopy) throw new Error("Source list not found");
 
             const lastList = await db.list.findFirst({
                 where: { boardId },
@@ -52,6 +52,6 @@ export const pasteList = actionClient
             revalidatePath(`/board/${boardId}`);
             return list;
         } catch (error) {
-            return { error: "Failed to paste list." };
+            throw new Error("Failed to paste list.");
         }
     });

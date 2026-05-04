@@ -28,6 +28,6 @@ export const deleteLabelBatch = actionClient
             return { success: true };
         } catch (error: any) {
             console.error("[DeleteLabelBatch] Error:", error);
-            return { error: "Failed to delete label." };
+            throw new Error("Failed to delete label.");
         }
     });

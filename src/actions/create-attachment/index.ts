@@ -72,6 +72,6 @@ export const createAttachment = actionClient
             revalidatePath(`/board/${boardId}`);
             return { success: true };
         } catch (error) {
-            return { error: "Failed to create attachment." };
+            throw new Error("Failed to create attachment.");
         }
     });

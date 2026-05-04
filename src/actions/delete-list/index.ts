@@ -14,6 +14,6 @@ export const deleteList = actionClient
             revalidatePath(`/board/${boardId}`);
             return list;
         } catch (error) {
-            return { error: "Failed to delete list." };
+            throw new Error("Failed to delete list.");
         }
     });

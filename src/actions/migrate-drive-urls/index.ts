@@ -75,6 +75,6 @@ export const migrateDriveUrls = actionClient
             return { count: migratedCount, totalFound: attachments.length };
         } catch (error: any) {
             console.error("[MigrateDriveUrls] Error:", error);
-            return { error: error.message || "Failed to migrate URLs" };
+            throw new Error(error.message || "Failed to migrate URLs");
         }
     });

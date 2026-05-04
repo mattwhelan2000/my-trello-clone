@@ -3,14 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { CardModal } from "@/components/modals/card-modal/CardModal";
-import { useAction } from "@/hooks/use-action";
+import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { deleteCard } from "@/actions/delete-card";
 import { copyCard } from "@/actions/copy-card";
 import { pasteCard } from "@/actions/paste-card";
 import { cloneCard } from "@/actions/clone-card";
 import { decloneCard } from "@/actions/declone-card";
 import { updateCard } from "@/actions/update-card";
-import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { 
     AlignLeft, 
     CheckSquare, 
@@ -22,12 +21,15 @@ import {
     ChevronDown, 
     Layers,
     MinusSquare,
-    Maximize2
+    Maximize2,
+    Copy,
+    FileJson
 } from "lucide-react";
 import { format } from "date-fns";
 import { detectFileType } from "@/lib/file-type-utils";
 import { MiniAudioPlayer } from "@/components/ui/MiniAudioPlayer";
 import { InstanceModal } from "@/components/modals/instance-modal";
+import { formatImageUrl } from "@/lib/format-image-url";
 
 const renderTitleWithLinks = (titleText: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -105,11 +107,11 @@ const CardItemInner = ({
         }
     };
 
-    const { execute: executeDeleteCard } = useAction(deleteCard);
-    const { execute: executeCopyCard } = useAction(copyCard);
-    const { execute: executePasteCard } = useAction(pasteCard);
-    const { execute: executeCloneCard } = useAction(cloneCard);
-    const { execute: executeDecloneCard } = useAction(decloneCard);
+    const { execute: executeDeleteCard } = useSafeAction(deleteCard);
+    const { execute: executeCopyCard } = useSafeAction(copyCard);
+    const { execute: executePasteCard } = useSafeAction(pasteCard);
+    const { execute: executeCloneCard } = useSafeAction(cloneCard);
+    const { execute: executeDecloneCard } = useSafeAction(decloneCard);
     
     const { execute: executeUpdateCard } = useSafeAction(updateCard, {
         onSuccess: () => {
@@ -176,15 +178,47 @@ const CardItemInner = ({
         handleMenuClose();
     };
 
+    const onCopyCardJson = async () => {
+        const cardToExport = {
+            title: data.title,
+            description: data.description,
+            color: data.color,
+            fontColor: data.fontColor,
+            isSlim: data.isSlim,
+            displayThumbnails: data.displayThumbnails,
+            dueDate: data.dueDate,
+            labels: (data.labels || []).map((l: any) => ({ title: l.title, color: l.color })),
+            attachments: (data.attachments || []).map((a: any) => ({ 
+                url: a.url, 
+                type: a.type, 
+                title: a.title, 
+                thumbnailUrl: a.thumbnailUrl, 
+                isCover: a.isCover 
+            })),
+            checklists: (data.checklists || []).map((cl: any) => ({
+                title: cl.title,
+                items: (cl.items || []).map((i: any) => ({ title: i.title, isCompleted: i.isCompleted }))
+            }))
+        };
+
+        try {
+            const json = JSON.stringify(cardToExport, null, 2);
+            await navigator.clipboard.writeText(json);
+            // We use standard toast if available, or just rely on the user seeing it works
+            // Assuming addToast is available via props or context in future, but for now just execute.
+        } catch (err) {
+            console.error("Failed to copy card JSON", err);
+        }
+        handleMenuClose();
+    };
+
     const getRenderableImageUrl = (url: string) => {
         if (!url) return null;
-        if (url.includes("dropbox.com") && url.includes("dl=0")) {
-            return url.replace("dl=0", "raw=1");
+        const formatted = formatImageUrl(url);
+        if (formatted && formatted.includes("ngrok-free.dev") && formatted.includes("view?filename=")) {
+            return `/api/proxy-image?url=${encodeURIComponent(formatted)}`;
         }
-        if (url.includes("ngrok-free.dev") && url.includes("view?filename=")) {
-            return `/api/proxy-image?url=${encodeURIComponent(url)}`;
-        }
-        return url;
+        return formatted;
     };
 
     const coverIframeAttachment = data.attachments?.find((a: any) => a.isCover && a.type === "IFRAME");
@@ -313,27 +347,6 @@ const CardItemInner = ({
                     </div>
                 ) : (
                     <>
-                        {/* Manual Order Controls */}
-                        <div className="absolute -left-3 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {!isFirstCard && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onMoveCard?.(data.id, data.listId, 'up'); }}
-                                    className="bg-blue-600 shadow-lg rounded-md p-1.5 border border-white/50 hover:bg-blue-500 active:scale-95 transition flex items-center justify-center"
-                                    title="Move Up"
-                                >
-                                    <ChevronUp className="h-4 w-4 text-white" />
-                                </button>
-                            )}
-                            {!isLastCard && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onMoveCard?.(data.id, data.listId, 'down'); }}
-                                    className="bg-blue-600 shadow-lg rounded-md p-1.5 border border-white/50 hover:bg-blue-500 active:scale-95 transition flex items-center justify-center"
-                                    title="Move Down"
-                                >
-                                    <ChevronDown className="h-4 w-4 text-white" />
-                                </button>
-                            )}
-                        </div>
 
                         {/* Editable Rank Number Badge */}
                         <div className="absolute -right-3 -top-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -416,7 +429,7 @@ const CardItemInner = ({
                             )}
 
                             {/* LINK CHIPS — clickable for any non-audio URL attachment */}
-                            {data.displayThumbnails !== false && linkAttachments.length > 0 && (
+                            {linkAttachments.length > 0 && (
                                 <div
                                     className="flex flex-col gap-y-1 mt-1"
                                     onClick={(e) => e.stopPropagation()}
@@ -542,6 +555,10 @@ const CardItemInner = ({
                         </button>
                         <div className="border-t border-neutral-800 my-1"></div>
                         <button onClick={(e) => { e.stopPropagation(); onCopyCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Copy Card</button>
+                        <button onClick={(e) => { e.stopPropagation(); onCopyCardJson(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition flex items-center gap-x-2 text-purple-400">
+                            <FileJson className="h-3.5 w-3.5" />
+                            Copy Card (JSON)
+                        </button>
                         <button onClick={(e) => { e.stopPropagation(); onPasteCard(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Paste Card</button>
                     </div>
                 </div>,

@@ -14,7 +14,7 @@ export const deleteLabel = actionClient
                 include: { card: { select: { syncGroupId: true } } }
             });
 
-            if (!labelToDelete) return { error: "Label not found" };
+            if (!labelToDelete) throw new Error("Label not found");
 
             if (labelToDelete.card?.syncGroupId) {
                 const syncedCards = await db.card.findMany({
@@ -37,6 +37,6 @@ export const deleteLabel = actionClient
             revalidatePath(`/board/${boardId}`);
             return { success: true };
         } catch (error) {
-            return { error: "Failed to delete label." };
+            throw new Error("Failed to delete label.");
         }
     });

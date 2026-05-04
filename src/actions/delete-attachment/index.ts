@@ -14,7 +14,7 @@ export const deleteAttachment = actionClient
                 include: { card: { select: { syncGroupId: true } } }
             });
 
-            if (!attachmentToDelete) return { error: "Attachment not found" };
+            if (!attachmentToDelete) throw new Error("Attachment not found");
 
             if (attachmentToDelete.card?.syncGroupId) {
                 const syncedCards = await db.card.findMany({
@@ -37,6 +37,6 @@ export const deleteAttachment = actionClient
             revalidatePath(`/board/${boardId}`);
             return { success: true };
         } catch (error) {
-            return { error: "Failed to delete attachment." };
+            throw new Error("Failed to delete attachment.");
         }
     });

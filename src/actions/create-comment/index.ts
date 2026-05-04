@@ -19,6 +19,6 @@ export const createComment = actionClient
             revalidatePath(`/board/${boardId}`);
             return activity;
         } catch (error) {
-            return { error: "Failed to create comment." };
+            throw new Error("Failed to create comment.");
         }
     });

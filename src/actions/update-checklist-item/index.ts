@@ -16,6 +16,6 @@ export const updateChecklistItem = actionClient
             revalidatePath(`/board/${boardId}`);
             return checklistItem;
         } catch (error) {
-            return { error: "Failed to update checklist item." };
+            throw new Error("Failed to update checklist item.");
         }
     });

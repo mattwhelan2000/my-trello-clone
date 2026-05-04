@@ -19,7 +19,9 @@ export const updateCardsBatch = actionClient
     delete: shouldDelete, 
     displayThumbnails, 
     isSlim,
-    addChecklist
+    addChecklist,
+    color,
+    fontColor
   } }) => {
   try {
     // 1. BATCH DELETE
@@ -81,6 +83,8 @@ export const updateCardsBatch = actionClient
     if (dueDate !== undefined) updateData.dueDate = dueDate;
     if (displayThumbnails !== undefined) updateData.displayThumbnails = displayThumbnails;
     if (isSlim !== undefined) updateData.isSlim = isSlim;
+    if (color !== undefined) updateData.color = color;
+    if (fontColor !== undefined) updateData.fontColor = fontColor;
 
     if (Object.keys(updateData).length > 0) {
         await db.card.updateMany({
@@ -141,8 +145,6 @@ export const updateCardsBatch = actionClient
 
   } catch (error) {
     console.error("[BATCH_UPDATE_ERROR]", error);
-    return {
-      error: "Failed to update cards batch."
-    }
+    throw new Error("Failed to update cards batch.")
   }
 });

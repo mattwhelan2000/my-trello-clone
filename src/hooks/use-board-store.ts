@@ -7,6 +7,8 @@ interface BoardStore {
     setSearchCards: (val: boolean) => void;
     searchLists: boolean;
     setSearchLists: (val: boolean) => void;
+    searchInvert: boolean;
+    setSearchInvert: (val: boolean) => void;
     
     selectedLabels: Set<string>;
     setSelectedLabels: (labels: Set<string>) => void;
@@ -25,12 +27,9 @@ interface BoardStore {
     setVisibleCardCount: (count: number) => void;
     visibleListCount: number;
     setVisibleListCount: (count: number) => void;
+    visibleListIds: string[];
+    setVisibleListIds: (ids: string[]) => void;
 
-    // Snapshot triggers
-    snapshotSaveTrigger: number;
-    triggerSnapshotSave: () => void;
-    snapshotLoadTrigger: number;
-    triggerSnapshotLoad: () => void;
 }
 
 export const useBoardStore = create<BoardStore>((set) => ({
@@ -40,6 +39,8 @@ export const useBoardStore = create<BoardStore>((set) => ({
     setSearchCards: (searchCards) => set({ searchCards }),
     searchLists: false,
     setSearchLists: (searchLists) => set({ searchLists }),
+    searchInvert: false,
+    setSearchInvert: (searchInvert) => set({ searchInvert }),
     
     selectedLabels: new Set(),
     setSelectedLabels: (selectedLabels) => set({ selectedLabels }),
@@ -63,9 +64,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
     setVisibleCardCount: (visibleCardCount) => set({ visibleCardCount }),
     visibleListCount: 0,
     setVisibleListCount: (visibleListCount) => set({ visibleListCount }),
+    visibleListIds: [],
+    setVisibleListIds: (visibleListIds) => set({ visibleListIds }),
 
-    snapshotSaveTrigger: 0,
-    triggerSnapshotSave: () => set((state) => ({ snapshotSaveTrigger: state.snapshotSaveTrigger + 1 })),
-    snapshotLoadTrigger: 0,
-    triggerSnapshotLoad: () => set((state) => ({ snapshotLoadTrigger: state.snapshotLoadTrigger + 1 })),
 }));

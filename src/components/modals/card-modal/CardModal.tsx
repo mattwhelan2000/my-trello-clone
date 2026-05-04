@@ -4,7 +4,7 @@ import { Modal } from "@/components/modals/Modal";
 import { useState, useRef, ElementRef, useEffect } from "react";
 import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "@/hooks/use-action";
+import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateCard } from "@/actions/update-card";
 import { createAttachment } from "@/actions/create-attachment";
 import { createChecklist } from "@/actions/create-checklist";
@@ -17,6 +17,7 @@ import { moveCard } from "@/actions/move-card";
 import { cloneCard } from "@/actions/clone-card";
 import { decloneCard } from "@/actions/declone-card";
 import { deleteCard } from "@/actions/delete-card";
+import { updateAttachment } from "@/actions/update-attachment";
 import { InstanceModal } from "@/components/modals/instance-modal";
 import { format } from "date-fns";
 import { useToast } from "@/components/ui/Toast";
@@ -26,7 +27,8 @@ import { AttachmentPreview, AttachmentPreviewLarge } from "@/components/ui/Attac
 import { AudioPlayer } from "@/components/ui/AudioPlayer";
 import { detectFileType, getFileTypeLabel } from "@/lib/file-type-utils";
 import Image from "next/image";
-import { Trash2, Copy, Layers, Share2, MoreHorizontal, Eye, EyeOff, MinusSquare, Maximize2 } from "lucide-react";
+import { Trash2, Copy, Layers, Share2, MoreHorizontal, Eye, EyeOff, MinusSquare, Maximize2, Pencil, Check } from "lucide-react";
+import { formatImageUrl } from "@/lib/format-image-url";
 
 interface CardModalProps {
     data: any;
@@ -58,6 +60,8 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const imageInputRef = useRef<ElementRef<"input">>(null);
     const customColorInputRef = useRef<ElementRef<"input">>(null);
     const [customColors, setCustomColors] = useState<string[]>([]);
+    const [editingAttachmentId, setEditingAttachmentId] = useState<string | null>(null);
+    const [editingAttachmentTitle, setEditingAttachmentTitle] = useState("");
     const [isMounted, setIsMounted] = useState(false);
     const { addToast } = useToast();
     const router = useRouter();
@@ -111,9 +115,9 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         }
     }, [isLabelPickerOpen, boardId]);
 
-    const { execute: executeUpdateCard } = useAction(updateCard, {
-        onSuccess: (responseData: any) => {
-            setTitle(responseData.title || title);
+    const { execute: executeUpdateCard, isExecuting: isExecuting_executeUpdateCard } = useSafeAction(updateCard, {
+        onSuccess: ({ data }) => {
+            setTitle(data?.title || title);
             inputRef.current?.blur();
             router.refresh(); // Hard refresh to force ListContainer to sync orderedData from DB
         },
@@ -122,8 +126,8 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         }
     });
 
-    const { execute: executeCreateChecklist } = useAction(createChecklist, {
-        onSuccess: (responseData: any) => {
+    const { execute: executeCreateChecklist, isExecuting: isExecuting_executeCreateChecklist } = useSafeAction(createChecklist, {
+        onSuccess: ({ data }) => {
             // Checklist created
             router.refresh();
         },
@@ -132,8 +136,8 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         }
     });
 
-    const { execute: executeCreateAttachment, isLoading: isAttachmentLoading } = useAction(createAttachment, {
-        onSuccess: (responseData: any) => {
+    const { execute: executeCreateAttachment, isExecuting: isAttachmentLoading } = useSafeAction(createAttachment, {
+        onSuccess: ({ data }) => {
             setIsAddingImage(false);
             if (imageInputRef.current) imageInputRef.current.value = "";
             router.refresh();
@@ -143,7 +147,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         }
     });
 
-    const { execute: executeUpdateAttachmentCover } = useAction(updateAttachmentCover, {
+    const { execute: executeUpdateAttachmentCover, isExecuting: isExecuting_executeUpdateAttachmentCover } = useSafeAction(updateAttachmentCover, {
         onSuccess: () => {
             // Cover updated successfully
             router.refresh();
@@ -153,14 +157,25 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         }
     });
 
-    const { execute: executeDeleteAttachment } = useAction(deleteAttachment, {
+    const { execute: executeDeleteAttachment, isExecuting: isExecuting_executeDeleteAttachment } = useSafeAction(deleteAttachment, {
         onSuccess: () => {
             router.refresh();
         },
         onError: (error) => console.error(error)
     });
+    
+    const { execute: executeUpdateAttachment, isExecuting: isExecuting_executeUpdateAttachment } = useSafeAction(updateAttachment, {
+        onSuccess: () => {
+            setEditingAttachmentId(null);
+            router.refresh();
+        },
+        onError: (error) => {
+            console.error(error);
+            addToast("Failed to rename attachment", "error");
+        }
+    });
 
-    const { execute: executeCreateLabel } = useAction(createLabel, {
+    const { execute: executeCreateLabel, isExecuting: isExecuting_executeCreateLabel } = useSafeAction(createLabel, {
         onSuccess: () => {
             setIsLabelPickerOpen(false);
             setNewLabelTitle("");
@@ -170,14 +185,14 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onError: (error) => console.error(error)
     });
 
-    const { execute: executeDeleteLabel } = useAction(deleteLabel, {
+    const { execute: executeDeleteLabel, isExecuting: isExecuting_executeDeleteLabel } = useSafeAction(deleteLabel, {
         onSuccess: () => {
             router.refresh();
         },
         onError: (error) => console.error(error)
     });
 
-    const { execute: executeCreateComment } = useAction(createComment, {
+    const { execute: executeCreateComment, isExecuting: isExecuting_executeCreateComment } = useSafeAction(createComment, {
         onSuccess: () => {
             setCommentText("");
             addToast("Comment added", "success");
@@ -186,7 +201,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onError: (error) => console.error(error)
     });
 
-    const { execute: executeMoveCard } = useAction(moveCard, {
+    const { execute: executeMoveCard, isExecuting: isExecuting_executeMoveCard } = useSafeAction(moveCard, {
         onSuccess: () => {
             setIsMovePickerOpen(false);
             addToast("Card moved", "success");
@@ -196,7 +211,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onError: (error) => console.error(error)
     });
 
-    const { execute: executeCloneCard } = useAction(cloneCard, {
+    const { execute: executeCloneCard, isExecuting: isExecuting_executeCloneCard } = useSafeAction(cloneCard, {
         onSuccess: () => {
             addToast("Card duplicated", "success");
             router.refresh();
@@ -205,7 +220,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onError: (error) => console.error(error)
     });
 
-    const { execute: executeDecloneCard } = useAction(decloneCard, {
+    const { execute: executeDecloneCard, isExecuting: isExecuting_executeDecloneCard } = useSafeAction(decloneCard, {
         onSuccess: () => {
             addToast("Card is now unique", "success");
             router.refresh();
@@ -213,7 +228,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
         onError: (error) => console.error(error)
     });
 
-    const { execute: executeDeleteCard } = useAction(deleteCard, {
+    const { execute: executeDeleteCard, isExecuting: isExecuting_executeDeleteCard } = useSafeAction(deleteCard, {
         onSuccess: () => {
             addToast("Card deleted", "success");
             router.refresh();
@@ -352,13 +367,11 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     // Helper to format Dropbox links appropriately for rendering
     const getRenderableImageUrl = (url: string) => {
         if (!url) return null;
-        if (url.includes("dropbox.com") && url.includes("dl=0")) {
-            return url.replace("dl=0", "raw=1");
+        const formatted = formatImageUrl(url);
+        if (formatted && formatted.includes("ngrok-free.dev") && formatted.includes("view?filename=")) {
+            return `/api/proxy-image?url=${encodeURIComponent(formatted)}`;
         }
-        if (url.includes("ngrok-free.dev") && url.includes("view?filename=")) {
-            return `/api/proxy-image?url=${encodeURIComponent(url)}`;
-        }
-        return url;
+        return formatted;
     };
 
     const CARD_COLORS = [
@@ -452,25 +465,68 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-x-2 px-1">
-                                    {!attachment.isCover ? (
-                                        <button
-                                            onClick={() => executeUpdateAttachmentCover({ id: attachment.id, cardId: data.id, boardId })}
-                                            className="text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1"
-                                        >
-                                            <Layout className="w-3 h-3" /> Make Cover
-                                        </button>
+                                <div className="flex flex-col gap-y-1 px-1">
+                                    {editingAttachmentId === attachment.id ? (
+                                        <div className="flex items-center gap-x-2 mb-1">
+                                            <input
+                                                autoFocus
+                                                value={editingAttachmentTitle}
+                                                onChange={(e) => setEditingAttachmentTitle(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") executeUpdateAttachment({ id: attachment.id, boardId, title: editingAttachmentTitle });
+                                                    if (e.key === "Escape") setEditingAttachmentId(null);
+                                                }}
+                                                className="text-xs px-2 py-1 border rounded-md outline-none focus:ring-1 focus:ring-blue-600 flex-1"
+                                            />
+                                            <button
+                                                onClick={() => executeUpdateAttachment({ id: attachment.id, boardId, title: editingAttachmentTitle })}
+                                                className="p-1 hover:bg-neutral-200 rounded-sm text-green-600"
+                                            >
+                                                <Check className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => setEditingAttachmentId(null)}
+                                                className="p-1 hover:bg-neutral-200 rounded-sm text-red-600"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
                                     ) : (
-                                        <button className="text-xs font-medium text-white bg-blue-600 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 cursor-default">
-                                            <CheckSquare className="w-3 h-3" /> Current Cover
-                                        </button>
+                                        <div className="flex items-center gap-x-2 mb-1 group/title">
+                                            <span className="text-xs font-semibold text-neutral-700 truncate max-w-[200px]">
+                                                {attachment.title || "Image Attachment"}
+                                            </span>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingAttachmentId(attachment.id);
+                                                    setEditingAttachmentTitle(attachment.title || "");
+                                                }}
+                                                className="opacity-0 group-hover/title:opacity-100 p-1 hover:bg-neutral-200 rounded-sm transition"
+                                            >
+                                                <Pencil className="w-3 h-3 text-neutral-500" />
+                                            </button>
+                                        </div>
                                     )}
-                                    <button
-                                        onClick={() => executeDeleteAttachment({ id: attachment.id, boardId })}
-                                        className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 ml-auto"
-                                    >
-                                        <X className="w-3 h-3" /> Delete
-                                    </button>
+                                    <div className="flex items-center gap-x-2">
+                                        {!attachment.isCover ? (
+                                            <button
+                                                onClick={() => executeUpdateAttachmentCover({ id: attachment.id, cardId: data.id, boardId })}
+                                                className="text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1"
+                                            >
+                                                <Layout className="w-3 h-3" /> Make Cover
+                                            </button>
+                                        ) : (
+                                            <button className="text-xs font-medium text-white bg-blue-600 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 cursor-default">
+                                                <CheckSquare className="w-3 h-3" /> Current Cover
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => executeDeleteAttachment({ id: attachment.id, boardId })}
+                                            className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 ml-auto"
+                                        >
+                                            <X className="w-3 h-3" /> Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )
@@ -576,6 +632,47 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                             if (isAudio) {
                                                 return (
                                                     <div key={link.id} className="flex flex-col gap-y-2 w-full">
+                                                        <div className="flex items-center gap-x-2 px-1 group/title">
+                                                            {editingAttachmentId === link.id ? (
+                                                                <div className="flex items-center gap-x-2 flex-1">
+                                                                    <input
+                                                                        autoFocus
+                                                                        value={editingAttachmentTitle}
+                                                                        onChange={(e) => setEditingAttachmentTitle(e.target.value)}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === "Enter") executeUpdateAttachment({ id: link.id, boardId, title: editingAttachmentTitle });
+                                                                            if (e.key === "Escape") setEditingAttachmentId(null);
+                                                                        }}
+                                                                        className="text-xs px-2 py-1 border rounded-md outline-none focus:ring-1 focus:ring-blue-600 flex-1"
+                                                                    />
+                                                                    <button
+                                                                        onClick={() => executeUpdateAttachment({ id: link.id, boardId, title: editingAttachmentTitle })}
+                                                                        className="p-1 hover:bg-neutral-200 rounded-sm text-green-600"
+                                                                    >
+                                                                        <Check className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setEditingAttachmentId(null)}
+                                                                        className="p-1 hover:bg-neutral-200 rounded-sm text-red-600"
+                                                                    >
+                                                                        <X className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    <span className="text-sm font-semibold text-neutral-700 truncate">{link.title || "Audio Attachment"}</span>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingAttachmentId(link.id);
+                                                                            setEditingAttachmentTitle(link.title || "");
+                                                                        }}
+                                                                        className="opacity-0 group-hover/title:opacity-100 p-1 hover:bg-neutral-200 rounded-sm transition"
+                                                                    >
+                                                                        <Pencil className="w-3 h-3 text-neutral-500" />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                         <AttachmentPreviewLarge url={link.url} title={link.title} type={link.type} />
                                                         <div className="flex items-center justify-end px-1">
                                                             <button
@@ -588,16 +685,56 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                     </div>
                                                 );
                                             }
-
+                                            
                                             return (
                                                 <div key={link.id} className="flex flex-col gap-y-1 w-full">
-                                                    <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full">
-                                                        <AttachmentPreview url={link.url} thumbnailUrl={link.thumbnailUrl} title={link.title} type={link.type} />
-                                                        <div className="flex flex-col min-w-0 pr-2 pb-1">
-                                                            <span className="font-semibold text-sm text-neutral-700 truncate">{link.title || link.url}</span>
-                                                            <span className="text-xs text-neutral-500 truncate mt-1">{getFileTypeLabel(detectFileType(link.url))}</span>
+                                                    {editingAttachmentId === link.id ? (
+                                                        <div className="flex items-center gap-x-2 mb-1">
+                                                            <input
+                                                                autoFocus
+                                                                value={editingAttachmentTitle}
+                                                                onChange={(e) => setEditingAttachmentTitle(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === "Enter") executeUpdateAttachment({ id: link.id, boardId, title: editingAttachmentTitle });
+                                                                    if (e.key === "Escape") setEditingAttachmentId(null);
+                                                                }}
+                                                                className="text-xs px-2 py-1 border rounded-md outline-none focus:ring-1 focus:ring-blue-600 flex-1"
+                                                            />
+                                                            <button
+                                                                onClick={() => executeUpdateAttachment({ id: link.id, boardId, title: editingAttachmentTitle })}
+                                                                className="p-1 hover:bg-neutral-200 rounded-sm text-green-600"
+                                                            >
+                                                                <Check className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setEditingAttachmentId(null)}
+                                                                className="p-1 hover:bg-neutral-200 rounded-sm text-red-600"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
                                                         </div>
-                                                    </a>
+                                                    ) : (
+                                                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full group/link">
+                                                            <AttachmentPreview url={link.url} thumbnailUrl={link.thumbnailUrl} title={link.title} type={link.type} />
+                                                            <div className="flex flex-col min-w-0 pr-2 pb-1 flex-1 relative">
+                                                                <div className="flex items-center gap-x-2">
+                                                                    <span className="font-semibold text-sm text-neutral-700 truncate">{link.title || link.url}</span>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            setEditingAttachmentId(link.id);
+                                                                            setEditingAttachmentTitle(link.title || "");
+                                                                        }}
+                                                                        className="opacity-0 group-hover/link:opacity-100 p-1 hover:bg-neutral-200 rounded-sm transition"
+                                                                    >
+                                                                        <Pencil className="w-3 h-3 text-neutral-500" />
+                                                                    </button>
+                                                                </div>
+                                                                <span className="text-xs text-neutral-500 truncate mt-1">{getFileTypeLabel(detectFileType(link.url))}</span>
+                                                            </div>
+                                                        </a>
+                                                    )}
                                                     {(link.thumbnailUrl || link.type === "IFRAME") && (
                                                         <div className="flex items-center gap-x-2 px-1 mt-1">
                                                             {!link.isCover ? (
