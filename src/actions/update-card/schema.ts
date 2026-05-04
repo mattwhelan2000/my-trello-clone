@@ -9,6 +9,5 @@ export const UpdateCardSchema = z.object({
     fontColor: z.string().optional(),
     dueDate: z.coerce.date().nullable().optional(),
     displayThumbnails: z.boolean().optional(),
-    thumbnailMode: z.string().optional(),
     isSlim: z.boolean().optional(),
 });

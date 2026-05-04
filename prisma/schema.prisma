@@ -64,7 +64,6 @@ model Card {
   syncGroupId       String?
   isSyncedWithSheet Boolean     @default(true)
   displayThumbnails Boolean     @default(true)
-  thumbnailMode     String      @default("cover")
   isSlim            Boolean     @default(false)
   labels      Label[]
   checklists  Checklist[]
