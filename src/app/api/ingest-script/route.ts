@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { extractText } from "unpdf";
 
-export const maxDuration = 60; // 60 seconds is the max for Vercel Hobby tier
+export const maxDuration = 60; // 60 seconds max duration for ingestion processing
 
 export async function POST(req: NextRequest) {
     try {
