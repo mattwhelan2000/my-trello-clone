@@ -514,12 +514,12 @@ const CardItemInner = ({
                             )}
                         </div>
                         {data.displayThumbnails !== false && renderableImageUrl && !renderableIframeUrl && (
-                            <div className="w-full relative flex items-center justify-center bg-black border-t border-neutral-800 overflow-hidden rounded-b-md">
+                            <div className={`w-full relative flex items-center justify-center border-t rounded-b-md overflow-hidden ${data.thumbnailMode === "contain" ? "bg-black/90 border-neutral-800 h-[180px]" : "bg-black border-neutral-800"}`}>
                                 <img 
                                     src={renderableImageUrl} 
                                     alt="Card Cover" 
                                     loading="lazy"
-                                    className="w-full h-auto max-h-[260px] object-cover object-center" 
+                                    className={`w-full ${data.thumbnailMode === "contain" ? "h-full object-contain" : "h-auto max-h-[260px] object-cover"} object-center`} 
                                 />
                             </div>
                         )}

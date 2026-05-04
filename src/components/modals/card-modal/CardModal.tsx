@@ -857,15 +857,19 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                             <X className="h-3 w-3" />
                                         </button>
                                     </div>
-                                    <div className="flex items-center gap-x-2 mb-3 border-b text-xs pb-1 font-medium">
+                                    <div className="flex items-center gap-x-2 mb-3 border-b text-xs pb-1 font-medium overflow-x-auto">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setColorPickerTab("bg"); }}
-                                            className={`px-2 py-0.5 rounded-sm ${colorPickerTab === "bg" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
+                                            className={`px-2 py-0.5 rounded-sm whitespace-nowrap ${colorPickerTab === "bg" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
                                         >Background</button>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setColorPickerTab("text"); }}
-                                            className={`px-2 py-0.5 rounded-sm ${colorPickerTab === "text" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
+                                            className={`px-2 py-0.5 rounded-sm whitespace-nowrap ${colorPickerTab === "text" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
                                         >Text</button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setColorPickerTab("thumb"); }}
+                                            className={`px-2 py-0.5 rounded-sm whitespace-nowrap ${colorPickerTab === "thumb" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
+                                        >Thumbnail</button>
                                     </div>
 
                                     {colorPickerTab === "bg" && (
@@ -959,6 +963,45 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                     {customColors.length === 0 && (
                                                         <span className="col-span-8 text-[9px] text-neutral-400 italic py-1">No custom colors yet</span>
                                                     )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {colorPickerTab === "thumb" && (
+                                        <div className="space-y-3">
+                                            <div className="flex flex-col gap-y-2">
+                                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Visibility</span>
+                                                <button
+                                                    onClick={() => executeUpdateCard({ id: data.id, boardId, displayThumbnails: !data.displayThumbnails })}
+                                                    className={`w-full text-left text-xs px-2 py-1.5 rounded-sm border transition flex items-center justify-between ${data.displayThumbnails !== false ? "bg-green-50 border-green-200 text-green-700" : "bg-neutral-50 border-neutral-200 text-neutral-600"}`}
+                                                >
+                                                    {data.displayThumbnails !== false ? "Visible" : "Hidden"}
+                                                    {data.displayThumbnails !== false && <Check className="h-3 w-3" />}
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="flex flex-col gap-y-2 border-t pt-2">
+                                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Scaling Mode</span>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button
+                                                        onClick={() => executeUpdateCard({ id: data.id, boardId, thumbnailMode: "cover" })}
+                                                        className={`flex flex-col items-center gap-y-1 p-2 rounded-sm border transition ${data.thumbnailMode !== "contain" ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+                                                    >
+                                                        <div className="h-8 w-full bg-neutral-200 rounded-sm relative overflow-hidden">
+                                                            <div className="absolute inset-0 bg-neutral-400 scale-150" />
+                                                        </div>
+                                                        <span className="text-[10px] font-bold">Crop (Cover)</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => executeUpdateCard({ id: data.id, boardId, thumbnailMode: "contain" })}
+                                                        className={`flex flex-col items-center gap-y-1 p-2 rounded-sm border transition ${data.thumbnailMode === "contain" ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50"}`}
+                                                    >
+                                                        <div className="h-8 w-full bg-neutral-800 rounded-sm relative overflow-hidden flex items-center justify-center">
+                                                            <div className="h-4 w-4 bg-neutral-400" />
+                                                        </div>
+                                                        <span className="text-[10px] font-bold">Scale (Fit)</span>
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
