@@ -360,22 +360,6 @@ const CardItemInner = ({
                                 className="w-10 h-7 bg-neutral-900 shadow-2xl text-white text-xs font-bold text-center border-2 border-white/70 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center p-0 hover:border-white transition-all"
                             />
                         </div>
-                        {data.displayThumbnails !== false && renderableImageUrl && !renderableIframeUrl && (
-                            <div className="w-full relative flex items-center justify-center bg-black border-b border-neutral-800 overflow-hidden rounded-t-md">
-                                <img 
-                                    src={renderableImageUrl} 
-                                    alt="Card Cover" 
-                                    loading="lazy"
-                                    className="w-full h-auto max-h-[260px] object-cover object-center" 
-                                />
-                            </div>
-                        )}
-
-                        {data.displayThumbnails !== false && renderableIframeUrl && (
-                            <div className="w-full relative flex items-center justify-center bg-neutral-200 border-b border-neutral-300 overflow-hidden rounded-t-md pointer-events-none">
-                                <iframe src={renderableIframeUrl} className="w-full h-[180px] border-0" allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
-                            </div>
-                        )}
 
                         <div className={`py-2 px-3 w-full flex flex-col gap-y-1.5 ${(!data.displayThumbnails || (!renderableImageUrl && !renderableIframeUrl)) ? "min-h-[36px]" : ""}`}>
 
@@ -529,6 +513,22 @@ const CardItemInner = ({
                                 </div>
                             )}
                         </div>
+                        {data.displayThumbnails !== false && renderableImageUrl && !renderableIframeUrl && (
+                            <div className="w-full relative flex items-center justify-center bg-black border-t border-neutral-800 overflow-hidden rounded-b-md">
+                                <img 
+                                    src={renderableImageUrl} 
+                                    alt="Card Cover" 
+                                    loading="lazy"
+                                    className="w-full h-auto max-h-[260px] object-cover object-center" 
+                                />
+                            </div>
+                        )}
+
+                        {data.displayThumbnails !== false && renderableIframeUrl && (
+                            <div className="w-full relative flex items-center justify-center bg-neutral-200 border-t border-neutral-300 overflow-hidden rounded-b-md pointer-events-none">
+                                <iframe src={renderableIframeUrl} className="w-full h-[180px] border-0" allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                            </div>
+                        )}
                     </>
                 )}
             </div>
