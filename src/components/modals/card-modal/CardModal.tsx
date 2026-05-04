@@ -180,9 +180,13 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
             setIsLabelPickerOpen(false);
             setNewLabelTitle("");
             setSelectedLabelColor("");
+            addToast("Label created and applied", "success");
             router.refresh();
         },
-        onError: (error) => console.error(error)
+        onError: (error) => {
+            console.error(error);
+            addToast("Failed to create label", "error");
+        }
     });
 
     const { execute: executeDeleteLabel, isExecuting: isExecuting_executeDeleteLabel } = useSafeAction(deleteLabel, {
@@ -1003,7 +1007,8 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                             <button
                                                                 key={`${label.title}-${label.color}`}
                                                                 onClick={() => executeCreateLabel({ cardId: data.id, boardId, title: label.title, color: label.color })}
-                                                                className="w-full text-left px-3 py-1.5 rounded-sm text-sm font-medium text-white shadow-sm hover:opacity-90 transition"
+                                                                disabled={isExecuting_executeCreateLabel}
+                                                                className="w-full text-left px-3 py-1.5 rounded-sm text-sm font-medium text-white shadow-sm hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 style={{ backgroundColor: label.color }}
                                                             >
                                                                 {label.title}
@@ -1018,10 +1023,16 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                         <div className="border-t pt-3">
                                             <div className="text-xs font-semibold mb-2 text-neutral-600 w-full text-left">Create a new label</div>
                                             <input
+                                                autoFocus
                                                 value={newLabelTitle}
                                                 onChange={(e) => setNewLabelTitle(e.target.value)}
                                                 placeholder="Label title..."
                                                 className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-blue-600 w-full mb-3"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter" && selectedLabelColor && !isExecuting_executeCreateLabel) {
+                                                        executeCreateLabel({ cardId: data.id, boardId, title: newLabelTitle || "Label", color: selectedLabelColor });
+                                                    }
+                                                }}
                                             />
                                             <div>
                                                 <div className="text-xs font-semibold mb-2 text-neutral-600 w-full text-left">Select a color</div>
@@ -1041,10 +1052,15 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                     if (!selectedLabelColor) return;
                                                     executeCreateLabel({ cardId: data.id, boardId, title: newLabelTitle || "Label", color: selectedLabelColor });
                                                 }}
-                                                disabled={!selectedLabelColor}
-                                                className="w-full bg-blue-600 text-white rounded-md text-sm font-medium py-1.5 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                                disabled={!selectedLabelColor || isExecuting_executeCreateLabel}
+                                                className="w-full bg-blue-600 text-white rounded-md text-sm font-medium py-1.5 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-x-2"
                                             >
-                                                Apply New Label
+                                                {isExecuting_executeCreateLabel ? (
+                                                    <>
+                                                        <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        Creating...
+                                                    </>
+                                                ) : "Apply New Label"}
                                             </button>
                                         </div>
                                     </div>
