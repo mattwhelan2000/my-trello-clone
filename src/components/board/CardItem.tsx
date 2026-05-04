@@ -213,12 +213,7 @@ const CardItemInner = ({
     };
 
     const getRenderableImageUrl = (url: string) => {
-        if (!url) return null;
-        const formatted = formatImageUrl(url);
-        if (formatted && formatted.includes("ngrok-free.dev") && formatted.includes("view?filename=")) {
-            return `/api/proxy-image?url=${encodeURIComponent(formatted)}`;
-        }
-        return formatted;
+        return formatImageUrl(url);
     };
 
     const coverIframeAttachment = data.attachments?.find((a: any) => a.isCover && a.type === "IFRAME");

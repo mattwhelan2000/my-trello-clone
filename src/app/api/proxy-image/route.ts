@@ -11,7 +11,8 @@ export async function GET(req: NextRequest) {
     try {
         const response = await fetch(url, {
             headers: {
-                "ngrok-skip-browser-warning": "true"
+                "ngrok-skip-browser-warning": "true",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
         });
 
@@ -24,7 +25,8 @@ export async function GET(req: NextRequest) {
         return new NextResponse(buffer, {
             headers: {
                 "Content-Type": response.headers.get("Content-Type") || "image/png",
-                "Cache-Control": "public, max-age=31536000, immutable"
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "Access-Control-Allow-Origin": "*"
             }
         });
     } catch (e) {
