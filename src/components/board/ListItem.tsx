@@ -17,6 +17,7 @@ import { pasteCard } from "@/actions/paste-card";
 import { ImportCardsModal } from "../modals/ImportCardsModal";
 import { CopyCardsModal } from "../modals/CopyCardsModal";
 import { Copy, FileJson } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 
 export const ListItem = ({
     data,
@@ -74,6 +75,7 @@ export const ListItem = ({
     const moveInputRef = useRef<HTMLInputElement>(null);
     const resizeStartY = useRef(0);
     const resizeStartHeight = useRef(600);
+    const { addToast } = useToast();
     const router = useRouter();
 
     const listHeightKey = `board_list_height_${data.boardId}`;

@@ -17,7 +17,7 @@ import { migrateDriveUrls } from "@/actions/migrate-drive-urls";
 import { useToast } from "@/components/ui/Toast";
 import { formatImageUrl } from "@/lib/format-image-url";
 
-import { SnapshotSelector } from \"./SnapshotSelector\";
+import { SnapshotSelector } from "./SnapshotSelector";
 interface BoardOptionsProps {
     boardId: string;
     listsCount: number;
@@ -217,7 +217,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         e.preventDefault();
         if (!imageUrl) return;
         const formattedUrl = formatImageUrl(imageUrl);
-        execute({ id: boardId, bgImage: formattedUrl, bgColor: "" });
+        execute({ id: boardId, bgImage: formattedUrl || undefined, bgColor: "" });
     };
 
     const onSheetSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -234,12 +234,12 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     const { execute: executeSync, isExecuting: isSyncing } = useSafeAction(syncGoogleSheet, {
         onSuccess: ({ data }) => {
-            if (data && "success" in data) {
+            if (data && "success" in (data as any)) {
                 addToast("Google Sheet Synced successfully", "success");
                 setIsOpen(false);
                 router.refresh();
-            } else if (data && "error" in data) {
-                addToast(data.error as string, "error");
+            } else if (data && "error" in (data as any)) {
+                addToast((data as any).error as string, "error");
             }
         },
         onError: (error) => {
@@ -250,11 +250,11 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     const { execute: executePush, isExecuting: isPushing } = useSafeAction(pushGoogleSheet, {
         onSuccess: ({ data }) => {
-            if (data && "success" in data) {
+            if (data && "success" in (data as any)) {
                 addToast("Board pushed to Google Sheet successfully", "success");
                 setIsOpen(false);
-            } else if (data && "error" in data) {
-                addToast(data.error as string, "error");
+            } else if (data && "error" in (data as any)) {
+                addToast((data as any).error as string, "error");
             }
         },
         onError: (error) => {
@@ -264,8 +264,8 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     });
 
     const { execute: executeUpdateListsColors, isExecuting: isUpdatingListsColors } = useSafeAction(updateListColors, {
-        onSuccess: (data) => {
-            const count = data.count || 0;
+        onSuccess: ({ data }) => {
+            const count = data?.count || 0;
             addToast(`${count} list colors updated`, "success");
             setIsOpen(false);
         },

@@ -20,8 +20,8 @@ export const deleteCards = actionClient
                     where: { cardId: { in: ids } }
                 });
 
-                // 2. Delete comments
-                await tx.comment.deleteMany({
+                // 2. Delete activities (comments)
+                await tx.activity.deleteMany({
                     where: { cardId: { in: ids } }
                 });
 

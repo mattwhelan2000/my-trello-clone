@@ -339,7 +339,9 @@ const CardItemInner = ({
                             )}
                         </div>
                         {data.syncGroupId && (
-                            <Layers className="h-3 w-3 text-blue-500 shrink-0" title="Instanced" />
+                            <span title="Instanced">
+                                <Layers className="h-3 w-3 text-blue-500 shrink-0" />
+                            </span>
                         )}
                         {hasAttachments && (
                             <Paperclip className="h-3 w-3 opacity-40 shrink-0" />
@@ -401,7 +403,9 @@ const CardItemInner = ({
                             {/* TITLE */}
                             <div className="w-full font-medium break-words flex items-center gap-x-2" style={{ color: data.fontColor || "#172b4d" }}>
                                 {data.syncGroupId && (
-                                    <Layers className="h-3.5 w-3.5 text-blue-500 shrink-0" title="Instanced" />
+                                    <span title="Instanced">
+                                        <Layers className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                    </span>
                                 )}
                                 {data.displayThumbnails === false && hasAttachments && (
                                     <Paperclip className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />
