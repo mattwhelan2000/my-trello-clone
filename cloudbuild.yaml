@@ -7,7 +7,13 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/trello-clone-492816/trello-clone:latest']
 
-  # 3. Deploy to Cloud Run (US Central)
+  # 3. Run Prisma db push to sync schema BEFORE deploying new code
+  - name: 'gcr.io/trello-clone-492816/trello-clone:latest'
+    entrypoint: 'npx'
+    args: ['prisma', 'db', 'push', '--skip-generate', '--accept-data-loss']
+    secretEnv: ['DATABASE_URL']
+
+  # 4. Deploy to Cloud Run (US Central)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -24,7 +30,7 @@ steps:
       - '--set-secrets=DATABASE_URL=DATABASE_URL_US:latest,GOOGLE_SERVICE_ACCOUNT_JSON=GOOGLE_SERVICE_ACCOUNT_JSON:latest,DROPBOX_APP_KEY=DROPBOX_APP_KEY:latest,DROPBOX_APP_SECRET=DROPBOX_APP_SECRET:latest,DROPBOX_REFRESH_TOKEN=DROPBOX_REFRESH_TOKEN:latest,GOOGLE_DRIVE_API_KEY=GOOGLE_DRIVE_API_KEY:latest'
       - '--set-env-vars=COMFYUI_API_URL=https://unbitten-uncontemptuously-aimee.ngrok-free.dev'
 
-  # 4. Deploy to Cloud Run (Europe West)
+  # 5. Deploy to Cloud Run (Europe West)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -43,6 +49,11 @@ steps:
 
 images:
   - 'gcr.io/trello-clone-492816/trello-clone:latest'
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/trello-clone-492816/secrets/DATABASE_URL_US/versions/latest
+      env: 'DATABASE_URL'
 
 options:
   logging: CLOUD_LOGGING_ONLY

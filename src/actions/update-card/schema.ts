@@ -9,5 +9,6 @@ export const UpdateCardSchema = z.object({
     fontColor: z.string().optional(),
     dueDate: z.coerce.date().nullable().optional(),
     displayThumbnails: z.boolean().optional(),
+    thumbnailMode: z.enum(["cover", "contain"]).optional(),
     isSlim: z.boolean().optional(),
 });

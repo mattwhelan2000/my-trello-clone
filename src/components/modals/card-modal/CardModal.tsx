@@ -52,7 +52,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [newLabelTitle, setNewLabelTitle] = useState("");
     const [selectedLabelColor, setSelectedLabelColor] = useState("");
     const [boardLabels, setBoardLabels] = useState<{ id: string; title: string; color: string }[]>([]);
-    const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text">("bg");
+    const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text" | "thumb">("bg");
     const [commentText, setCommentText] = useState("");
     const [fetchedLists, setFetchedLists] = useState<{ id: string; title: string }[]>(propLists);
     const [posValue, setPosValue] = useState((index !== undefined ? index + 1 : 0).toString());
@@ -857,7 +857,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                             <X className="h-3 w-3" />
                                         </button>
                                     </div>
-                                    <div className="flex items-center gap-x-2 mb-3 border-b text-xs pb-1 font-medium">
+                                    <div className="flex items-center gap-x-1 mb-3 border-b text-xs pb-1 font-medium">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setColorPickerTab("bg"); }}
                                             className={`px-2 py-0.5 rounded-sm ${colorPickerTab === "bg" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
@@ -866,6 +866,10 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                             onClick={(e) => { e.stopPropagation(); setColorPickerTab("text"); }}
                                             className={`px-2 py-0.5 rounded-sm ${colorPickerTab === "text" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
                                         >Text</button>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setColorPickerTab("thumb"); }}
+                                            className={`px-2 py-0.5 rounded-sm ${colorPickerTab === "thumb" ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-700"}`}
+                                        >Thumbnail</button>
                                     </div>
 
                                     {colorPickerTab === "bg" && (
@@ -959,6 +963,44 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                     {customColors.length === 0 && (
                                                         <span className="col-span-8 text-[9px] text-neutral-400 italic py-1">No custom colors yet</span>
                                                     )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {colorPickerTab === "thumb" && (
+                                        <div className="space-y-3">
+                                            <div className="flex flex-col gap-y-2">
+                                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Visibility</span>
+                                                <button
+                                                    onClick={() => executeUpdateCard({ id: data.id, boardId, displayThumbnails: !data.displayThumbnails })}
+                                                    className={`w-full text-left text-xs px-2 py-1.5 rounded-sm border transition flex items-center justify-between ${data.displayThumbnails !== false ? "bg-green-50 border-green-200 text-green-700" : "bg-neutral-50 border-neutral-200 text-neutral-600"}`}
+                                                >
+                                                    {data.displayThumbnails !== false ? "Thumbnails Visible" : "Thumbnails Hidden"}
+                                                    {data.displayThumbnails !== false && <Check className="h-3 w-3" />}
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-col gap-y-2 border-t pt-2">
+                                                <span className="text-[10px] font-bold text-neutral-400 uppercase">Scaling Mode</span>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button
+                                                        onClick={() => executeUpdateCard({ id: data.id, boardId, thumbnailMode: "cover" })}
+                                                        className={`flex flex-col items-center gap-y-1.5 p-2 rounded-md border-2 transition ${(data.thumbnailMode || "cover") === "cover" ? "border-blue-500 bg-blue-50" : "border-neutral-200 bg-white hover:bg-neutral-50"}`}
+                                                    >
+                                                        <div className="h-8 w-full bg-neutral-200 rounded-sm relative overflow-hidden">
+                                                            <div className="absolute inset-[-4px] bg-neutral-400 rounded" />
+                                                        </div>
+                                                        <span className={`text-[10px] font-bold ${(data.thumbnailMode || "cover") === "cover" ? "text-blue-700" : "text-neutral-600"}`}>Crop</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => executeUpdateCard({ id: data.id, boardId, thumbnailMode: "contain" })}
+                                                        className={`flex flex-col items-center gap-y-1.5 p-2 rounded-md border-2 transition ${data.thumbnailMode === "contain" ? "border-blue-500 bg-blue-50" : "border-neutral-200 bg-white hover:bg-neutral-50"}`}
+                                                    >
+                                                        <div className="h-8 w-full bg-neutral-800 rounded-sm relative overflow-hidden flex items-center justify-center">
+                                                            <div className="h-5 w-5 bg-neutral-400 rounded-sm" />
+                                                        </div>
+                                                        <span className={`text-[10px] font-bold ${data.thumbnailMode === "contain" ? "text-blue-700" : "text-neutral-600"}`}>Scale</span>
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>

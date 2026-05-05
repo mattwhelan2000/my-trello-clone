@@ -212,16 +212,12 @@ const CardItemInner = ({
         handleMenuClose();
     };
 
-    const getRenderableImageUrl = (url: string) => {
-        return formatImageUrl(url);
-    };
-
     const coverIframeAttachment = data.attachments?.find((a: any) => a.isCover && a.type === "IFRAME");
     const renderableIframeUrl = coverIframeAttachment ? coverIframeAttachment.url : null;
 
     const coverImageAttachment = data.attachments?.find((a: any) => a.isCover && a.type !== "IFRAME")
         || data.attachments?.find((a: any) => a.type === "IMAGE" || a.thumbnailUrl);
-    const renderableImageUrl = coverImageAttachment ? getRenderableImageUrl(coverImageAttachment.type === "IMAGE" ? coverImageAttachment.url : coverImageAttachment.thumbnailUrl) : null;
+    const renderableImageUrl = coverImageAttachment ? formatImageUrl(coverImageAttachment.type === "IMAGE" ? coverImageAttachment.url : coverImageAttachment.thumbnailUrl) : null;
 
     const mapAttachment = data.attachments?.find((a: any) => 
         a.url.includes("google.com/maps") || 
@@ -514,12 +510,20 @@ const CardItemInner = ({
                             )}
                         </div>
                         {data.displayThumbnails !== false && renderableImageUrl && !renderableIframeUrl && (
-                            <div className="w-full relative flex items-center justify-center bg-black border-t border-neutral-800 overflow-hidden rounded-b-md">
+                            <div className={`w-full relative flex items-center justify-center border-t overflow-hidden rounded-b-md ${
+                                data.thumbnailMode === "contain" 
+                                    ? "bg-black/90 border-neutral-800 h-[180px]" 
+                                    : "bg-black border-neutral-800"
+                            }`}>
                                 <img 
                                     src={renderableImageUrl} 
                                     alt="Card Cover" 
                                     loading="lazy"
-                                    className="w-full h-auto max-h-[260px] object-cover object-center" 
+                                    className={`w-full object-center ${
+                                        data.thumbnailMode === "contain"
+                                            ? "h-full object-contain"
+                                            : "h-auto max-h-[260px] object-cover"
+                                    }`} 
                                 />
                             </div>
                         )}
