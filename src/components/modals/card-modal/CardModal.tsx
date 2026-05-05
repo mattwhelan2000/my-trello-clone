@@ -2,7 +2,7 @@
 
 import { Modal } from "@/components/modals/Modal";
 import { useState, useRef, ElementRef, useEffect } from "react";
-import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Plus, Pencil, Check } from "lucide-react";
+import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateCard } from "@/actions/update-card";
