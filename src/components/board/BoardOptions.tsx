@@ -19,6 +19,7 @@ import { formatImageUrl } from "@/lib/format-image-url";
 
 import { SnapshotSelector } from "./SnapshotSelector";
 import { DownloadBoardPDF } from "./DownloadBoardPDF";
+import { BulkIngestPreviewDialog } from "@/components/modals/BulkIngestPreviewDialog";
 
 interface BoardOptionsProps {
     boardId: string;
@@ -78,13 +79,16 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     const [editingSwatch, setEditingSwatch] = useState<{ type: 'bg' | 'list', index: number } | null>(null);
     const colorInputRef = React.useRef<HTMLInputElement>(null);
 
-    // Ingest Conflict State
-    const [conflicts, setConflicts] = useState<{ name: string; cardName: string; listTitle: string }[]>([]);
-    const [resolvedFiles, setResolvedFiles] = useState<{ name: string; url: string }[]>([]);
+    // Ingest State
+    const [resolvedFiles, setResolvedFiles] = useState<any[]>([]);
     const [showConflictModal, setShowConflictModal] = useState(false);
     const [resolutions, setResolutions] = useState<Record<string, "ignore" | "replace">>({});
     const [defaultResolution, setDefaultResolution] = useState<"ignore" | "replace">("ignore");
     const [isDoingForAll, setIsDoingForAll] = useState(false);
+    // Preview Dialog State
+    const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+    const [previewFiles, setPreviewFiles] = useState<any[]>([]);
+    const [isFetchingFolder, setIsFetchingFolder] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     
     React.useEffect(() => {
@@ -280,55 +284,81 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     const { execute: executeIngest, isExecuting: isIngesting } = useSafeAction(bulkIngestImages, {
         onSuccess: ({ data }) => {
-            console.log("[BulkIngest] Action raw response:", data);
-            
             if (data && "error" in data && data.error) {
                 addToast(data.error as string, "error");
                 return;
             }
 
-            // Handle Ingest Result (Success)
+            // Handle successful import
             if (data && "count" in data) {
-                console.log(`[BulkIngest] Ingest complete. Count: ${data.count}`);
-                addToast(`Successfully ingested ${data.count} files`, "success");
+                addToast(`Successfully ingested ${data.count} cards`, "success");
                 setIngestUrls("");
                 setIsOpen(false);
-                setShowConflictModal(false);
-                setConflicts([]);
+                setShowPreviewDialog(false);
+                setPreviewFiles([]);
                 setResolvedFiles([]);
-                setResolutions({});
-                setIsDoingForAll(false);
                 router.refresh();
                 return;
             }
 
-            // Handle Analysis Mode Result (Conflicts Found)
-            if (data && "conflicts" in data) {
-                const conflictList = data.conflicts as { name: string; cardName: string; listTitle: string }[];
-                const files = (data.resolvedFiles || []) as { name: string; url: string }[];
-                
+            // Handle Analysis Mode Result — show Preview Dialog
+            if (data && "preview" in data) {
+                const preview = (data.preview || []) as any[];
+                const files = (data.resolvedFiles || []) as any[];
+                setPreviewFiles(preview);
                 setResolvedFiles(files);
-                console.log(`[BulkIngest] Found ${conflictList.length} conflicts and ${files.length} total files`);
-                
-                if (conflictList.length > 0) {
-                    setConflicts(conflictList);
-                    setShowConflictModal(true);
-                    return;
-                }
+                setShowPreviewDialog(true);
+                return;
             }
         },
         onError: (error) => {
             console.error("[BulkIngest] Action Hook Error:", error);
-            addToast("Bulk ingest failed", "error");
+            addToast("Bulk ingest failed. Check the folder URL and try again.", "error");
+            setIsFetchingFolder(false);
         }
     });
 
-    const onIngestSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const onIngestSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const urls = ingestUrls.split("\n").map(u => u.trim()).filter(Boolean);
-        if (urls.length === 0) return;
+        const urlInput = ingestUrls.trim();
+        if (!urlInput) return;
 
-        // Step 1: Run analysis
+        setIsFetchingFolder(true);
+
+        // Detect Dropbox shared folder URL
+        const isDropbox = urlInput.includes("dropbox.com");
+        if (isDropbox) {
+            // Fetch file list from Dropbox via our API route
+            try {
+                const res = await fetch(`/api/list-dropbox-folder?url=${encodeURIComponent(urlInput)}`);
+                if (!res.ok) {
+                    const err = await res.json();
+                    addToast(`Dropbox Error: ${err.error || res.status}`, "error");
+                    setIsFetchingFolder(false);
+                    return;
+                }
+                const { files } = await res.json();
+                if (!files || files.length === 0) {
+                    addToast("No files found in that Dropbox folder.", "error");
+                    setIsFetchingFolder(false);
+                    return;
+                }
+                // Run analysis pass with the resolved files from Dropbox
+                executeIngest({
+                    boardId,
+                    urls: [urlInput],
+                    isAnalysis: true,
+                    resolvedFiles: files,
+                });
+            } catch (err) {
+                addToast("Failed to connect to Dropbox. Check your access token.", "error");
+                setIsFetchingFolder(false);
+            }
+            return;
+        }
+
+        // Google Drive folder — run analysis server-side
+        const urls = urlInput.split("\n").map((u: string) => u.trim()).filter(Boolean);
         executeIngest({
             boardId,
             urls,
@@ -336,15 +366,29 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         });
     };
 
-    const onConfirmIngest = () => {
-        const urls = ingestUrls.split("\n").map(u => u.trim()).filter(Boolean);
+    const onConfirmPreviewIngest = (opts: {
+        enabledFiles: string[];
+        globalColor: string | null;
+        globalLabel: string | null;
+        globalLabelColor: string | null;
+        resolvedFiles: any[];
+    }) => {
+        // Build file overrides: disable files not in the enabledFiles list
+        const fileOverrides: Record<string, any> = {};
+        for (const file of resolvedFiles) {
+            if (!opts.enabledFiles.includes(file.name)) {
+                fileOverrides[file.name] = { enabled: false };
+            }
+        }
         executeIngest({
             boardId,
-            urls,
+            urls: [ingestUrls.trim()],
             isAnalysis: false,
-            resolvedFiles, // Use the files we already found
-            resolutions: isDoingForAll ? {} : resolutions,
-            defaultResolution: isDoingForAll ? defaultResolution : undefined,
+            resolvedFiles: opts.resolvedFiles,
+            fileOverrides,
+            globalColor: opts.globalColor || undefined,
+            globalLabel: opts.globalLabel || undefined,
+            globalLabelColor: opts.globalLabelColor || undefined,
         });
     };
 
@@ -780,12 +824,16 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                             <textarea
                                 value={ingestUrls}
                                 onChange={(e) => setIngestUrls(e.target.value)}
-                                placeholder={"Paste a Google Drive folder URL...\nFiles named: Sc001_CARDNAME.ext"}
+                                placeholder={"Paste a Google Drive or Dropbox folder URL...\nFiles named: Sc001_CARDNAME.ext"}
                                 className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-orange-600 w-full min-h-[60px]"
-                                disabled={anyLoading}
+                                disabled={anyLoading || isFetchingFolder}
                             />
-                            <button type="submit" disabled={anyLoading || !ingestUrls.trim()} className="bg-orange-600 text-white w-full rounded-sm text-sm font-medium py-1.5 hover:bg-orange-700 transition">
-                                {isIngesting ? "Ingesting..." : "Bulk Ingest"}
+                            <button type="submit" disabled={anyLoading || isFetchingFolder || !ingestUrls.trim()} className="bg-orange-600 text-white w-full rounded-sm text-sm font-medium py-1.5 hover:bg-orange-700 transition flex items-center justify-center gap-x-2">
+                                {(isIngesting || isFetchingFolder) ? (
+                                    <><span className="animate-pulse">●</span> Scanning Folder...</>
+                                ) : (
+                                    "Preview & Ingest"
+                                )}
                             </button>
                         </form>
                     </div>
@@ -853,103 +901,15 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                 </div>
             )}
 
-            {/* Conflict Resolution Modal */}
-            {showConflictModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="bg-orange-50 px-6 py-4 border-b border-orange-100 flex items-center gap-x-3 text-left">
-                            <AlertTriangle className="h-6 w-6 text-orange-600" />
-                            <div>
-                                <h3 className="font-bold text-neutral-900">Duplicate Cards Found</h3>
-                                <p className="text-xs text-neutral-600">{conflicts.length} items already exist on this board.</p>
-                            </div>
-                        </div>
-
-                        <div className="max-h-[300px] overflow-y-auto px-6 py-4 space-y-3">
-                            {!isDoingForAll ? (
-                                conflicts.map((conflict) => (
-                                    <div key={conflict.name} className="flex items-center justify-between p-3 bg-neutral-50 rounded-md border border-neutral-200">
-                                        <div className="flex flex-col gap-y-0.5 text-left">
-                                            <span className="text-sm font-semibold text-neutral-800">{conflict.name}</span>
-                                            <span className="text-xs text-neutral-500">List: {conflict.listTitle}</span>
-                                        </div>
-                                        <div className="flex items-center gap-x-2">
-                                            <button
-                                                onClick={() => setResolutions(prev => ({ ...prev, [conflict.name]: "ignore" }))}
-                                                className={`px-3 py-1 text-xs rounded-full border transition ${resolutions[conflict.name] === "ignore" || !resolutions[conflict.name] ? "bg-neutral-800 text-white border-neutral-800" : "bg-white text-neutral-600 border-neutral-300 hover:bg-neutral-100"}`}
-                                            >
-                                                Ignore
-                                            </button>
-                                            <button
-                                                onClick={() => setResolutions(prev => ({ ...prev, [conflict.name]: "replace" }))}
-                                                className={`px-3 py-1 text-xs rounded-full border transition ${resolutions[conflict.name] === "replace" ? "bg-orange-600 text-white border-orange-600" : "bg-white text-neutral-600 border-neutral-300 hover:bg-neutral-100"}`}
-                                            >
-                                                Replace
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="py-8 text-center flex flex-col items-center gap-y-4">
-                                    <div className="flex items-center gap-x-4">
-                                        <button
-                                            onClick={() => setDefaultResolution("ignore")}
-                                            className={`flex flex-col items-center gap-y-2 p-4 rounded-lg border-2 transition ${defaultResolution === "ignore" ? "border-neutral-800 bg-neutral-50" : "border-transparent bg-white hover:bg-neutral-50"}`}
-                                        >
-                                            <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${defaultResolution === "ignore" ? "border-neutral-800 bg-neutral-800" : "border-neutral-300"}`}>
-                                                {defaultResolution === "ignore" && <div className="h-2 w-2 bg-white rounded-full" />}
-                                            </div>
-                                            <span className="text-sm font-bold">Ignore All</span>
-                                            <span className="text-xs text-neutral-500 text-center">Skip existing cards</span>
-                                        </button>
-                                        <button
-                                            onClick={() => setDefaultResolution("replace")}
-                                            className={`flex flex-col items-center gap-y-2 p-4 rounded-lg border-2 transition ${defaultResolution === "replace" ? "border-orange-600 bg-orange-50" : "border-transparent bg-white hover:bg-neutral-50"}`}
-                                        >
-                                            <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${defaultResolution === "replace" ? "border-orange-600 bg-orange-600" : "border-neutral-300"}`}>
-                                                {defaultResolution === "replace" && <div className="h-2 w-2 bg-white rounded-full" />}
-                                            </div>
-                                            <span className="text-sm font-bold">Replace All</span>
-                                            <span className="text-xs text-neutral-500 text-center">Overwrite images</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="px-6 py-4 bg-neutral-50 border-t flex flex-col gap-y-4">
-                            <label className="flex items-center gap-x-2 cursor-pointer group">
-                                <input
-                                    type="checkbox"
-                                    checked={isDoingForAll}
-                                    onChange={(e) => setIsDoingForAll(e.target.checked)}
-                                    className="h-4 w-4 rounded border-neutral-300 text-orange-600 focus:ring-orange-600"
-                                />
-                                <span className="text-sm text-neutral-700 group-hover:text-neutral-900 transition font-medium">Do this for all duplicates</span>
-                            </label>
-
-                            <div className="flex items-center gap-x-3">
-                                <button
-                                    onClick={() => {
-                                        setShowConflictModal(false);
-                                        setConflicts([]);
-                                    }}
-                                    className="flex-1 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-200 rounded-md transition"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={onConfirmIngest}
-                                    disabled={isIngesting}
-                                    className="flex-1 px-4 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-md transition shadow-md shadow-orange-200 flex items-center justify-center gap-x-2"
-                                >
-                                    {isIngesting ? "Ingesting..." : <><CheckCircle2 className="h-4 w-4" /> Confirm & Ingest</>}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Bulk Ingest Preview Dialog */}
+            <BulkIngestPreviewDialog
+                files={previewFiles}
+                resolvedFiles={resolvedFiles}
+                isOpen={showPreviewDialog}
+                onClose={() => { setShowPreviewDialog(false); setPreviewFiles([]); setIsFetchingFolder(false); }}
+                onConfirm={onConfirmPreviewIngest}
+                isConfirming={isIngesting}
+            />
             <input 
                 type="color" 
                 ref={colorInputRef} 

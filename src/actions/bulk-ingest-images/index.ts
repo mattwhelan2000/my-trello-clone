@@ -6,6 +6,7 @@ import { actionClient } from "@/lib/create-safe-action";
 import { BulkIngestSchema } from "./schema";
 import { detectFileType } from "@/lib/file-type-utils";
 import { google } from "googleapis";
+import { parseFilename, fuzzyMatchList } from "@/lib/import-utils";
 
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 
@@ -30,7 +31,6 @@ async function listDriveFolder(folderId: string): Promise<{ name: string; url: s
 
         const data = await res.json();
         for (const file of data.files || []) {
-            // Include all files
             const url = `/api/drive-image?id=${file.id}`;
             results.push({ name: file.name, url, id: file.id, mimeType: file.mimeType });
         }
@@ -58,43 +58,47 @@ async function getDriveFileContent(fileId: string): Promise<string> {
     return response.data as string;
 }
 
-import { parseFilename, fuzzyMatchList } from "@/lib/import-utils";
-
 export const bulkIngestImages = actionClient
     .schema(BulkIngestSchema)
-    .action(async ({ parsedInput: { boardId, urls, isAnalysis, resolutions, defaultResolution, resolvedFiles } }) => {
+    .action(async ({ parsedInput: { boardId, urls, isAnalysis, resolutions, defaultResolution, resolvedFiles, fileOverrides, globalColor, globalLabel, globalLabelColor } }) => {
         try {
-            console.log(`[BulkIngest] Optimized Transaction Start (${boardId})`);
+            console.log(`[BulkIngest] Start (${boardId})`);
 
             let allFiles = (resolvedFiles as any[]) || [];
             if (allFiles.length === 0) {
                 for (const url of urls) {
-                    const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-                    if (match) allFiles.push(...(await listDriveFolder(match[1])));
+                    // Google Drive folder
+                    const driveMatch = url.match(/\/folders\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+                    if (driveMatch) {
+                        allFiles.push(...(await listDriveFolder(driveMatch[1])));
+                        continue;
+                    }
+                    // Dropbox folder — files come pre-resolved from the client preview dialog
+                    // (Dropbox files passed as resolvedFiles[] already)
                 }
             }
             if (allFiles.length === 0) return { count: 0 };
 
             const existingLists = await db.list.findMany({ where: { boardId } });
-            const existingCards = await db.card.findMany({ 
+            const existingCards = await db.card.findMany({
                 where: { listId: { in: existingLists.map(l => l.id) } }
             });
             const cardMap = new Map(existingCards.map(c => [`${c.listId}_${c.title.toLowerCase()}`, c]));
 
-            // Pre-parse and pre-fetch JSON if needed
+            // Pre-parse files
             const processedFiles = [];
             for (const file of allFiles) {
-                let scenePrefix = "";
+                let scenePrefix: string | null = null;
                 let cardName = "";
                 let description = "";
 
-                if (file.mimeType === "application/json") {
+                if (file.mimeType === "application/json" && file.id) {
                     try {
                         const content = await getDriveFileContent(file.id);
                         const json = JSON.parse(content);
                         const rawTitle = json.title || file.name.replace(/\.json$/, "");
                         description = json.description || "";
-                        
+
                         const parsed = parseFilename(rawTitle);
                         scenePrefix = parsed.scenePrefix;
                         cardName = parsed.cardName;
@@ -109,35 +113,47 @@ export const bulkIngestImages = actionClient
                     cardName = parsed.cardName;
                 }
 
-                processedFiles.push({ ...file, scenePrefix, cardName, description });
+                // Apply per-file override for enabled state (skip disabled files)
+                const override = fileOverrides?.[file.name];
+                if (override?.enabled === false) continue;
+
+                processedFiles.push({ ...file, scenePrefix, cardName, description, override });
             }
 
             if (isAnalysis) {
-                const conflicts: any[] = [];
-                for (const file of processedFiles) {
+                // Return file list for the Preview Dialog (no DB writes)
+                const preview = processedFiles.map(file => {
                     const list = existingLists.find(l => fuzzyMatchList(file.scenePrefix, l.title));
-                    if (list && cardMap.has(`${list.id}_${file.cardName.toLowerCase()}`)) {
-                        conflicts.push({ name: file.name, cardName: file.cardName, listTitle: list.title });
-                    }
-                }
-                if (conflicts.length === 0) { isAnalysis = false; }
-                else { return { conflicts, totalFiles: allFiles.length, resolvedFiles: allFiles }; }
+                    const isDuplicate = list && cardMap.has(`${list.id}_${file.cardName.toLowerCase()}`);
+                    return {
+                        name: file.name,
+                        url: file.url,
+                        cardName: file.cardName,
+                        scenePrefix: file.scenePrefix,
+                        mimeType: file.mimeType,
+                        matchedListTitle: list?.title || null,
+                        matchedListId: list?.id || null,
+                        isDuplicate: !!isDuplicate,
+                    };
+                });
+                return { preview, totalFiles: allFiles.length, resolvedFiles: allFiles };
             }
 
             let ingestedCount = 0;
             let listOrder = Math.max(...existingLists.map(l => l.order), -1) + 1;
             const listRef = [...existingLists];
 
-            // Perform all operations in a single Transaction for speed
             await db.$transaction(async (tx) => {
                 for (const file of processedFiles) {
-                    const { scenePrefix, cardName, description } = file;
+                    const { scenePrefix, cardName, description, override } = file;
                     if (!cardName) continue;
 
+                    // Determine list
                     let list = listRef.find(l => fuzzyMatchList(scenePrefix, l.title));
                     if (!list) {
+                        const listTitle = scenePrefix || "Ingest";
                         list = await tx.list.create({
-                            data: { title: scenePrefix, order: listOrder++, boardId }
+                            data: { title: listTitle, order: listOrder++, boardId }
                         });
                         listRef.push(list);
                     }
@@ -153,12 +169,27 @@ export const bulkIngestImages = actionClient
                         }
                     } else {
                         const lastOrder = existingCards.filter(c => c.listId === list!.id).reduce((max, c) => Math.max(max, c.order), -1);
+                        
+                        // Merge color/label: per-file override takes priority, then global
+                        const cardColor = override?.color || globalColor || null;
+                        const labelTitle = override?.label || globalLabel || null;
+                        const labelColor = override?.labelColor || globalLabelColor || null;
+
                         card = await tx.card.create({
-                            data: { 
-                                title: cardName, 
+                            data: {
+                                title: cardName,
                                 description: description || null,
-                                order: lastOrder + 1, 
-                                listId: list.id 
+                                order: lastOrder + 1,
+                                listId: list.id,
+                                color: cardColor,
+                                ...(labelTitle ? {
+                                    labels: {
+                                        create: [{
+                                            title: labelTitle,
+                                            color: labelColor || cardColor || "#6b7280",
+                                        }]
+                                    }
+                                } : {}),
                             }
                         });
                         cardMap.set(cardKey, card);
@@ -180,7 +211,7 @@ export const bulkIngestImages = actionClient
                     ingestedCount++;
                 }
             }, {
-                timeout: 30000 // Increase timeout to 30s for large batches
+                timeout: 60000
             });
 
             revalidatePath(`/board/${boardId}`);
@@ -190,5 +221,3 @@ export const bulkIngestImages = actionClient
             throw new Error(error.message || "Failed to process folder.");
         }
     });
-
-
