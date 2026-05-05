@@ -18,6 +18,8 @@ import { useToast } from "@/components/ui/Toast";
 import { formatImageUrl } from "@/lib/format-image-url";
 
 import { SnapshotSelector } from "./SnapshotSelector";
+import { DownloadBoardPDF } from "./DownloadBoardPDF";
+
 interface BoardOptionsProps {
     boardId: string;
     listsCount: number;
