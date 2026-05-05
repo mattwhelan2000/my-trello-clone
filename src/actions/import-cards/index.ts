@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { actionClient } from "@/lib/create-safe-action";
-import { ImportCardsSchema } from "./schema";
+import { parseFilename, fuzzyMatchList } from "@/lib/import-utils";
 
 export const importCards = actionClient
     .schema(ImportCardsSchema)
@@ -16,29 +16,48 @@ export const importCards = actionClient
                 cardsToImport = [cardsToImport];
             }
 
-            const list = await db.list.findUnique({
-                where: { id: listId, boardId },
+            // Fetch all lists for the board to support fuzzy matching
+            const allLists = await db.list.findMany({
+                where: { boardId },
+                orderBy: { order: "asc" }
             });
 
-            if (!list) throw new Error("List not found");
-
-            const lastCard = await db.card.findFirst({
-                where: { listId },
-                orderBy: { order: "desc" },
-                select: { order: true },
-            });
-
-            let currentOrder = lastCard ? lastCard.order + 1 : 0;
+            const defaultList = allLists.find(l => l.id === listId);
+            if (!defaultList) throw new Error("Target list not found");
 
             const results = [];
 
+            // We need to keep track of orders for each list we might insert into
+            const listOrders: Record<string, number> = {};
+            
+            // Initialize orders for lists we touch
+            for (const l of allLists) {
+                const lastCard = await db.card.findFirst({
+                    where: { listId: l.id },
+                    orderBy: { order: "desc" },
+                    select: { order: true }
+                });
+                listOrders[l.id] = lastCard ? lastCard.order + 1 : 0;
+            }
+
             for (const cardData of cardsToImport) {
+                // Determine target list based on fuzzy matching
+                let targetListId = listId;
+                const { scenePrefix } = parseFilename(cardData.title || "");
+                
+                if (scenePrefix) {
+                    const matchedList = allLists.find(l => fuzzyMatchList(scenePrefix, l.title));
+                    if (matchedList) {
+                        targetListId = matchedList.id;
+                    }
+                }
+
                 const card = await db.card.create({
                     data: {
                         title: cardData.title || "Untitled Card",
                         description: cardData.description,
-                        order: currentOrder++,
-                        listId: listId,
+                        order: listOrders[targetListId]++,
+                        listId: targetListId,
                         color: cardData.color,
                         fontColor: cardData.fontColor,
                         isSlim: cardData.isSlim ?? false,
