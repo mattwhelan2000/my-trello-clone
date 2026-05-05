@@ -1,24 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 
+async function getDropboxAccessToken(): Promise<string> {
+    const appKey = process.env.DROPBOX_APP_KEY;
+    const appSecret = process.env.DROPBOX_APP_SECRET;
+    const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
+
+    if (!appKey || !appSecret || !refreshToken) {
+        throw new Error("Missing Dropbox credentials");
+    }
+
+    const credentials = Buffer.from(`${appKey}:${appSecret}`).toString("base64");
+    const res = await fetch("https://api.dropbox.com/oauth2/token", {
+        method: "POST",
+        headers: {
+            "Authorization": `Basic ${credentials}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+        }),
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Failed to refresh Dropbox token: ${err}`);
+    }
+
+    const data = await res.json();
+    return data.access_token as string;
+}
+
 // Proxies a file from Dropbox using the access token
-// This route is used to serve Dropbox files through our server to avoid CORS issues
-// and to generate working direct download URLs
 export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const path = searchParams.get("path");
-    const folderUrl = searchParams.get("folder");
 
-    if (!path && !folderUrl) {
-        return NextResponse.json({ error: "Missing path or folder parameter" }, { status: 400 });
+    if (!path) {
+        return NextResponse.json({ error: "Missing path parameter" }, { status: 400 });
     }
 
-    const token = process.env.DROPBOX_ACCESS_TOKEN;
-    if (!token) {
-        return NextResponse.json({ error: "DROPBOX_ACCESS_TOKEN not configured" }, { status: 500 });
+    let token: string;
+    try {
+        token = await getDropboxAccessToken();
+    } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 
     try {
-        // Get a temporary download link from Dropbox
         const linkRes = await fetch("https://api.dropboxapi.com/2/files/get_temporary_link", {
             method: "POST",
             headers: {

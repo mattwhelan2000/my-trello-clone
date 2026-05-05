@@ -1,5 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 
+async function getDropboxAccessToken(): Promise<string> {
+    const appKey = process.env.DROPBOX_APP_KEY;
+    const appSecret = process.env.DROPBOX_APP_SECRET;
+    const refreshToken = process.env.DROPBOX_REFRESH_TOKEN;
+
+    if (!appKey || !appSecret || !refreshToken) {
+        throw new Error("Missing Dropbox credentials (DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN)");
+    }
+
+    const credentials = Buffer.from(`${appKey}:${appSecret}`).toString("base64");
+    const res = await fetch("https://api.dropbox.com/oauth2/token", {
+        method: "POST",
+        headers: {
+            "Authorization": `Basic ${credentials}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+        }),
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Failed to refresh Dropbox token: ${err}`);
+    }
+
+    const data = await res.json();
+    return data.access_token as string;
+}
+
 // Converts a Dropbox shared folder URL into a listable path using the Dropbox API
 // Works with the shared link format: https://www.dropbox.com/scl/fo/...
 export async function GET(req: NextRequest) {
@@ -10,10 +41,13 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
     }
 
-    const token = process.env.DROPBOX_ACCESS_TOKEN;
-    if (!token) {
-        return NextResponse.json({ error: "DROPBOX_ACCESS_TOKEN not configured" }, { status: 500 });
+    let token: string;
+    try {
+        token = await getDropboxAccessToken();
+    } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
+
 
     try {
         // Step 1: Resolve the shared link to get metadata about the folder
