@@ -12,7 +12,7 @@ steps:
     entrypoint: 'sh'
     args:
       - '-c'
-      - 'npm install prisma@latest --no-save && npx prisma db push --skip-generate --accept-data-loss'
+      - 'npm install prisma@latest --no-save && npx prisma db push --url="$$DATABASE_URL" --accept-data-loss'
     secretEnv: ['DATABASE_URL']
 
   # 4. Deploy to Cloud Run (US Central)
