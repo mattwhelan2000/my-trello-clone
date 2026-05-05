@@ -10,5 +10,6 @@ export const BulkIngestSchema = z.object({
     resolvedFiles: z.array(z.object({
         name: z.string(),
         url: z.string(),
+        mimeType: z.string().optional(),
     })).optional(),
 });

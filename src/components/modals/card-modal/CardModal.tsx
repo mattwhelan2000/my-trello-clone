@@ -626,9 +626,11 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                     </div>
                                     <div className="flex flex-col gap-y-3">
                                         {linkAttachments.map((link: any) => {
-                                            const isAudio = detectFileType(link.url) === 'audio';
+                                            const fileType = detectFileType(link.url);
+                                            const isAudio = fileType === 'audio';
+                                            const hasLargePreview = ['audio', 'pdf', 'video', 'office-word', 'office-excel', 'office-powerpoint'].includes(fileType);
 
-                                            if (isAudio) {
+                                            if (hasLargePreview) {
                                                 return (
                                                     <div key={link.id} className="flex flex-col gap-y-2 w-full">
                                                         <div className="flex items-center gap-x-2 px-1 group/title">
@@ -659,7 +661,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                                 </div>
                                                             ) : (
                                                                 <>
-                                                                    <span className="text-sm font-semibold text-neutral-700 truncate">{link.title || "Audio Attachment"}</span>
+                                                                    <span className="text-sm font-semibold text-neutral-700 truncate">{link.title || `${getFileTypeLabel(fileType)} Attachment`}</span>
                                                                     <button
                                                                         onClick={() => {
                                                                             setEditingAttachmentId(link.id);
@@ -674,6 +676,18 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                         </div>
                                                         <AttachmentPreviewLarge url={link.url} title={link.title} type={link.type} />
                                                         <div className="flex items-center justify-end px-1">
+                                                            {!link.isCover && (fileType === 'pdf' || fileType === 'video') ? (
+                                                                <button
+                                                                    onClick={() => executeUpdateAttachmentCover({ id: link.id, cardId: data.id, boardId })}
+                                                                    className="text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 mr-auto"
+                                                                >
+                                                                    <Layout className="w-3 h-3" /> Make Cover
+                                                                </button>
+                                                            ) : link.isCover && (fileType === 'pdf' || fileType === 'video') ? (
+                                                                <button className="text-xs font-medium text-white bg-blue-600 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 cursor-default mr-auto">
+                                                                    <CheckSquare className="w-3 h-3" /> Current Cover
+                                                                </button>
+                                                            ) : null}
                                                             <button
                                                                 onClick={() => executeDeleteAttachment({ id: link.id, boardId })}
                                                                 className="text-xs font-medium text-red-600 hover:text-red-700 bg-neutral-100 hover:bg-neutral-200 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1"

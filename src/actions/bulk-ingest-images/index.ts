@@ -4,15 +4,16 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { actionClient } from "@/lib/create-safe-action";
 import { BulkIngestSchema } from "./schema";
+import { detectFileType } from "@/lib/file-type-utils";
+import { google } from "googleapis";
 
-const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"];
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 
-async function listDriveFolder(folderId: string): Promise<{ name: string; url: string; id: string }[]> {
+async function listDriveFolder(folderId: string): Promise<{ name: string; url: string; id: string; mimeType: string }[]> {
     const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
     if (!apiKey) throw new Error("GOOGLE_DRIVE_API_KEY is not set.");
 
-    const results: { name: string; url: string; id: string }[] = [];
+    const results: { name: string; url: string; id: string; mimeType: string }[] = [];
     let pageToken: string | undefined;
 
     do {
@@ -29,17 +30,32 @@ async function listDriveFolder(folderId: string): Promise<{ name: string; url: s
 
         const data = await res.json();
         for (const file of data.files || []) {
-            if (!file.mimeType.startsWith("image/")) continue;
-            const ext = `.${file.name.split(".").pop()?.toLowerCase()}`;
-            if (!IMAGE_EXTENSIONS.includes(ext)) continue;
-
+            // Include all files
             const url = `/api/drive-image?id=${file.id}`;
-            results.push({ name: file.name, url, id: file.id });
+            results.push({ name: file.name, url, id: file.id, mimeType: file.mimeType });
         }
         pageToken = data.nextPageToken;
     } while (pageToken);
 
     return results;
+}
+
+async function getDriveFileContent(fileId: string): Promise<string> {
+    const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    if (!serviceAccountJson) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set");
+
+    const credentials = JSON.parse(serviceAccountJson);
+    const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ["https://www.googleapis.com/auth/drive.readonly"],
+    });
+
+    const drive = google.drive({ version: "v3", auth });
+    const response = await drive.files.get(
+        { fileId, alt: "media" },
+        { responseType: "text" }
+    );
+    return response.data as string;
 }
 
 function extractNumbers(str: string): number[] {
@@ -55,7 +71,19 @@ function fuzzyMatchList(prefix: string, listTitle: string): boolean {
 
 function parseFilename(name: string) {
     const nameWithoutExt = name.replace(/\.[^/.]+$/, "");
-    const delimiter = nameWithoutExt.includes("_") ? "_" : " ";
+    
+    // Support multiple delimiters: Sc001_Title, Sc001 Title, Sc001-Title, Sc001 - Title
+    let delimiter = " ";
+    if (nameWithoutExt.includes("_")) delimiter = "_";
+    else if (nameWithoutExt.includes(" - ")) delimiter = " - ";
+    else if (nameWithoutExt.includes("-")) {
+        // Only use - as delimiter if it looks like a prefix split, not a word hyphen
+        const parts = nameWithoutExt.split("-");
+        if (parts[0].match(/[a-zA-Z]*\d+/) || parts[0].length < 10) {
+            delimiter = "-";
+        }
+    }
+    
     const parts = nameWithoutExt.split(delimiter);
     if (parts.length > 1) {
         return { scenePrefix: parts[0].trim(), cardName: parts.slice(1).join(delimiter).trim() };
@@ -69,7 +97,7 @@ export const bulkIngestImages = actionClient
         try {
             console.log(`[BulkIngest] Optimized Transaction Start (${boardId})`);
 
-            let allFiles = resolvedFiles || [];
+            let allFiles = (resolvedFiles as any[]) || [];
             if (allFiles.length === 0) {
                 for (const url of urls) {
                     const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
@@ -84,13 +112,43 @@ export const bulkIngestImages = actionClient
             });
             const cardMap = new Map(existingCards.map(c => [`${c.listId}_${c.title.toLowerCase()}`, c]));
 
+            // Pre-parse and pre-fetch JSON if needed
+            const processedFiles = [];
+            for (const file of allFiles) {
+                let scenePrefix = "";
+                let cardName = "";
+                let description = "";
+
+                if (file.mimeType === "application/json") {
+                    try {
+                        const content = await getDriveFileContent(file.id);
+                        const json = JSON.parse(content);
+                        const rawTitle = json.title || file.name.replace(/\.json$/, "");
+                        description = json.description || "";
+                        
+                        const parsed = parseFilename(rawTitle);
+                        scenePrefix = parsed.scenePrefix;
+                        cardName = parsed.cardName;
+                    } catch (e) {
+                        const parsed = parseFilename(file.name);
+                        scenePrefix = parsed.scenePrefix;
+                        cardName = parsed.cardName;
+                    }
+                } else {
+                    const parsed = parseFilename(file.name);
+                    scenePrefix = parsed.scenePrefix;
+                    cardName = parsed.cardName;
+                }
+
+                processedFiles.push({ ...file, scenePrefix, cardName, description });
+            }
+
             if (isAnalysis) {
                 const conflicts: any[] = [];
-                for (const file of allFiles) {
-                    const { scenePrefix, cardName } = parseFilename(file.name);
-                    const list = existingLists.find(l => fuzzyMatchList(scenePrefix, l.title));
-                    if (list && cardMap.has(`${list.id}_${cardName.toLowerCase()}`)) {
-                        conflicts.push({ name: file.name, cardName, listTitle: list.title });
+                for (const file of processedFiles) {
+                    const list = existingLists.find(l => fuzzyMatchList(file.scenePrefix, l.title));
+                    if (list && cardMap.has(`${list.id}_${file.cardName.toLowerCase()}`)) {
+                        conflicts.push({ name: file.name, cardName: file.cardName, listTitle: list.title });
                     }
                 }
                 if (conflicts.length === 0) { isAnalysis = false; }
@@ -103,8 +161,8 @@ export const bulkIngestImages = actionClient
 
             // Perform all operations in a single Transaction for speed
             await db.$transaction(async (tx) => {
-                for (const file of allFiles) {
-                    const { scenePrefix, cardName } = parseFilename(file.name);
+                for (const file of processedFiles) {
+                    const { scenePrefix, cardName, description } = file;
                     if (!cardName) continue;
 
                     let list = listRef.find(l => fuzzyMatchList(scenePrefix, l.title));
@@ -127,18 +185,26 @@ export const bulkIngestImages = actionClient
                     } else {
                         const lastOrder = existingCards.filter(c => c.listId === list!.id).reduce((max, c) => Math.max(max, c.order), -1);
                         card = await tx.card.create({
-                            data: { title: cardName, order: lastOrder + 1, listId: list.id }
+                            data: { 
+                                title: cardName, 
+                                description: description || null,
+                                order: lastOrder + 1, 
+                                listId: list.id 
+                            }
                         });
                         cardMap.set(cardKey, card);
                         existingCards.push(card);
                     }
 
+                    const fileType = detectFileType(file.url);
+                    const isImage = fileType === "image" || fileType === "svg";
+
                     await tx.attachment.create({
                         data: {
                             url: file.url,
                             title: file.name,
-                            type: "IMAGE",
-                            isCover: true,
+                            type: isImage ? "IMAGE" : "LINK",
+                            isCover: isImage,
                             cardId: card.id,
                         }
                     });
@@ -155,3 +221,5 @@ export const bulkIngestImages = actionClient
             throw new Error(error.message || "Failed to process folder.");
         }
     });
+
+

@@ -287,7 +287,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
             // Handle Ingest Result (Success)
             if (data && "count" in data) {
                 console.log(`[BulkIngest] Ingest complete. Count: ${data.count}`);
-                addToast(`Successfully ingested ${data.count} images`, "success");
+                addToast(`Successfully ingested ${data.count} files`, "success");
                 setIngestUrls("");
                 setIsOpen(false);
                 setShowConflictModal(false);
@@ -395,6 +395,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
             {/* Search and Filter UI Relocated Here */}
             <div className="flex items-center gap-x-2 mr-2">
                 <SnapshotSelector boardId={boardId} />
+                <DownloadBoardPDF boardId={boardId} boardTitle={boardLists[0]?.board?.title || "Board Export"} />
                 {/* ShotGrid-style Label Filter Split Button */}
                 <div className="relative flex items-center shadow-lg">
                     <button
@@ -771,12 +772,12 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                     </div>
 
                     <div>
-                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><Download className="h-3 w-3" /> Bulk Ingest Images</h4>
+                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><Download className="h-3 w-3" /> Bulk Ingest Files</h4>
                         <form onSubmit={onIngestSubmit} className="flex flex-col gap-y-2 mb-4">
                             <textarea
                                 value={ingestUrls}
                                 onChange={(e) => setIngestUrls(e.target.value)}
-                                placeholder={"Paste a Google Drive folder URL...\nFiles named: Sc001_CARDNAME.jpg"}
+                                placeholder={"Paste a Google Drive folder URL...\nFiles named: Sc001_CARDNAME.ext"}
                                 className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-orange-600 w-full min-h-[60px]"
                                 disabled={anyLoading}
                             />

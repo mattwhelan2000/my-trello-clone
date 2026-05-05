@@ -274,6 +274,7 @@ export const createCard = actionClient
             revalidatePath(`/board/${boardId}`);
             return card;
         } catch (error) {
-            throw new Error("Failed to create card.");
+            console.error("[CREATE_CARD_ERROR]", error);
+            throw new Error(error instanceof Error ? error.message : "Failed to create card.");
         }
     });

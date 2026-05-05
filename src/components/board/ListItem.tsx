@@ -188,7 +188,8 @@ export const ListItem = ({
         },
         onError: (error) => {
             console.error(error);
-            addToast("Failed to create card", "error");
+            const message = error.serverError || "Failed to create card";
+            addToast(message, "error");
         }
     });
 
