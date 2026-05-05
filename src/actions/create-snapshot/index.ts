@@ -17,7 +17,8 @@ export const createSnapshot = actionClient
                 select: {
                     id: true,
                     isSlim: true,
-                    displayThumbnails: true
+                    displayThumbnails: true,
+                    thumbnailMode: true
                 }
             });
 

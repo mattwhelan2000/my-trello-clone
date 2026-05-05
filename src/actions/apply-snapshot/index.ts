@@ -20,19 +20,42 @@ export const applySnapshot = actionClient
 
             const snapshotData = snapshot.data as any[];
 
-            // 2. Perform bulk update
-            // We use a transaction for all updates
-            const updates = snapshotData.map((item: any) => 
-                db.card.updateMany({
-                    where: { id: item.id },
-                    data: {
-                        isSlim: item.isSlim,
-                        displayThumbnails: item.displayThumbnails
-                    }
-                })
-            );
+            if (snapshotData.length === 0) {
+                throw new Error("Snapshot is empty.");
+            }
 
-            await db.$transaction(updates);
+            // 2. Build efficient bulk update using raw SQL with CASE expressions
+            // This replaces ~N individual updateMany calls with a single query
+            const ids = snapshotData.map((item: any) => item.id);
+            
+            let slimCases = "";
+            let thumbCases = "";
+            let modeCases = "";
+            
+            for (const item of snapshotData) {
+                const escapedId = item.id.replace(/'/g, "''");
+                slimCases += `WHEN id = '${escapedId}' THEN ${item.isSlim ? 'true' : 'false'} `;
+                thumbCases += `WHEN id = '${escapedId}' THEN ${item.displayThumbnails !== false ? 'true' : 'false'} `;
+                if (item.thumbnailMode) {
+                    modeCases += `WHEN id = '${escapedId}' THEN '${item.thumbnailMode === 'contain' ? 'contain' : 'cover'}' `;
+                }
+            }
+            
+            const idList = ids.map((id: string) => `'${id.replace(/'/g, "''")}'`).join(",");
+            
+            let sql = `UPDATE "Card" SET 
+                "isSlim" = CASE ${slimCases} ELSE "isSlim" END,
+                "displayThumbnails" = CASE ${thumbCases} ELSE "displayThumbnails" END`;
+            
+            if (modeCases) {
+                sql += `,
+                "thumbnailMode" = CASE ${modeCases} ELSE "thumbnailMode" END`;
+            }
+            
+            sql += `
+                WHERE id IN (${idList})`;
+            
+            await db.$executeRawUnsafe(sql);
 
             revalidatePath(`/board/${boardId}`);
             return { success: true, count: snapshotData.length };
