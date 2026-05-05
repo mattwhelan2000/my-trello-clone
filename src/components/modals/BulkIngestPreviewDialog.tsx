@@ -77,27 +77,12 @@ export function BulkIngestPreviewDialog({
         }
     }, [isOpen, files]);
 
-    if (!isOpen) return null;
-
-    const toggleFile = (name: string) => {
-        const next = new Set(enabledFiles);
-        if (next.has(name)) next.delete(name);
-        else next.add(name);
-        setEnabledFiles(next);
-    };
-
-    const toggleAll = (on: boolean) => {
-        setEnabledFiles(on ? new Set(files.map(f => f.name)) : new Set());
-    };
-
-    const enabledCount = enabledFiles.size;
-    const duplicateCount = files.filter(f => f && f.isDuplicate && enabledFiles.has(f.name)).length;
-
     // Group files by their matched list
     const grouped = useMemo(() => {
         if (!groupByList) return { "All Files": files };
         const groups: Record<string, PreviewFile[]> = {};
         for (const f of files) {
+            if (!f) continue;
             const key = f.matchedListTitle || "⚠️ No Matching List";
             if (!groups[key]) groups[key] = [];
             groups[key].push(f);
@@ -114,6 +99,23 @@ export function BulkIngestPreviewDialog({
             resolvedFiles,
         });
     };
+
+    const toggleFile = (name: string) => {
+        const next = new Set(enabledFiles);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        setEnabledFiles(next);
+    };
+
+    const toggleAll = (on: boolean) => {
+        setEnabledFiles(on ? new Set(files.map(f => f.name)) : new Set());
+    };
+
+    if (!isOpen) return null;
+
+    const enabledCount = enabledFiles.size;
+    const duplicateCount = files.filter(f => f && f.isDuplicate && enabledFiles.has(f.name)).length;
+
 
     return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
