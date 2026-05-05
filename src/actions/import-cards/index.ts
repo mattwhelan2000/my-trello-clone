@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { actionClient } from "@/lib/create-safe-action";
+import { ImportCardsSchema } from "./schema";
 import { parseFilename, fuzzyMatchList } from "@/lib/import-utils";
 
 export const importCards = actionClient

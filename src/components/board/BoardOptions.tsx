@@ -93,6 +93,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     // Search and Filter State from Global Store
     const { 
+        boardLists,
         query, 
         setQuery, 
         searchCards, 
