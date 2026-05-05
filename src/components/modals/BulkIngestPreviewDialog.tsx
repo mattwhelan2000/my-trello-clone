@@ -70,6 +70,13 @@ export function BulkIngestPreviewDialog({
     const [showLabelInput, setShowLabelInput] = useState(false);
     const [groupByList, setGroupByList] = useState(true);
 
+    // Sync enabled files whenever the dialog opens or files change
+    React.useEffect(() => {
+        if (isOpen && files.length > 0) {
+            setEnabledFiles(new Set(files.filter(f => f && f.name).map(f => f.name)));
+        }
+    }, [isOpen, files]);
+
     if (!isOpen) return null;
 
     const toggleFile = (name: string) => {
@@ -84,7 +91,7 @@ export function BulkIngestPreviewDialog({
     };
 
     const enabledCount = enabledFiles.size;
-    const duplicateCount = files.filter(f => f.isDuplicate && enabledFiles.has(f.name)).length;
+    const duplicateCount = files.filter(f => f && f.isDuplicate && enabledFiles.has(f.name)).length;
 
     // Group files by their matched list
     const grouped = useMemo(() => {

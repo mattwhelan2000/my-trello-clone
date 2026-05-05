@@ -307,6 +307,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                 const files = (data.resolvedFiles || []) as any[];
                 setPreviewFiles(preview);
                 setResolvedFiles(files);
+                setIsFetchingFolder(false);
                 setShowPreviewDialog(true);
                 return;
             }
@@ -320,16 +321,16 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     const onIngestSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const urlInput = ingestUrls.trim();
-        if (!urlInput) return;
+        try {
+            const urlInput = ingestUrls.trim();
+            if (!urlInput) return;
 
-        setIsFetchingFolder(true);
+            setIsFetchingFolder(true);
 
-        // Detect Dropbox shared folder URL
-        const isDropbox = urlInput.includes("dropbox.com");
-        if (isDropbox) {
-            // Fetch file list from Dropbox via our API route
-            try {
+            // Detect Dropbox shared folder URL
+            const isDropbox = urlInput.includes("dropbox.com");
+            if (isDropbox) {
+                // Fetch file list from Dropbox via our API route
                 const res = await fetch(`/api/list-dropbox-folder?url=${encodeURIComponent(urlInput)}`);
                 if (!res.ok) {
                     const err = await res.json();
@@ -350,20 +351,21 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                     isAnalysis: true,
                     resolvedFiles: files,
                 });
-            } catch (err) {
-                addToast("Failed to connect to Dropbox. Check your access token.", "error");
-                setIsFetchingFolder(false);
+                return;
             }
-            return;
-        }
 
-        // Google Drive folder — run analysis server-side
-        const urls = urlInput.split("\n").map((u: string) => u.trim()).filter(Boolean);
-        executeIngest({
-            boardId,
-            urls,
-            isAnalysis: true,
-        });
+            // Google Drive folder — run analysis server-side
+            const urls = urlInput.split("\n").map((u: string) => u.trim()).filter(Boolean);
+            executeIngest({
+                boardId,
+                urls,
+                isAnalysis: true,
+            });
+        } catch (err: any) {
+            console.error("[BulkIngest] Submit Error:", err);
+            addToast("A critical error occurred while scanning. Check console for details.", "error");
+            setIsFetchingFolder(false);
+        }
     };
 
     const onConfirmPreviewIngest = (opts: {
