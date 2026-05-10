@@ -196,7 +196,7 @@ export const bulkIngestImages = actionClient
                         existingCards.push(card);
                     }
 
-                    const fileType = detectFileType(file.url);
+                    const fileType = detectFileType(file.name);
                     const isImage = fileType === "image" || fileType === "svg";
 
                     await tx.attachment.create({

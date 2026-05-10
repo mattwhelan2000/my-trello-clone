@@ -62,6 +62,8 @@ model Card {
   color             String?
   fontColor         String?
   syncGroupId       String?
+  shotCount         String?
+  vfxAssetNumbers   String?
   isSyncedWithSheet Boolean     @default(true)
   displayThumbnails Boolean     @default(true)
   thumbnailMode     String      @default("cover")

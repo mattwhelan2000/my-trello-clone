@@ -2,7 +2,7 @@
 
 import { Modal } from "@/components/modals/Modal";
 import { useState, useRef, ElementRef, useEffect } from "react";
-import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Plus, Trash2, Copy, Layers, Share2, MoreHorizontal, Eye, EyeOff, MinusSquare, Maximize2, Pencil, Check } from "lucide-react";
+import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Plus, Trash2, Copy, Layers, Share2, MoreHorizontal, Eye, EyeOff, MinusSquare, Maximize2, Pencil, Check, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateCard } from "@/actions/update-card";
@@ -62,6 +62,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [customColors, setCustomColors] = useState<string[]>([]);
     const [editingAttachmentId, setEditingAttachmentId] = useState<string | null>(null);
     const [editingAttachmentTitle, setEditingAttachmentTitle] = useState("");
+    const [previewingAttachmentId, setPreviewingAttachmentId] = useState<string | null>(null);
     const [isMounted, setIsMounted] = useState(false);
     const { addToast } = useToast();
     const router = useRouter();
@@ -588,6 +589,24 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                             <p className="text-sm text-neutral-500">
                                 in list <span className="underline">{fetchedLists.find((l: any) => l.id === data.listId)?.title || "..."}</span>
                             </p>
+                            {data.shotCount && (
+                                <div className="flex flex-col gap-y-1">
+                                    <h3 className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Shot Count</h3>
+                                    <div className="flex items-center gap-x-1.5 px-2 py-1 bg-yellow-500/10 text-yellow-700 border border-yellow-500/20 rounded-md text-xs font-bold shadow-sm">
+                                        <Zap className="h-3.5 w-3.5" />
+                                        <span>{data.shotCount} Shots</span>
+                                    </div>
+                                </div>
+                            )}
+                            {data.vfxAssetNumbers && (
+                                <div className="flex flex-col gap-y-1">
+                                    <h3 className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Asset IDs</h3>
+                                    <div className="flex items-center gap-x-1.5 px-2 py-1 bg-blue-500/10 text-blue-700 border border-blue-500/20 rounded-md text-xs font-bold shadow-sm">
+                                        <Layers className="h-3.5 w-3.5" />
+                                        <span className="truncate max-w-[200px]" title={data.vfxAssetNumbers}>{data.vfxAssetNumbers}</span>
+                                    </div>
+                                </div>
+                            )}
                             {optimisticDueDate && (
                                 <div className="flex flex-col gap-y-1">
                                     <h3 className="text-xs font-semibold text-neutral-500 uppercase">Due Date</h3>
@@ -627,6 +646,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                     <div className="flex flex-col gap-y-3">
                                         {linkAttachments.map((link: any) => {
                                             const fileType = detectFileType(link.url);
+                                            const isPreviewOpen = previewingAttachmentId === link.id;
                                             const isAudio = fileType === 'audio';
                                             const hasLargePreview = ['audio', 'pdf', 'video', 'office-word', 'office-excel', 'office-powerpoint'].includes(fileType);
 
@@ -660,30 +680,23 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                                     </button>
                                                                 </div>
                                                             ) : (
-                                                                <>
-                                                                    <span className="text-sm font-semibold text-neutral-700 truncate">{link.title || `${getFileTypeLabel(fileType)} Attachment`}</span>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setEditingAttachmentId(link.id);
-                                                                            setEditingAttachmentTitle(link.title || "");
-                                                                        }}
-                                                                        className="opacity-0 group-hover/title:opacity-100 p-1 hover:bg-neutral-200 rounded-sm transition"
-                                                                    >
-                                                                        <Pencil className="w-3 h-3 text-neutral-500" />
-                                                                    </button>
-                                                                </>
+                                                                    <div className="flex items-center justify-between w-full"><div className="flex items-center gap-x-2 flex-1 min-w-0"><span className="text-sm font-semibold text-neutral-700 truncate">{link.title || `${getFileTypeLabel(fileType)} Attachment`}</span><button onClick={() => { setEditingAttachmentId(link.id); setEditingAttachmentTitle(link.title || ""); }} className="opacity-0 group-hover/title:opacity-100 p-1 hover:bg-neutral-200 rounded-sm transition"><Pencil className="w-3 h-3 text-neutral-500" /></button></div><button onClick={() => setPreviewingAttachmentId(isPreviewOpen ? null : link.id)} className={`flex items-center gap-x-1.5 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-tight transition ${isPreviewOpen ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}>{isPreviewOpen ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}{isPreviewOpen ? "Hide Preview" : "View Preview"}</button></div>
                                                             )}
                                                         </div>
-                                                        <AttachmentPreviewLarge url={link.url} title={link.title} type={link.type} />
+                                                        {isPreviewOpen && (
+                                                            <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                                                                <AttachmentPreviewLarge url={link.url} title={link.title} type={link.type} />
+                                                            </div>
+                                                        )}
                                                         <div className="flex items-center justify-end px-1">
-                                                            {!link.isCover && (fileType === 'pdf' || fileType === 'video') ? (
+                                                            {!link.isCover && (fileType === 'pdf' || fileType === 'video' || fileType === 'image' || fileType === 'svg') ? (
                                                                 <button
                                                                     onClick={() => executeUpdateAttachmentCover({ id: link.id, cardId: data.id, boardId })}
                                                                     className="text-xs font-medium text-neutral-600 hover:text-neutral-900 bg-neutral-200 hover:bg-neutral-300 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 mr-auto"
                                                                 >
                                                                     <Layout className="w-3 h-3" /> Make Cover
                                                                 </button>
-                                                            ) : link.isCover && (fileType === 'pdf' || fileType === 'video') ? (
+                                                            ) : link.isCover && (fileType === 'pdf' || fileType === 'video' || fileType === 'image' || fileType === 'svg') ? (
                                                                 <button className="text-xs font-medium text-white bg-blue-600 px-3 py-1.5 rounded-sm transition flex items-center gap-x-1 cursor-default mr-auto">
                                                                     <CheckSquare className="w-3 h-3" /> Current Cover
                                                                 </button>
@@ -727,7 +740,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full group/link">
+                                                        <a href={formatImageUrl(link.url) || link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full group/link">
                                                             <AttachmentPreview url={link.url} thumbnailUrl={link.thumbnailUrl} title={link.title} type={link.type} />
                                                             <div className="flex flex-col min-w-0 pr-2 pb-1 flex-1 relative">
                                                                 <div className="flex items-center gap-x-2">

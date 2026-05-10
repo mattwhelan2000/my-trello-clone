@@ -8,7 +8,7 @@ import { parseFilename, fuzzyMatchList } from "@/lib/import-utils";
 
 export const importCards = actionClient
     .schema(ImportCardsSchema)
-    .action(async ({ parsedInput: { boardId, listId, cardsJson } }) => {
+    .action(async ({ parsedInput: { boardId, listId, cardsJson, isAnalysis, cardOverrides, globalColor, globalLabel, globalLabelColor } }) => {
         try {
             let cardsToImport = JSON.parse(cardsJson);
             
@@ -23,12 +23,47 @@ export const importCards = actionClient
                 orderBy: { order: "asc" }
             });
 
-            const defaultList = allLists.find(l => l.id === listId);
-            if (!defaultList) throw new Error("Target list not found");
+            // Fetch existing cards to detect duplicates
+            const existingCards = await db.card.findMany({
+                where: { listId: { in: allLists.map(l => l.id) } },
+                select: { title: true, listId: true }
+            });
 
+            if (isAnalysis) {
+                const preview = cardsToImport.map((cardData: any, index: number) => {
+                    const title = cardData.title || `Card ${index + 1}`;
+                    const { scenePrefix } = parseFilename(title);
+                    
+                    let matchedList = allLists.find(l => l.id === listId);
+                    if (scenePrefix) {
+                        const fuzzy = allLists.find(l => fuzzyMatchList(scenePrefix, l.title));
+                        if (fuzzy) matchedList = fuzzy;
+                    }
+
+                    const isDuplicate = existingCards.some(ec => 
+                        ec.title.toLowerCase() === title.toLowerCase() && 
+                        ec.listId === matchedList?.id
+                    );
+
+                    return {
+                        name: title, // Using name for the unique key in UI
+                        url: "",
+                        cardName: title,
+                        scenePrefix,
+                        mimeType: "application/json",
+                        matchedListTitle: matchedList?.title || null,
+                        matchedListId: matchedList?.id || null,
+                        isDuplicate,
+                        // Pass through original data
+                        data: cardData
+                    };
+                });
+
+                return { preview, success: true };
+            }
+
+            // --- ACTUAL IMPORT MODE ---
             const results = [];
-
-            // We need to keep track of orders for each list we might insert into
             const listOrders: Record<string, number> = {};
             
             // Initialize orders for lists we touch
@@ -42,33 +77,51 @@ export const importCards = actionClient
             }
 
             for (const cardData of cardsToImport) {
-                // Determine target list based on fuzzy matching
-                let targetListId = listId;
-                const { scenePrefix } = parseFilename(cardData.title || "");
-                
-                if (scenePrefix) {
-                    const matchedList = allLists.find(l => fuzzyMatchList(scenePrefix, l.title));
-                    if (matchedList) {
-                        targetListId = matchedList.id;
+                const title = cardData.title || "Untitled Card";
+                const override = cardOverrides?.[title];
+
+                // Skip if disabled in preview
+                if (override && override.enabled === false) continue;
+
+                // Determine target list
+                let targetListId = override?.listId || listId;
+                if (!override?.listId) {
+                    const { scenePrefix } = parseFilename(title);
+                    if (scenePrefix) {
+                        const matchedList = allLists.find(l => fuzzyMatchList(scenePrefix, l.title));
+                        if (matchedList) {
+                            targetListId = matchedList.id;
+                        }
                     }
                 }
 
+                // Merge color/label: per-file override > global > original data
+                const finalColor = override?.color || globalColor || cardData.color || null;
+                const finalLabel = override?.label || globalLabel || null;
+                const finalLabelColor = override?.labelColor || globalLabelColor || null;
+
                 const card = await db.card.create({
                     data: {
-                        title: cardData.title || "Untitled Card",
+                        title: title,
                         description: cardData.description,
                         order: listOrders[targetListId]++,
                         listId: targetListId,
-                        color: cardData.color,
+                        color: finalColor,
                         fontColor: cardData.fontColor,
                         isSlim: cardData.isSlim ?? false,
                         displayThumbnails: cardData.displayThumbnails ?? true,
                         dueDate: cardData.dueDate ? new Date(cardData.dueDate) : null,
                         labels: {
-                            create: (cardData.labels || []).map((l: any) => ({
-                                title: l.title,
-                                color: l.color,
-                            }))
+                            create: [
+                                ...(cardData.labels || []).map((l: any) => ({
+                                    title: l.title,
+                                    color: l.color,
+                                })),
+                                ...(finalLabel ? [{
+                                    title: finalLabel,
+                                    color: finalLabelColor || "#6b7280",
+                                }] : [])
+                            ]
                         },
                         attachments: {
                             create: (cardData.attachments || []).map((a: any) => ({

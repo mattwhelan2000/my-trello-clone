@@ -1,6 +1,11 @@
 export const formatImageUrl = (url: string | undefined | null) => {
     if (!url) return url;
 
+    // If it's already an internal API proxy or relative path, don't mangle it
+    if (url.startsWith("/") || url.includes("/api/")) {
+        return url;
+    }
+
     // Convert Dropbox links to direct download formats and wrap in proxy for persistence
     if (url.includes("dropbox.com") || url.includes("dropboxusercontent.com")) {
         let directUrl = url;

@@ -18,15 +18,27 @@ const TEXT_EXTENSIONS = ['txt', 'log', 'ini', 'cfg', 'conf'];
 function getExtension(url: string): string {
     try {
         const urlObj = new URL(url);
-        const pathname = urlObj.pathname;
+        let pathname = urlObj.pathname;
+        
+        // If pathname has no extension, check query parameters (useful for proxies)
+        if (!pathname.includes('.')) {
+            const params = Array.from(urlObj.searchParams.values());
+            for (const val of params) {
+                if (val.includes('.')) {
+                    pathname = val;
+                    break;
+                }
+            }
+        }
+
         const lastDot = pathname.lastIndexOf('.');
         if (lastDot === -1) return '';
-        return pathname.substring(lastDot + 1).toLowerCase().split('?')[0];
+        return pathname.substring(lastDot + 1).toLowerCase().split(/[?#]/)[0];
     } catch {
         // Fallback for non-URL strings
         const lastDot = url.lastIndexOf('.');
         if (lastDot === -1) return '';
-        return url.substring(lastDot + 1).toLowerCase().split('?')[0];
+        return url.substring(lastDot + 1).toLowerCase().split(/[?#]/)[0];
     }
 }
 
@@ -36,6 +48,12 @@ export function detectFileType(url: string): FileCategory {
 
     if (IMAGE_EXTENSIONS.includes(ext)) return 'image';
     if (SVG_EXTENSIONS.includes(ext)) return 'svg';
+    
+    // Special case for our internal Drive image proxy which doesn't expose extensions in the URL
+    if (url.includes("/api/drive-image")) return 'image';
+    if (url.includes("/api/dropbox-file")) return 'image';
+    if (url.includes("/api/proxy-image") && url.includes(".jpg")) return 'image'; // Heuristic
+
     if (PDF_EXTENSIONS.includes(ext)) return 'pdf';
     if (VIDEO_EXTENSIONS.includes(ext)) return 'video';
     if (AUDIO_EXTENSIONS.includes(ext)) return 'audio';

@@ -8,7 +8,7 @@ import { google } from "googleapis";
 
 export const syncGoogleSheet = actionClient
     .schema(SyncGoogleSheetSchema)
-    .action(async ({ parsedInput: { boardId } }) => {
+    .action(async ({ parsedInput: { boardId, analyze, tabName: passedTabName } }) => {
         try {
             const board = await db.board.findUnique({
                 where: { id: boardId },
@@ -38,12 +38,10 @@ export const syncGoogleSheet = actionClient
             
             if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
                 try {
-                    // Try parsing the JSON string (could be stringified JSON or base64)
                     let credentials;
                     try {
                         credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
                     } catch {
-                        // If it fails, try decoding from base64 first
                         credentials = JSON.parse(Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_JSON, 'base64').toString('utf-8'));
                     }
 
@@ -53,28 +51,25 @@ export const syncGoogleSheet = actionClient
                     });
                 } catch (err) {
                     console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON", err);
-                    throw new Error("Failed to parse Google Service Account credentials. Check your .env file.");
+                    throw new Error("Failed to parse Google Service Account credentials.");
                 }
             } else {
-                // Fallback to simple API key if provided instead
                 authClient = process.env.GOOGLE_API_KEY;
             }
 
             const sheets = google.sheets({ version: 'v4', auth: authClient });
 
-            // Sanitize board title for tab name: Google Sheets disallows * ? : [ ] \ /
-            const tabName = board.title.replace(/[*?:\[\]\\/]/g, '').trim().substring(0, 100) || "Board Export";
+            // Determine Tab Name
+            const tabName = passedTabName || board.title.replace(/[*?:\[\]\\/]/g, '').trim().substring(0, 100) || "Board Export";
 
             let rows: any[] = [];
             try {
-                // Try fetching specific board tab first
                 const response = await sheets.spreadsheets.values.get({
                     spreadsheetId: board.googleSheetId,
                     range: `'${tabName}'!A:Z`,
                 });
                 rows = response.data.values || [];
             } catch (err) {
-                // Fallback to default first sheet if tab doesn't exist (for older exports)
                 console.log(`Tab '${tabName}' not found. Falling back to default A:Z range.`);
                 const fallbackResponse = await sheets.spreadsheets.values.get({
                     spreadsheetId: board.googleSheetId,
@@ -87,43 +82,80 @@ export const syncGoogleSheet = actionClient
                 throw new Error("No data found in the linked Google Sheet.");
             }
 
-            // Strict V8 Mapping Headers (11 Columns)
-            // 0: SCENE, 1: INT/EXT, 2: LENGTH, 3: Scene LOCATION, 4: Scene DESCRIPTION
-            // 5: THUMBNAIL, 6: TIME, 7: SET LOCATION, 8: VFX, 9: VFX THUMBNAIL, 10: CHARACTERS
+            // V9 Mapping Headers (15 Columns)
+            // 0: SCENE, 1: INT/EXT, 2: LENGTH, 3: Scene LOCATION, 4: Scene DESCRIPTION, 5: THUMBNAIL, 6: TIME
+            // 7: SET LOCATION, 8: VFX, 9: SHOT COUNT, 10: DIFFICULTY, 11: VFX ASSETS (Asset Numbers), 12: VFX THUMBNAIL, 13: CHARACTERS, 14: PER SHOT COST
             const SCENE_IDX = 0;
             const INT_EXT_IDX = 1;
             const LENGTH_IDX = 2;
             const LOC_TITLE_IDX = 3;
             const LOC_DESC_IDX = 4;
-            const THUMBNAIL_IDX = 5;
             const TIME_IDX = 6;
             const SET_IDX = 7;
             const VFX_IDX = 8;
-            const VFX_THUMBNAIL_IDX = 9;
-            const CHAR_IDX = 10;
+            const SHOT_COUNT_IDX = 9;
+            const DIFFICULTY_IDX = 10;
+            const ASSETS_IDX = 11;
+            const CHAR_IDX = 13;
 
-            // Sync Logic
-            let listOrderCounter = Math.max(...board.lists.map(l => l.order), -1) + 1;
-
+            // Group rows by Scene
+            const sceneGroups: Record<string, any[]> = {};
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row[SCENE_IDX]) continue; 
-
+                if (!row[SCENE_IDX]) continue;
                 const sceneNum = String(row[SCENE_IDX]).trim();
-                const intExt = row[INT_EXT_IDX] ? String(row[INT_EXT_IDX]).trim() : "";
-                const length = row[LENGTH_IDX] ? String(row[LENGTH_IDX]).trim() : "";
-                
-                if (!sceneNum) continue;
+                if (!sceneGroups[sceneNum]) sceneGroups[sceneNum] = [];
+                sceneGroups[sceneNum].push(row);
+            }
 
+            const analysisSummary: any[] = [];
+            let listOrderCounter = Math.max(...board.lists.map(l => l.order), -1) + 1;
+
+            for (const [sceneNum, groupRows] of Object.entries(sceneGroups)) {
+                const firstRow = groupRows[0];
+                const intExt = firstRow[INT_EXT_IDX] ? String(firstRow[INT_EXT_IDX]).trim() : "";
+                const length = firstRow[LENGTH_IDX] ? String(firstRow[LENGTH_IDX]).trim() : "";
+                
                 let constructedTitle = sceneNum;
                 if (intExt) constructedTitle += ` ${intExt}`;
                 if (length) constructedTitle += ` - ${length}`;
 
-                // Find or create List
+                // Scene Metadata
+                const locTitle = firstRow[LOC_TITLE_IDX] ? String(firstRow[LOC_TITLE_IDX]).trim() : "Scene LOCATION";
+                const locDesc = firstRow[LOC_DESC_IDX] ? String(firstRow[LOC_DESC_IDX]).trim() : "";
+                const timeTitle = firstRow[TIME_IDX] ? String(firstRow[TIME_IDX]).trim() : "TIME";
+                const setDesc = firstRow[SET_IDX] ? String(firstRow[SET_IDX]).trim() : "";
+                const charDesc = firstRow[CHAR_IDX] ? String(firstRow[CHAR_IDX]).trim() : "";
+
+                // Analysis of List
                 let targetList = board.lists.find(l => l.title.startsWith(sceneNum));
+                const listAction = !targetList ? "CREATE" : (targetList.title !== constructedTitle ? "UPDATE" : "NONE");
                 
+                if (analyze) {
+                    const sceneChanges = {
+                        sceneNum,
+                        listAction,
+                        newTitle: constructedTitle,
+                        standardCards: [
+                            { title: "Scene LOCATION", action: "SYNC", detail: locTitle },
+                            { title: "TIME", action: "SYNC", detail: timeTitle },
+                            { title: "SET LOCATION", action: "SYNC", detail: setDesc },
+                            { title: "CHARACTERS", action: "SYNC", detail: charDesc },
+                        ],
+                        vfxCards: groupRows.filter(r => r[VFX_IDX]).map(r => ({
+                            title: String(r[VFX_IDX]).trim(),
+                            shotCount: r[SHOT_COUNT_IDX] ? String(r[SHOT_COUNT_IDX]).trim() : "",
+                            assets: r[ASSETS_IDX] ? String(r[ASSETS_IDX]).trim() : "",
+                            action: "SYNC"
+                        }))
+                    };
+                    analysisSummary.push(sceneChanges);
+                    continue;
+                }
+
+                // EXECUTION MODE
                 if (!targetList) {
-                    const newList = await db.list.create({
+                    targetList = await db.list.create({
                         data: {
                             boardId: board.id,
                             title: constructedTitle,
@@ -132,71 +164,57 @@ export const syncGoogleSheet = actionClient
                         },
                         include: { cards: true }
                     });
-                    board.lists.push(newList);
-                    targetList = newList;
-                } else if (targetList.isSyncedWithSheet && targetList.title !== constructedTitle) {
+                } else if (targetList.title !== constructedTitle) {
                     await db.list.update({
                         where: { id: targetList.id },
                         data: { title: constructedTitle }
                     });
                 }
 
-                // Process the 5 standard cards mapped directly to columns 3-8 by sequential order!
-                let sortedCards = (targetList.cards || []).sort((a, b) => a.order - b.order);
+                const sortedCards = (targetList.cards || []).sort((a, b) => a.order - b.order);
                 let cardOrderCounter = Math.max(...sortedCards.map(c => c.order), -1) + 1;
 
-                // Helper to update or create
-                const applyCardSync = async (
-                    cardIdx: number, 
-                    defaultTitle: string, 
-                    newTitle: string | undefined, 
-                    newDesc: string | undefined
-                ) => {
-                    const existingCard = sortedCards[cardIdx];
-                    if (existingCard) {
-                        if (existingCard.isSyncedWithSheet) {
-                            const dataToUpdate: any = {};
-                            if (newTitle !== undefined && existingCard.title !== newTitle) dataToUpdate.title = newTitle;
-                            if (newDesc !== undefined && existingCard.description !== newDesc) dataToUpdate.description = newDesc;
-                            
-                            if (Object.keys(dataToUpdate).length > 0) {
-                                await db.card.update({
-                                    where: { id: existingCard.id },
-                                    data: dataToUpdate
-                                });
-                            }
-                        }
-                    } else if (newTitle || newDesc) { // Only create if missing and has data
-                        const newC = await db.card.create({
-                            data: {
-                                listId: targetList!.id,
-                                title: newTitle || defaultTitle,
-                                description: newDesc || "",
-                                order: cardOrderCounter++,
-                                isSyncedWithSheet: true
-                            }
-                        });
-                        sortedCards.push(newC);
+                const applyCardSync = async (idx: number, defaultTitle: string, newTitle: string | undefined, newDesc: string | undefined, extras?: any) => {
+                    const existing = sortedCards[idx];
+                    const data = { 
+                        title: newTitle || defaultTitle, 
+                        description: newDesc || "", 
+                        isSyncedWithSheet: true,
+                        ...extras 
+                    };
+                    if (existing) {
+                        await db.card.update({ where: { id: existing.id }, data });
+                    } else {
+                        await db.card.create({ data: { listId: targetList!.id, order: cardOrderCounter++, ...data } });
                     }
                 };
 
-                const locTitle = row[LOC_TITLE_IDX] ? String(row[LOC_TITLE_IDX]).trim() : "Scene LOCATION";
-                const locDesc = row[LOC_DESC_IDX] ? String(row[LOC_DESC_IDX]).trim() : "";
-                const timeTitle = row[TIME_IDX] ? String(row[TIME_IDX]).trim() : "TIME";
-                const setDesc = row[SET_IDX] ? String(row[SET_IDX]).trim() : "";
-                const vfxDesc = row[VFX_IDX] ? String(row[VFX_IDX]).trim() : "";
-                const charDesc = row[CHAR_IDX] ? String(row[CHAR_IDX]).trim() : "";
-
-                // 0: Scene Location (Col 3 = Title, Col 4 = Desc)
+                // Standard Cards
                 await applyCardSync(0, "Scene LOCATION", locTitle, locDesc);
-                // 1: Time (Col 5 = Title)
                 await applyCardSync(1, "TIME", timeTitle, undefined);
-                // 2: Set Location (Col 6 = Desc)
                 await applyCardSync(2, "SET LOCATION", undefined, setDesc);
-                // 3: VFX (Col 7 = Desc)
-                await applyCardSync(3, "VFX", undefined, vfxDesc);
-                // 4: Characters (Col 8 = Desc)
                 await applyCardSync(4, "CHARACTERS", undefined, charDesc);
+
+                // VFX Cards (One per row in group)
+                // We start VFX cards at index 5 or overwrite existing VFX cards
+                let vfxCounter = 0;
+                for (const row of groupRows) {
+                    const vfxTitle = row[VFX_IDX] ? String(row[VFX_IDX]).trim() : null;
+                    if (!vfxTitle) continue;
+
+                    const shotCount = row[SHOT_COUNT_IDX] ? String(row[SHOT_COUNT_IDX]).trim() : "";
+                    const assets = row[ASSETS_IDX] ? String(row[ASSETS_IDX]).trim() : "";
+                    const vfxDesc = `Assets: ${assets}`;
+
+                    // Find existing card by title or by offset
+                    const cardIdx = 5 + vfxCounter;
+                    await applyCardSync(cardIdx, "VFX", vfxTitle, vfxDesc, { shotCount, vfxAssetNumbers: assets });
+                    vfxCounter++;
+                }
+            }
+
+            if (analyze) {
+                return { analysis: analysisSummary };
             }
 
             revalidatePath(`/board/${board.id}`);
@@ -204,6 +222,6 @@ export const syncGoogleSheet = actionClient
             
         } catch (error: any) {
             console.error("Google Sheets Sync Error:", error);
-            throw new Error("Failed to sync with Google Sheets. Please ensure the Sheet is 'Viewable by anyone with the link' and the ID is correct.");
+            throw new Error(error.message || "Failed to sync with Google Sheets.");
         }
     });

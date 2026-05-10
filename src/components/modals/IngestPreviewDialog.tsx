@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import {
     X, CheckSquare, Square, FileText, Music, Film, Image as ImageIcon,
-    File, Tag, Palette, ChevronDown, AlertTriangle, Check, Loader2, ListFilter
+    File, Tag, Palette, ChevronDown, AlertTriangle, Check, Loader2, ListFilter, FileJson
 } from "lucide-react";
 import { detectFileType } from "@/lib/file-type-utils";
 
@@ -16,9 +16,11 @@ interface PreviewFile {
     matchedListTitle: string | null;
     matchedListId: string | null;
     isDuplicate: boolean;
+    data?: any;
 }
 
-interface BulkIngestPreviewDialogProps {
+interface IngestPreviewDialogProps {
+    boardId: string;
     files: PreviewFile[];
     resolvedFiles: any[]; // raw files to pass back
     isOpen: boolean;
@@ -31,6 +33,7 @@ interface BulkIngestPreviewDialogProps {
         resolvedFiles: any[];
     }) => void;
     isConfirming: boolean;
+    title?: string;
 }
 
 const CARD_COLORS = [
@@ -51,17 +54,20 @@ function FileIcon({ mimeType, className = "h-4 w-4" }: { mimeType: string; class
     if (mimeType.startsWith("audio/")) return <Music className={className} />;
     if (mimeType.startsWith("video/")) return <Film className={className} />;
     if (mimeType === "application/pdf") return <FileText className={`${className} text-red-500`} />;
+    if (mimeType === "application/json") return <FileJson className={`${className} text-blue-500`} />;
     return <File className={className} />;
 }
 
-export function BulkIngestPreviewDialog({
+export function IngestPreviewDialog({
+    boardId,
     files,
     resolvedFiles,
     isOpen,
     onClose,
     onConfirm,
     isConfirming,
-}: BulkIngestPreviewDialogProps) {
+    title = "Bulk Ingest Preview",
+}: IngestPreviewDialogProps) {
     const [enabledFiles, setEnabledFiles] = useState<Set<string>>(() => new Set(files.map(f => f.name)));
     const [globalColor, setGlobalColor] = useState("");
     const [globalLabel, setGlobalLabel] = useState("");
@@ -69,6 +75,8 @@ export function BulkIngestPreviewDialog({
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [showLabelInput, setShowLabelInput] = useState(false);
     const [groupByList, setGroupByList] = useState(true);
+    const [boardLabels, setBoardLabels] = useState<{ id: string; title: string; color: string }[]>([]);
+    const [isFetchingLabels, setIsFetchingLabels] = useState(false);
 
     // Sync enabled files whenever the dialog opens or files change
     React.useEffect(() => {
@@ -76,6 +84,20 @@ export function BulkIngestPreviewDialog({
             setEnabledFiles(new Set(files.filter(f => f && f.name).map(f => f.name)));
         }
     }, [isOpen, files]);
+
+    // Fetch existing board labels
+    React.useEffect(() => {
+        if (isOpen && showLabelInput && boardLabels.length === 0) {
+            setIsFetchingLabels(true);
+            fetch(`/api/boards/${boardId}/labels`)
+                .then(res => res.ok ? res.json() : [])
+                .then(data => {
+                    setBoardLabels(data);
+                    setIsFetchingLabels(false);
+                })
+                .catch(() => setIsFetchingLabels(false));
+        }
+    }, [isOpen, showLabelInput, boardId, boardLabels.length]);
 
     // Group files by their matched list
     const grouped = useMemo(() => {
@@ -123,8 +145,8 @@ export function BulkIngestPreviewDialog({
                 {/* Header */}
                 <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 flex items-center justify-between flex-shrink-0">
                     <div>
-                        <h2 className="text-lg font-bold text-white">Bulk Ingest Preview</h2>
-                        <p className="text-xs text-orange-100 mt-0.5">{files.length} files found · {enabledCount} selected</p>
+                        <h2 className="text-lg font-bold text-white">{title}</h2>
+                        <p className="text-xs text-orange-100 mt-0.5">{files.length} items found · {enabledCount} selected</p>
                     </div>
                     <button onClick={onClose} className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/20 transition">
                         <X className="h-5 w-5" />
@@ -202,17 +224,38 @@ export function BulkIngestPreviewDialog({
                             <ChevronDown className="h-3 w-3 text-neutral-400" />
                         </button>
                         {showLabelInput && (
-                            <div className="absolute top-full left-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl p-3 z-10 w-52">
-                                <p className="text-[10px] font-bold text-neutral-500 uppercase mb-2">Add Label to All Cards</p>
+                            <div className="absolute top-full left-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl p-3 z-10 w-64">
+                                <p className="text-[10px] font-bold text-neutral-500 uppercase mb-2 text-center">Add Label to All Items</p>
+                                
+                                {boardLabels.length > 0 && (
+                                    <div className="mb-3">
+                                        <p className="text-[10px] font-bold text-neutral-400 uppercase mb-1.5 px-1">Select Existing</p>
+                                        <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto p-1 bg-neutral-50 rounded-md border border-neutral-100">
+                                            {boardLabels.map(label => (
+                                                <button
+                                                    key={label.id}
+                                                    onClick={() => { setGlobalLabel(label.title); setGlobalLabelColor(label.color); }}
+                                                    className={`px-2 py-1 rounded-[4px] text-[10px] font-bold text-white transition-all ${globalLabel === label.title ? "ring-2 ring-blue-500 ring-offset-1 scale-105" : "hover:brightness-110"}`}
+                                                    style={{ backgroundColor: label.color }}
+                                                >
+                                                    {label.title}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <p className="text-[10px] font-bold text-neutral-400 uppercase mb-1.5 px-1">Create New or Search</p>
                                 <input
                                     type="text"
                                     value={globalLabel}
                                     onChange={e => setGlobalLabel(e.target.value)}
                                     placeholder="Label name (e.g. GRAPHICS)"
-                                    className="w-full text-xs px-2 py-1.5 border rounded-md outline-none focus:ring-1 focus:ring-orange-500 mb-2"
+                                    className="w-full text-xs px-2 py-1.5 border rounded-md outline-none focus:ring-1 focus:ring-orange-500 mb-2 shadow-sm"
                                 />
-                                <p className="text-[10px] font-bold text-neutral-500 uppercase mb-1.5">Label Color</p>
-                                <div className="grid grid-cols-5 gap-1.5">
+                                
+                                <p className="text-[10px] font-bold text-neutral-400 uppercase mb-1.5 px-1">Label Color</p>
+                                <div className="grid grid-cols-5 gap-1.5 p-1 bg-neutral-50 rounded-md border border-neutral-100">
                                     {CARD_COLORS.slice(1).map(c => (
                                         <button
                                             key={c.value}
@@ -223,6 +266,15 @@ export function BulkIngestPreviewDialog({
                                         />
                                     ))}
                                 </div>
+                                
+                                {globalLabel && (
+                                    <button 
+                                        onClick={() => setShowLabelInput(false)}
+                                        className="w-full mt-3 py-1.5 bg-orange-600 text-white text-[10px] font-bold uppercase rounded-md hover:bg-orange-700 transition shadow-sm"
+                                    >
+                                        Apply to All
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>

@@ -3,6 +3,7 @@
 import { detectFileType, getFileTypeLabel, FileCategory } from "@/lib/file-type-utils";
 import { FileText, Film, Music, FileSpreadsheet, FileType, Code, File, Globe } from "lucide-react";
 import { AudioPlayer } from "@/components/ui/AudioPlayer";
+import { formatImageUrl } from "@/lib/format-image-url";
 
 interface AttachmentPreviewProps {
     url: string;
@@ -17,11 +18,12 @@ interface AttachmentPreviewProps {
  * Supports: images, SVGs, PDFs, videos, audio, Office docs, code/text files, and generic links.
  */
 export const AttachmentPreview = ({ url, thumbnailUrl, title, type, className = "" }: AttachmentPreviewProps) => {
-    const fileType = type === "IFRAME" ? "iframe" : detectFileType(url);
+    const formattedUrl = formatImageUrl(url) || url;
+    const fileType = type === "IFRAME" ? "iframe" : detectFileType(formattedUrl);
 
     return (
         <div className={`h-16 w-24 bg-neutral-200 rounded-sm overflow-hidden flex-shrink-0 flex items-center justify-center relative ${className}`}>
-            {renderPreview(fileType as any, url, thumbnailUrl, title)}
+            {renderPreview(fileType as any, formattedUrl, thumbnailUrl, title)}
         </div>
     );
 };
@@ -145,14 +147,15 @@ function renderPreview(fileType: FileCategory, url: string, thumbnailUrl?: strin
  * Larger preview for display inside a card modal - shows more detail.
  */
 export const AttachmentPreviewLarge = ({ url, title, type }: { url: string; title?: string | null; type?: string }) => {
-    const fileType = type === "IFRAME" ? "iframe" : detectFileType(url);
+    const formattedUrl = formatImageUrl(url) || url;
+    const fileType = type === "IFRAME" ? "iframe" : detectFileType(formattedUrl);
 
     switch (fileType) {
         case 'iframe':
             return (
                 <div className="w-full rounded-md overflow-hidden border bg-white">
                     <iframe
-                        src={url}
+                        src={formattedUrl}
                         className="w-full h-[400px]"
                         title={title || "Embedded Content"}
                         allowFullScreen
@@ -165,7 +168,7 @@ export const AttachmentPreviewLarge = ({ url, title, type }: { url: string; titl
             return (
                 <div className="w-full rounded-md overflow-hidden border bg-white">
                     <iframe
-                        src={url}
+                        src={formattedUrl}
                         className="w-full h-[400px]"
                         title={title || "PDF Preview"}
                     />
@@ -176,7 +179,7 @@ export const AttachmentPreviewLarge = ({ url, title, type }: { url: string; titl
             return (
                 <div className="w-full rounded-md overflow-hidden bg-black">
                     <video
-                        src={url}
+                        src={formattedUrl}
                         controls
                         className="w-full max-h-[400px]"
                         preload="metadata"
@@ -185,7 +188,7 @@ export const AttachmentPreviewLarge = ({ url, title, type }: { url: string; titl
             );
 
         case 'audio':
-            return <AudioPlayer url={url} title={title} />;
+            return <AudioPlayer url={formattedUrl} title={title} />;
 
         case 'office-word':
         case 'office-excel':
@@ -193,14 +196,22 @@ export const AttachmentPreviewLarge = ({ url, title, type }: { url: string; titl
             return (
                 <div className="w-full rounded-md overflow-hidden border bg-white">
                     <iframe
-                        src={`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`}
+                        src={`https://docs.google.com/gview?url=${encodeURIComponent(formattedUrl)}&embedded=true`}
                         className="w-full h-[400px]"
                         title={title || "Document Preview"}
                     />
                 </div>
             );
 
+        case 'image':
+        case 'svg':
+            return (
+                <div className="w-full rounded-md overflow-hidden border bg-neutral-100 flex items-center justify-center p-2">
+                    <img src={formattedUrl} alt={title || "Preview"} className="max-w-full max-h-[600px] object-contain shadow-sm rounded-sm" />
+                </div>
+            );
+
         default:
             return null;
     }
-};
+}

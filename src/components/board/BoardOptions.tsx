@@ -19,7 +19,8 @@ import { formatImageUrl } from "@/lib/format-image-url";
 
 import { SnapshotSelector } from "./SnapshotSelector";
 import { DownloadBoardPDF } from "./DownloadBoardPDF";
-import { BulkIngestPreviewDialog } from "@/components/modals/BulkIngestPreviewDialog";
+import { IngestPreviewDialog } from "@/components/modals/IngestPreviewDialog";
+import { SyncPreviewDialog } from "@/components/modals/SyncPreviewDialog";
 
 interface BoardOptionsProps {
     boardId: string;
@@ -67,6 +68,7 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const [imageUrl, setImageUrl] = useState("");
     const [sheetId, setSheetId] = useState(initialGoogleSheetId || "");
+    const [sheetTabName, setSheetTabName] = useState("");
     const [ingestUrls, setIngestUrls] = useState("");
     const { addToast } = useToast();
     const router = useRouter();
@@ -89,6 +91,11 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
     const [showPreviewDialog, setShowPreviewDialog] = useState(false);
     const [previewFiles, setPreviewFiles] = useState<any[]>([]);
     const [isFetchingFolder, setIsFetchingFolder] = useState(false);
+    
+    // Sync Sync State
+    const [syncAnalysis, setSyncAnalysis] = useState<any[]>([]);
+    const [showSyncPreview, setShowSyncPreview] = useState(false);
+
     const [isMounted, setIsMounted] = useState(false);
     
     React.useEffect(() => {
@@ -241,9 +248,16 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
 
     const { execute: executeSync, isExecuting: isSyncing } = useSafeAction(syncGoogleSheet, {
         onSuccess: ({ data }) => {
+            if (data && "analysis" in (data as any)) {
+                setSyncAnalysis((data as any).analysis);
+                setShowSyncPreview(true);
+                return;
+            }
+
             if (data && "success" in (data as any)) {
                 addToast("Google Sheet Synced successfully", "success");
                 setIsOpen(false);
+                setShowSyncPreview(false);
                 router.refresh();
             } else if (data && "error" in (data as any)) {
                 addToast((data as any).error as string, "error");
@@ -841,12 +855,19 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                     </div>
 
                     <div>
-                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><LayoutList className="h-3 w-3" /> Google Sheet ID</h4>
+                        <h4 className="text-xs font-semibold text-neutral-600 mb-2 flex items-center gap-x-1"><LayoutList className="h-3 w-3" /> Google Sheet ID & Tab</h4>
                         <form onSubmit={onSheetSubmit} className="flex flex-col gap-y-2 mb-4">
                             <input
                                 value={sheetId}
                                 onChange={(e) => setSheetId(e.target.value)}
                                 placeholder="Paste Sheet URL or ID..."
+                                className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-green-600 w-full"
+                                disabled={anyLoading}
+                            />
+                            <input
+                                value={sheetTabName}
+                                onChange={(e) => setSheetTabName(e.target.value)}
+                                placeholder="Tab Name (Optional)"
                                 className="text-sm px-2 py-1.5 border rounded-sm outline-none focus:ring-1 focus:ring-green-600 w-full"
                                 disabled={anyLoading}
                             />
@@ -874,12 +895,12 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                             {isExportingCSV ? "Exporting..." : "Export as CSV"}
                         </button>
                         <button
-                            onClick={() => executeSync({ boardId })}
+                            onClick={() => executeSync({ boardId, analyze: true, tabName: sheetTabName || undefined })}
                             disabled={anyLoading || !sheetId}
                             className="bg-green-100 text-green-800 w-full rounded-sm text-sm font-medium py-1.5 hover:bg-green-200 transition flex items-center justify-center gap-x-2"
                         >
                             <LayoutList className="h-4 w-4" />
-                            {isSyncing ? "Syncing..." : "Sync from Sheet"}
+                            {isSyncing ? "Analyzing..." : "Sync from Sheet"}
                         </button>
 
                         <button
@@ -904,13 +925,22 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
             )}
 
             {/* Bulk Ingest Preview Dialog */}
-            <BulkIngestPreviewDialog
+            <IngestPreviewDialog
+                boardId={boardId}
                 files={previewFiles}
                 resolvedFiles={resolvedFiles}
                 isOpen={showPreviewDialog}
                 onClose={() => { setShowPreviewDialog(false); setPreviewFiles([]); setIsFetchingFolder(false); }}
                 onConfirm={onConfirmPreviewIngest}
                 isConfirming={isIngesting}
+            />
+
+            <SyncPreviewDialog
+                isOpen={showSyncPreview}
+                onClose={() => { setShowSyncPreview(false); setSyncAnalysis([]); }}
+                analysis={syncAnalysis}
+                isConfirming={isSyncing}
+                onConfirm={() => executeSync({ boardId, analyze: false, tabName: sheetTabName || undefined })}
             />
             <input 
                 type="color" 

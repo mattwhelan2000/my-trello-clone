@@ -23,7 +23,8 @@ import {
     MinusSquare,
     Maximize2,
     Copy,
-    FileJson
+    FileJson,
+    Zap
 } from "lucide-react";
 import { format } from "date-fns";
 import { detectFileType } from "@/lib/file-type-utils";
@@ -212,12 +213,14 @@ const CardItemInner = ({
         handleMenuClose();
     };
 
-    const coverIframeAttachment = data.attachments?.find((a: any) => a.isCover && a.type === "IFRAME");
+    const coverIframeAttachment = data.attachments?.find((a: any) => a.isCover && (a.type === "IFRAME" || detectFileType(a.url) === "pdf"));
     const renderableIframeUrl = coverIframeAttachment ? coverIframeAttachment.url : null;
 
     const coverImageAttachment = data.attachments?.find((a: any) => a.isCover && a.type !== "IFRAME")
         || data.attachments?.find((a: any) => a.type === "IMAGE" || a.thumbnailUrl);
-    const renderableImageUrl = coverImageAttachment ? formatImageUrl(coverImageAttachment.type === "IMAGE" ? coverImageAttachment.url : coverImageAttachment.thumbnailUrl) : null;
+    const renderableImageUrl = coverImageAttachment 
+        ? formatImageUrl(coverImageAttachment.type === "IMAGE" ? coverImageAttachment.url : (coverImageAttachment.thumbnailUrl || coverImageAttachment.url)) 
+        : null;
 
     const mapAttachment = data.attachments?.find((a: any) => 
         a.url.includes("google.com/maps") || 
@@ -469,6 +472,13 @@ const CardItemInner = ({
                                             <CheckSquare className="h-3 w-3" />
                                             <span>{checklistCompleted}/{checklistTotal}</span>
                                             <span className="opacity-70">({Math.round((checklistCompleted / checklistTotal) * 100)}%)</span>
+                                        </div>
+                                    )}
+
+                                    {data.shotCount && (
+                                        <div className="flex items-center gap-x-1 text-xs px-1.5 py-0.5 rounded-sm bg-yellow-500/20 text-yellow-700 font-bold border border-yellow-500/20" title="Shot Count">
+                                            <Zap className="h-3 w-3" />
+                                            <span>{data.shotCount}</span>
                                         </div>
                                     )}
 
