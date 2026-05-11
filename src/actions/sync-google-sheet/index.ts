@@ -8,7 +8,7 @@ import { google } from "googleapis";
 
 export const syncGoogleSheet = actionClient
     .schema(SyncGoogleSheetSchema)
-    .action(async ({ parsedInput: { boardId, analyze, tabName: passedTabName } }) => {
+    .action(async ({ parsedInput: { boardId, analyze, tabName: passedTabName, globalColor, globalLabel, globalLabelColor, skipZeroVfx, disabledCards = [] } }) => {
         try {
             const board = await db.board.findUnique({
                 where: { id: boardId },
@@ -142,7 +142,11 @@ export const syncGoogleSheet = actionClient
                             { title: "SET LOCATION", action: "SYNC", detail: setDesc },
                             { title: "CHARACTERS", action: "SYNC", detail: charDesc },
                         ],
-                        vfxCards: groupRows.filter(r => r[VFX_IDX]).map(r => ({
+                        vfxCards: groupRows.filter(r => {
+                            if (!r[VFX_IDX]) return false;
+                            if (skipZeroVfx && (!r[SHOT_COUNT_IDX] || String(r[SHOT_COUNT_IDX]).trim() === "0")) return false;
+                            return true;
+                        }).map(r => ({
                             title: String(r[VFX_IDX]).trim(),
                             shotCount: r[SHOT_COUNT_IDX] ? String(r[SHOT_COUNT_IDX]).trim() : "",
                             assets: r[ASSETS_IDX] ? String(r[ASSETS_IDX]).trim() : "",
@@ -175,19 +179,39 @@ export const syncGoogleSheet = actionClient
                 let cardOrderCounter = Math.max(...sortedCards.map(c => c.order), -1) + 1;
 
                 const applyCardSync = async (idx: number, defaultTitle: string, newTitle: string | undefined, newDesc: string | undefined, extras?: any) => {
+                    const finalTitle = newTitle || defaultTitle;
+                    
+                    // Skip if disabled by user
+                    if (disabledCards.includes(`${sceneNum}|${finalTitle}`)) return;
+
                     const existing = sortedCards[idx];
-                    const data = { 
-                        title: newTitle || defaultTitle, 
+                    let data: any = { 
+                        title: finalTitle, 
                         description: newDesc || "", 
                         isSyncedWithSheet: true,
                         ...extras 
                     };
+
+                    if (globalColor) {
+                        data.color = globalColor;
+                    }
+
                     if (existing) {
                         await db.card.update({ where: { id: existing.id }, data });
+                        if (globalLabel && globalLabelColor) {
+                            const existingLabel = await db.label.findFirst({ where: { cardId: existing.id, title: globalLabel } });
+                            if (!existingLabel) {
+                                await db.label.create({ data: { cardId: existing.id, title: globalLabel, color: globalLabelColor } });
+                            }
+                        }
                     } else {
-                        await db.card.create({ data: { listId: targetList!.id, order: cardOrderCounter++, ...data } });
+                        const newCard = await db.card.create({ data: { listId: targetList!.id, order: cardOrderCounter++, ...data } });
+                        if (globalLabel && globalLabelColor) {
+                            await db.label.create({ data: { cardId: newCard.id, title: globalLabel, color: globalLabelColor } });
+                        }
                     }
                 };
+
 
                 // Standard Cards
                 await applyCardSync(0, "Scene LOCATION", locTitle, locDesc);
@@ -203,6 +227,9 @@ export const syncGoogleSheet = actionClient
                     if (!vfxTitle) continue;
 
                     const shotCount = row[SHOT_COUNT_IDX] ? String(row[SHOT_COUNT_IDX]).trim() : "";
+                    
+                    if (skipZeroVfx && (!shotCount || shotCount === "0")) continue;
+
                     const assets = row[ASSETS_IDX] ? String(row[ASSETS_IDX]).trim() : "";
                     const vfxDesc = `Assets: ${assets}`;
 

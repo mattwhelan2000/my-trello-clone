@@ -940,7 +940,13 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                 onClose={() => { setShowSyncPreview(false); setSyncAnalysis([]); }}
                 analysis={syncAnalysis}
                 isConfirming={isSyncing}
-                onConfirm={() => executeSync({ boardId, analyze: false, tabName: sheetTabName || undefined })}
+                boardLabels={uniqueLabels}
+                onConfirm={(opts) => executeSync({ 
+                    boardId, 
+                    analyze: false, 
+                    tabName: sheetTabName || undefined,
+                    ...opts
+                })}
             />
             <input 
                 type="color" 
