@@ -111,6 +111,21 @@ export const syncGoogleSheet = actionClient
             const analysisSummary: any[] = [];
             let listOrderCounter = Math.max(...board.lists.map(l => l.order), -1) + 1;
 
+            // Before making any changes, save a full sync backup
+            if (!analyze) {
+                const allLists = await db.list.findMany({ where: { boardId } });
+                const allCards = await db.card.findMany({ where: { list: { boardId } } });
+                const allLabels = await db.label.findMany({ where: { card: { list: { boardId } } } });
+
+                await db.boardSnapshot.create({
+                    data: {
+                        boardId,
+                        title: `SYNC_BACKUP_${Date.now()}`,
+                        data: { lists: allLists, cards: allCards, labels: allLabels }
+                    }
+                });
+            }
+
             for (const [sceneNum, groupRows] of Object.entries(sceneGroups)) {
                 const firstRow = groupRows[0];
                 const intExt = firstRow[INT_EXT_IDX] ? String(firstRow[INT_EXT_IDX]).trim() : "";

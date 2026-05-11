@@ -10,6 +10,7 @@ import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateBoard } from "@/actions/update-board";
 import { exportBoard } from "@/actions/export-board";
 import { syncGoogleSheet } from "@/actions/sync-google-sheet";
+import { revertSync } from "@/actions/revert-sync";
 import { pushGoogleSheet } from "@/actions/push-google-sheet";
 import { updateListColors } from "@/actions/update-list-colors";
 import { bulkIngestImages } from "@/actions/bulk-ingest-images";
@@ -450,7 +451,18 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
         executeMigrate({ boardId });
     };
 
-    const anyLoading = isUpdatingBoard || isExporting || isExportingCSV || isSyncing || isPushing || isUpdatingListsColors || isIngesting || isDeletingLabel || isMigrating;
+    const { execute: executeRevert, isExecuting: isReverting } = useSafeAction(revertSync, {
+        onSuccess: () => {
+            addToast("Reverted to the last pre-sync board state", "success");
+            setIsOpen(false);
+        },
+        onError: (error) => {
+            console.error("Revert sync failed", error);
+            addToast("Failed to revert sync: " + error.message, "error");
+        }
+    });
+
+    const anyLoading = isUpdatingBoard || isExporting || isExportingCSV || isSyncing || isPushing || isIngesting || isFetchingFolder || isMigrating || isReverting || isDeletingLabel;
     if (!isMounted) return null;
 
     return (
@@ -901,6 +913,18 @@ export const BoardOptions = ({ boardId, listsCount, cardsCount, initialGoogleShe
                         >
                             <LayoutList className="h-4 w-4" />
                             {isSyncing ? "Analyzing..." : "Sync from Sheet"}
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (confirm("Are you sure you want to revert to the state just before your last sync? This will delete any cards you created since then.")) {
+                                    executeRevert({ boardId });
+                                }
+                            }}
+                            disabled={anyLoading}
+                            className="bg-red-100 text-red-800 w-full rounded-sm text-sm font-medium py-1.5 hover:bg-red-200 transition flex items-center justify-center gap-x-2 border border-red-200"
+                        >
+                            <AlertTriangle className="h-4 w-4" />
+                            {isReverting ? "Reverting..." : "Revert Last Sync"}
                         </button>
 
                         <button
