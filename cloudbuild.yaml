@@ -1,7 +1,19 @@
 steps:
-  # 1. Build the container image
+  # 0. Pull the previous image to use as a cache for faster builds
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/trello-clone-492816/trello-clone:latest', '.']
+    entrypoint: 'bash'
+    args: ['-c', 'docker pull gcr.io/trello-clone-492816/trello-clone:latest || exit 0']
+
+  # 1. Build the container image using the cached layers
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-t', 'gcr.io/trello-clone-492816/trello-clone:latest', 
+      '--cache-from', 'gcr.io/trello-clone-492816/trello-clone:latest',
+      '.'
+    ]
+    env:
+      - 'DOCKER_BUILDKIT=1'
 
   # 2. Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
