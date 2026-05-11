@@ -5,11 +5,14 @@ import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { importBoard } from "@/actions/import-board";
 import { useRouter } from "next/navigation";
 import { Loader2, UploadCloud } from "lucide-react";
+import { ImportBoardPreviewDialog } from "@/components/modals/ImportBoardPreviewDialog";
 
 export const ImportBoardButton = () => {
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [error, setError] = useState<string>("");
+    const [previewData, setPreviewData] = useState<any | null>(null);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const { execute, isExecuting } = useSafeAction(importBoard, {
         onSuccess: ({ data }) => {
@@ -41,7 +44,8 @@ export const ImportBoardButton = () => {
                     return;
                 }
 
-                execute(json);
+                setPreviewData(json);
+                setIsDialogOpen(true);
             } catch (err) {
                 setError("Failed to parse JSON file.");
             }
@@ -82,6 +86,25 @@ export const ImportBoardButton = () => {
             {error && (
                 <p className="text-xs text-red-500 mt-2 text-center">{error}</p>
             )}
+
+            <ImportBoardPreviewDialog
+                isOpen={isDialogOpen}
+                onClose={() => {
+                    setIsDialogOpen(false);
+                    setPreviewData(null);
+                }}
+                onConfirm={(selectedListIds) => {
+                    if (previewData) {
+                        const filteredData = {
+                            ...previewData,
+                            lists: previewData.lists.filter((l: any) => selectedListIds.includes(l.id || l.title))
+                        };
+                        execute(filteredData);
+                    }
+                }}
+                isConfirming={isExecuting}
+                boardData={previewData}
+            />
         </div>
     );
 };

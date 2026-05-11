@@ -14,6 +14,8 @@ import { deleteList } from "@/actions/delete-list";
 import { copyList } from "@/actions/copy-list";
 import { pasteList } from "@/actions/paste-list";
 import { pasteCard } from "@/actions/paste-card";
+import { sortLists } from "@/actions/sort-lists";
+import { sortCards } from "@/actions/sort-cards";
 import { ImportCardsModal } from "../modals/ImportCardsModal";
 import { CopyCardsModal } from "../modals/CopyCardsModal";
 import { Copy, FileJson } from "lucide-react";
@@ -197,6 +199,9 @@ export const ListItem = ({
     const { execute: executeCopyList } = useSafeAction(copyList, { onSuccess: () => addToast("List copied", "success") });
     const { execute: executePasteList } = useSafeAction(pasteList, { onSuccess: () => addToast("List pasted", "success") });
     const { execute: executePasteCard } = useSafeAction(pasteCard, { onSuccess: () => addToast("Card pasted", "success") });
+    
+    const { execute: executeSortLists } = useSafeAction(sortLists, { onSuccess: () => addToast("Lists sorted", "success") });
+    const { execute: executeSortCards } = useSafeAction(sortCards, { onSuccess: () => addToast("Cards sorted", "success") });
 
     const enableEditing = () => {
         setIsEditing(true);
@@ -357,6 +362,26 @@ export const ListItem = ({
         if (clipboardCardId) {
             executePasteCard({ sourceCardId: clipboardCardId, targetListId: data.id, boardId: data.boardId });
         }
+        handleMenuClose();
+    };
+
+    const onSortListsAsc = () => {
+        executeSortLists({ boardId: data.boardId, order: "asc" });
+        handleMenuClose();
+    };
+
+    const onSortListsDesc = () => {
+        executeSortLists({ boardId: data.boardId, order: "desc" });
+        handleMenuClose();
+    };
+
+    const onSortCardsAsc = () => {
+        executeSortCards({ boardId: data.boardId, listId: data.id, order: "asc" });
+        handleMenuClose();
+    };
+
+    const onSortCardsDesc = () => {
+        executeSortCards({ boardId: data.boardId, listId: data.id, order: "desc" });
         handleMenuClose();
     };
 
@@ -565,6 +590,12 @@ export const ListItem = ({
                                 <Copy className="h-3.5 w-3.5" />
                                 Copy Cards (JSON)
                             </button>
+                            <div className="border-t border-neutral-800 my-1"></div>
+                            <span className="block px-3 py-1.5 text-xs font-semibold text-neutral-500 mb-1 uppercase tracking-wider border-b border-neutral-800/50">Sort</span>
+                            <button onClick={(e) => { e.stopPropagation(); onSortCardsAsc(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Sort Cards in List (A-Z)</button>
+                            <button onClick={(e) => { e.stopPropagation(); onSortCardsDesc(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition">Sort Cards in List (Z-A)</button>
+                            <button onClick={(e) => { e.stopPropagation(); onSortListsAsc(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-yellow-500/80 hover:text-yellow-500">Sort All Lists on Board (A-Z)</button>
+                            <button onClick={(e) => { e.stopPropagation(); onSortListsDesc(); }} className="w-full text-left px-3 py-1.5 hover:bg-neutral-800 transition text-yellow-500/80 hover:text-yellow-500">Sort All Lists on Board (Z-A)</button>
                         </div>
                     </div>,
                     document.body
