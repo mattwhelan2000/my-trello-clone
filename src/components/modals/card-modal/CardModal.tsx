@@ -4,6 +4,7 @@ import { Modal } from "@/components/modals/Modal";
 import { useState, useRef, ElementRef, useEffect } from "react";
 import { AlignLeft, Layout, CheckSquare, Clock, Paperclip, Activity, X, Plus, Trash2, Copy, Layers, Share2, MoreHorizontal, Eye, EyeOff, MinusSquare, Maximize2, Pencil, Check, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Download } from "lucide-react";
 import { useAction as useSafeAction } from "next-safe-action/hooks";
 import { updateCard } from "@/actions/update-card";
 import { createAttachment } from "@/actions/create-attachment";
@@ -55,6 +56,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text" | "thumb">("bg");
     const [commentText, setCommentText] = useState("");
     const [fetchedLists, setFetchedLists] = useState<{ id: string; title: string }[]>(propLists);
+    const [previewAttachment, setPreviewAttachment] = useState<{ url: string; title: string; type: string } | null>(null);
     const [posValue, setPosValue] = useState((index !== undefined ? index + 1 : 0).toString());
     const inputRef = useRef<ElementRef<"input">>(null);
     const imageInputRef = useRef<ElementRef<"input">>(null);
@@ -740,7 +742,14 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <a href={formatImageUrl(link.url) || link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full group/link">
+                                                        <div 
+                                                            role="button"
+                                                            onClick={(e) => {
+                                                                if ((e.target as HTMLElement).closest('button')) return;
+                                                                setPreviewAttachment({ url: link.url, title: link.title || "", type: link.type });
+                                                            }}
+                                                            className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full group/link cursor-pointer"
+                                                        >
                                                             <AttachmentPreview url={link.url} thumbnailUrl={link.thumbnailUrl} title={link.title} type={link.type} />
                                                             <div className="flex flex-col min-w-0 pr-2 pb-1 flex-1 relative">
                                                                 <div className="flex items-center gap-x-2">
@@ -759,7 +768,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                                 </div>
                                                                 <span className="text-xs text-neutral-500 truncate mt-1">{getFileTypeLabel(detectFileType(link.url))}</span>
                                                             </div>
-                                                        </a>
+                                                        </div>
                                                     )}
                                                     {(link.thumbnailUrl || link.type === "IFRAME") && (
                                                         <div className="flex items-center gap-x-2 px-1 mt-1">
@@ -1323,6 +1332,46 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                     isOpen={isInstanceModalOpen}
                     onClose={() => setIsInstanceModalOpen(false)}
                 />
+            )}
+
+            {previewAttachment && (
+                <div 
+                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewAttachment(null);
+                    }}
+                >
+                    <div 
+                        className="w-full h-full max-w-6xl max-h-[90vh] bg-neutral-900 rounded-xl overflow-hidden flex flex-col shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-4 bg-neutral-950 flex-shrink-0">
+                            <h3 className="text-white font-medium text-lg truncate pr-4">{previewAttachment.title || "Attachment Preview"}</h3>
+                            <div className="flex items-center gap-x-2">
+                                <a 
+                                    href={formatImageUrl(previewAttachment.url) || previewAttachment.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-full transition"
+                                    title="Open original in new tab / Download"
+                                >
+                                    <Download className="h-5 w-5" />
+                                </a>
+                                <button 
+                                    onClick={() => setPreviewAttachment(null)} 
+                                    className="text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-full transition"
+                                    title="Close Preview"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 w-full h-full bg-neutral-800/50 p-2 sm:p-4 overflow-y-auto flex items-center justify-center">
+                            <AttachmentPreviewLarge url={previewAttachment.url} title={previewAttachment.title} type={previewAttachment.type} />
+                        </div>
+                    </div>
+                </div>
             )}
         </Modal>
     );
