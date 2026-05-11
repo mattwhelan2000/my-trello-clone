@@ -56,7 +56,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
     const [colorPickerTab, setColorPickerTab] = useState<"bg" | "text" | "thumb">("bg");
     const [commentText, setCommentText] = useState("");
     const [fetchedLists, setFetchedLists] = useState<{ id: string; title: string }[]>(propLists);
-    const [previewAttachment, setPreviewAttachment] = useState<{ url: string; title: string; type: string } | null>(null);
+    const [previewAttachmentIndex, setPreviewAttachmentIndex] = useState<number | null>(null);
     const [posValue, setPosValue] = useState((index !== undefined ? index + 1 : 0).toString());
     const inputRef = useRef<ElementRef<"input">>(null);
     const imageInputRef = useRef<ElementRef<"input">>(null);
@@ -646,7 +646,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                         <h3 className="font-semibold text-neutral-700 mt-1">Attachments</h3>
                                     </div>
                                     <div className="flex flex-col gap-y-3">
-                                        {linkAttachments.map((link: any) => {
+                                        {linkAttachments.map((link: any, index: number) => {
                                             const fileType = detectFileType(link.url);
                                             const isPreviewOpen = previewingAttachmentId === link.id;
                                             const isAudio = fileType === 'audio';
@@ -746,7 +746,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                                             role="button"
                                                             onClick={(e) => {
                                                                 if ((e.target as HTMLElement).closest('button')) return;
-                                                                setPreviewAttachment({ url: link.url, title: link.title || "", type: link.type });
+                                                                setPreviewAttachmentIndex(index);
                                                             }}
                                                             className="flex items-center gap-x-3 p-2 bg-neutral-50/50 hover:bg-neutral-100 rounded-md border transition w-full group/link cursor-pointer"
                                                         >
@@ -1334,23 +1334,28 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                 />
             )}
 
-            {previewAttachment && (
+            {previewAttachmentIndex !== null && linkAttachments[previewAttachmentIndex] && (
                 <div 
                     className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
                     onClick={(e) => {
                         e.stopPropagation();
-                        setPreviewAttachment(null);
+                        setPreviewAttachmentIndex(null);
                     }}
                 >
                     <div 
-                        className="w-full h-full max-w-6xl max-h-[90vh] bg-neutral-900 rounded-xl overflow-hidden flex flex-col shadow-2xl"
+                        className="w-full h-full max-w-6xl max-h-[90vh] bg-neutral-900 rounded-xl overflow-hidden flex flex-col shadow-2xl relative"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between p-4 bg-neutral-950 flex-shrink-0">
-                            <h3 className="text-white font-medium text-lg truncate pr-4">{previewAttachment.title || "Attachment Preview"}</h3>
+                            <div className="flex items-center gap-x-3">
+                                <h3 className="text-white font-medium text-lg truncate max-w-lg">{linkAttachments[previewAttachmentIndex].title || "Attachment Preview"}</h3>
+                                <span className="text-xs text-neutral-500 font-medium px-2 py-1 bg-white/10 rounded-md">
+                                    {previewAttachmentIndex + 1} of {linkAttachments.length}
+                                </span>
+                            </div>
                             <div className="flex items-center gap-x-2">
                                 <a 
-                                    href={formatImageUrl(previewAttachment.url) || previewAttachment.url} 
+                                    href={formatImageUrl(linkAttachments[previewAttachmentIndex].url) || linkAttachments[previewAttachmentIndex].url} 
                                     target="_blank" 
                                     rel="noopener noreferrer" 
                                     className="text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-full transition"
@@ -1359,7 +1364,7 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                     <Download className="h-5 w-5" />
                                 </a>
                                 <button 
-                                    onClick={() => setPreviewAttachment(null)} 
+                                    onClick={() => setPreviewAttachmentIndex(null)} 
                                     className="text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-full transition"
                                     title="Close Preview"
                                 >
@@ -1367,8 +1372,26 @@ export const CardModal = ({ data, boardId, isOpen, onClose, lists: propLists = [
                                 </button>
                             </div>
                         </div>
-                        <div className="flex-1 w-full h-full bg-neutral-800/50 p-2 sm:p-4 overflow-y-auto flex items-center justify-center">
-                            <AttachmentPreviewLarge url={previewAttachment.url} title={previewAttachment.title} type={previewAttachment.type} />
+                        <div className="flex-1 w-full h-full bg-neutral-800/50 p-2 sm:p-4 overflow-y-auto flex items-center justify-center relative group">
+                            {previewAttachmentIndex > 0 && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setPreviewAttachmentIndex(previewAttachmentIndex - 1); }}
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black text-white rounded-full transition opacity-0 group-hover:opacity-100 disabled:opacity-0"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                                </button>
+                            )}
+                            
+                            <AttachmentPreviewLarge url={linkAttachments[previewAttachmentIndex].url} title={linkAttachments[previewAttachmentIndex].title} type={linkAttachments[previewAttachmentIndex].type} />
+                            
+                            {previewAttachmentIndex < linkAttachments.length - 1 && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setPreviewAttachmentIndex(previewAttachmentIndex + 1); }}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-black text-white rounded-full transition opacity-0 group-hover:opacity-100 disabled:opacity-0"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
