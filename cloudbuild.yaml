@@ -9,6 +9,7 @@ steps:
     args: [
       'build', 
       '-t', 'gcr.io/trello-clone-492816/trello-clone:latest', 
+      '--build-arg', 'BUILDKIT_INLINE_CACHE=1',
       '--cache-from', 'gcr.io/trello-clone-492816/trello-clone:latest',
       '.'
     ]
