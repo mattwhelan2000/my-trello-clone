@@ -8,7 +8,7 @@ import { google } from "googleapis";
 
 export const syncGoogleSheet = actionClient
     .schema(SyncGoogleSheetSchema)
-    .action(async ({ parsedInput: { boardId, analyze, tabName: passedTabName, globalColor, globalLabel, globalLabelColor, skipZeroVfx, disabledCards = [] } }) => {
+    .action(async ({ parsedInput: { boardId, analyze, tabName: passedTabName, globalColor, globalLabel, globalLabelColor, skipZeroVfx, disabledCards = [], syncSceneLocation = true, syncTime = true, syncSetLocation = true, syncCharacters = true, syncVfx = true } }) => {
         try {
             const board = await db.board.findUnique({
                 where: { id: boardId },
@@ -214,29 +214,31 @@ export const syncGoogleSheet = actionClient
 
 
                 // Standard Cards
-                await applyCardSync(0, "Scene LOCATION", locTitle, locDesc);
-                await applyCardSync(1, "TIME", timeTitle, undefined);
-                await applyCardSync(2, "SET LOCATION", undefined, setDesc);
-                await applyCardSync(4, "CHARACTERS", undefined, charDesc);
+                if (syncSceneLocation) await applyCardSync(0, "Scene LOCATION", locTitle, locDesc);
+                if (syncTime) await applyCardSync(1, "TIME", timeTitle, undefined);
+                if (syncSetLocation) await applyCardSync(2, "SET LOCATION", undefined, setDesc);
+                if (syncCharacters) await applyCardSync(4, "CHARACTERS", undefined, charDesc);
 
                 // VFX Cards (One per row in group)
                 // We start VFX cards at index 5 or overwrite existing VFX cards
-                let vfxCounter = 0;
-                for (const row of groupRows) {
-                    const vfxTitle = row[VFX_IDX] ? String(row[VFX_IDX]).trim() : null;
-                    if (!vfxTitle) continue;
+                if (syncVfx) {
+                    let vfxCounter = 0;
+                    for (const row of groupRows) {
+                        const vfxTitle = row[VFX_IDX] ? String(row[VFX_IDX]).trim() : null;
+                        if (!vfxTitle) continue;
 
-                    const shotCount = row[SHOT_COUNT_IDX] ? String(row[SHOT_COUNT_IDX]).trim() : "";
-                    
-                    if (skipZeroVfx && (!shotCount || shotCount === "0")) continue;
+                        const shotCount = row[SHOT_COUNT_IDX] ? String(row[SHOT_COUNT_IDX]).trim() : "";
+                        
+                        if (skipZeroVfx && (!shotCount || shotCount === "0")) continue;
 
-                    const assets = row[ASSETS_IDX] ? String(row[ASSETS_IDX]).trim() : "";
-                    const vfxDesc = `Assets: ${assets}`;
+                        const assets = row[ASSETS_IDX] ? String(row[ASSETS_IDX]).trim() : "";
+                        const vfxDesc = `Assets: ${assets}`;
 
-                    // Find existing card by title or by offset
-                    const cardIdx = 5 + vfxCounter;
-                    await applyCardSync(cardIdx, "VFX", vfxTitle, vfxDesc, { shotCount, vfxAssetNumbers: assets });
-                    vfxCounter++;
+                        // Find existing card by title or by offset
+                        const cardIdx = 5 + vfxCounter;
+                        await applyCardSync(cardIdx, "VFX", vfxTitle, vfxDesc, { shotCount, vfxAssetNumbers: assets });
+                        vfxCounter++;
+                    }
                 }
             }
 

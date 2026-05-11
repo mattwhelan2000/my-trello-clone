@@ -18,7 +18,18 @@ interface SyncChanges {
 interface SyncPreviewDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (opts: { globalColor?: string; globalLabel?: string; globalLabelColor?: string; skipZeroVfx: boolean; disabledCards: string[] }) => void;
+    onConfirm: (opts: { 
+        globalColor?: string; 
+        globalLabel?: string; 
+        globalLabelColor?: string; 
+        skipZeroVfx: boolean; 
+        disabledCards: string[];
+        syncSceneLocation: boolean;
+        syncTime: boolean;
+        syncSetLocation: boolean;
+        syncCharacters: boolean;
+        syncVfx: boolean;
+    }) => void;
     isConfirming: boolean;
     analysis: SyncChanges[];
     boardLabels?: { title: string; color: string; id?: string }[];
@@ -53,6 +64,13 @@ export function SyncPreviewDialog({
     const [skipZeroVfx, setSkipZeroVfx] = useState(false);
     const [disabledCards, setDisabledCards] = useState<Set<string>>(new Set());
 
+    // Column Toggles (Default to false for standard, true for VFX per user request)
+    const [syncSceneLocation, setSyncSceneLocation] = useState(false);
+    const [syncTime, setSyncTime] = useState(false);
+    const [syncSetLocation, setSyncSetLocation] = useState(false);
+    const [syncCharacters, setSyncCharacters] = useState(false);
+    const [syncVfx, setSyncVfx] = useState(true);
+
     if (!isOpen) return null;
 
     const totalVfx = analysis.reduce((acc, curr) => acc + curr.vfxCards.length, 0);
@@ -64,7 +82,12 @@ export function SyncPreviewDialog({
             globalLabel: globalLabel || undefined,
             globalLabelColor: globalLabelColor || undefined,
             skipZeroVfx,
-            disabledCards: Array.from(disabledCards)
+            disabledCards: Array.from(disabledCards),
+            syncSceneLocation,
+            syncTime,
+            syncSetLocation,
+            syncCharacters,
+            syncVfx
         });
     };
 
@@ -94,6 +117,35 @@ export function SyncPreviewDialog({
                     <button onClick={onClose} className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/20 transition">
                         <X className="h-5 w-5" />
                     </button>
+                </div>
+
+                {/* Column Sync Chooser */}
+                <div className="bg-neutral-50 border-b border-neutral-200 px-6 py-2.5 flex flex-wrap items-center gap-x-6 gap-y-2 flex-shrink-0 text-xs">
+                    <span className="font-bold text-neutral-600 uppercase tracking-wider text-[10px]">Sync Columns:</span>
+                    
+                    <label className="flex items-center gap-x-1.5 cursor-pointer text-neutral-700 hover:text-neutral-900 transition">
+                        <input type="checkbox" checked={syncVfx} onChange={e => setSyncVfx(e.target.checked)} className="h-3.5 w-3.5 rounded border-neutral-300 text-yellow-500 focus:ring-yellow-500" />
+                        <span className="font-semibold text-yellow-700">VFX Cards</span>
+                    </label>
+
+                    <div className="w-px h-4 bg-neutral-300" />
+
+                    <label className="flex items-center gap-x-1.5 cursor-pointer text-neutral-600 hover:text-neutral-900 transition">
+                        <input type="checkbox" checked={syncSceneLocation} onChange={e => setSyncSceneLocation(e.target.checked)} className="h-3.5 w-3.5 rounded border-neutral-300 text-[#0079bf] focus:ring-[#0079bf]" />
+                        <span>Scene Location</span>
+                    </label>
+                    <label className="flex items-center gap-x-1.5 cursor-pointer text-neutral-600 hover:text-neutral-900 transition">
+                        <input type="checkbox" checked={syncTime} onChange={e => setSyncTime(e.target.checked)} className="h-3.5 w-3.5 rounded border-neutral-300 text-[#0079bf] focus:ring-[#0079bf]" />
+                        <span>Time</span>
+                    </label>
+                    <label className="flex items-center gap-x-1.5 cursor-pointer text-neutral-600 hover:text-neutral-900 transition">
+                        <input type="checkbox" checked={syncSetLocation} onChange={e => setSyncSetLocation(e.target.checked)} className="h-3.5 w-3.5 rounded border-neutral-300 text-[#0079bf] focus:ring-[#0079bf]" />
+                        <span>Set Location</span>
+                    </label>
+                    <label className="flex items-center gap-x-1.5 cursor-pointer text-neutral-600 hover:text-neutral-900 transition">
+                        <input type="checkbox" checked={syncCharacters} onChange={e => setSyncCharacters(e.target.checked)} className="h-3.5 w-3.5 rounded border-neutral-300 text-[#0079bf] focus:ring-[#0079bf]" />
+                        <span>Characters</span>
+                    </label>
                 </div>
 
                 {/* Global Options Bar */}
@@ -242,11 +294,18 @@ export function SyncPreviewDialog({
                                         <div className="space-y-1.5">
                                             {scene.standardCards.map((card, i) => {
                                                 const id = `${scene.sceneNum}|${card.title}`;
-                                                const disabled = disabledCards.has(id);
+                                                let columnDisabled = false;
+                                                if (card.title === "Scene LOCATION" && !syncSceneLocation) columnDisabled = true;
+                                                if (card.title === "TIME" && !syncTime) columnDisabled = true;
+                                                if (card.title === "SET LOCATION" && !syncSetLocation) columnDisabled = true;
+                                                if (card.title === "CHARACTERS" && !syncCharacters) columnDisabled = true;
+
+                                                const disabled = columnDisabled || disabledCards.has(id);
+
                                                 return (
                                                     <div key={i} className={`flex items-center justify-between text-xs p-2 rounded border transition ${disabled ? "bg-neutral-100 border-neutral-200 opacity-50" : "bg-neutral-50 border-neutral-100"}`}>
                                                         <div className="flex items-center gap-x-2 text-neutral-600">
-                                                            <button onClick={() => toggleCard(id)} className="focus:outline-none">
+                                                            <button onClick={() => toggleCard(id)} disabled={columnDisabled} className="focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
                                                                 {disabled ? <Square className="h-3 w-3 text-neutral-400" /> : <CheckSquare className="h-3 w-3 text-[#0079bf]" />}
                                                             </button>
                                                             {card.title === "Scene LOCATION" && <MapPin className="h-3 w-3 opacity-60" />}
@@ -275,15 +334,15 @@ export function SyncPreviewDialog({
                                             ) : (
                                                 scene.vfxCards.map((vfx, i) => {
                                                     const id = `${scene.sceneNum}|${vfx.title}`;
-                                                    const disabled = disabledCards.has(id);
                                                     const isZeroVfx = skipZeroVfx && (!vfx.shotCount || vfx.shotCount === "0");
-                                                    
                                                     if (isZeroVfx) return null;
+
+                                                    const disabled = !syncVfx || disabledCards.has(id);
 
                                                     return (
                                                         <div key={i} className={`border p-2 rounded flex flex-col gap-y-1 transition ${disabled ? "bg-neutral-100 border-neutral-200 opacity-50 line-through" : "bg-yellow-50/30 border-yellow-100"}`}>
                                                             <div className="flex items-center gap-x-2">
-                                                                <button onClick={() => toggleCard(id)} className="focus:outline-none">
+                                                                <button onClick={() => toggleCard(id)} disabled={!syncVfx} className="focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
                                                                     {disabled ? <Square className="h-3 w-3 text-neutral-400" /> : <CheckSquare className="h-3 w-3 text-yellow-600" />}
                                                                 </button>
                                                                 <div className="flex items-center justify-between flex-1 min-w-0">

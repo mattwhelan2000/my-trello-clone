@@ -9,4 +9,9 @@ export const SyncGoogleSheetSchema = z.object({
     globalLabelColor: z.string().optional(),
     skipZeroVfx: z.boolean().optional(),
     disabledCards: z.array(z.string()).optional(),
+    syncSceneLocation: z.boolean().optional(),
+    syncTime: z.boolean().optional(),
+    syncSetLocation: z.boolean().optional(),
+    syncCharacters: z.boolean().optional(),
+    syncVfx: z.boolean().optional(),
 });
