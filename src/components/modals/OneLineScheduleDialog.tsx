@@ -5,6 +5,7 @@ import {
     X, Upload, FileText, Download, CalendarDays, Loader2,
     CheckSquare, Square, ChevronDown, ChevronRight, Film, Sun, Moon, AlertTriangle, Clock
 } from "lucide-react";
+import { CalendarExportDialog } from "./CalendarExportDialog";
 
 export interface OneLineScene {
     sceneNum: string;
@@ -26,6 +27,7 @@ interface OneLineScheduleDialogProps {
     isOpen: boolean;
     onClose: () => void;
     boardId: string;
+    boardTitle: string;
     boardLists: { id: string; title: string }[];
 }
 
@@ -41,6 +43,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
     const [disabledDays, setDisabledDays] = useState<Set<string>>(new Set());
     const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
+    const [showCalendarExport, setShowCalendarExport] = useState(false);
 
     // ------- helpers -------
     const dayKey = (d: OneLineDay) => `${d.shootDay}-${d.isSecondUnit ? "2U" : "main"}`;
@@ -151,6 +154,10 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    };
+
+    const onOpenCalendarExport = () => {
+        setShowCalendarExport(true);
     };
 
     // ------- RENDER -------
@@ -361,6 +368,14 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
                                     Export JSON
                                 </button>
                                 <button
+                                    onClick={onOpenCalendarExport}
+                                    disabled={enabledDays.length === 0}
+                                    className="flex items-center gap-x-2 px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition disabled:opacity-40"
+                                >
+                                    <Calendar className="h-4 w-4" />
+                                    Export Calendar
+                                </button>
+                                <button
                                     onClick={onCreateCards}
                                     disabled={isCreating || enabledDays.length === 0}
                                     className="flex items-center gap-x-2 px-5 py-2 text-sm font-bold rounded-lg bg-yellow-400 hover:bg-yellow-300 text-yellow-950 transition shadow-lg disabled:opacity-40"
@@ -372,6 +387,13 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
                     </>
                 )}
             </div>
+
+            <CalendarExportDialog 
+                isOpen={showCalendarExport}
+                onClose={() => setShowCalendarExport(false)}
+                boardTitle={boardTitle}
+                days={enabledDays}
+            />
         </div>
     );
 }
@@ -381,12 +403,45 @@ function FuzzyMatchPreview({ sceneNum, lists }: { sceneNum: string; lists: { id:
     if (!sceneNum || sceneNum === "?") {
         return <p className="text-[10px] text-red-400/70 mt-0.5">⚠ No scene number — will be skipped</p>;
     }
+    
     const num = sceneNum.replace(/\D/g, "").padStart(3, "0");
     const numInt = parseInt(sceneNum.replace(/\D/g, ""), 10);
-    const match = lists.find(l => {
+    
+    let confidence = 0;
+    let match = lists.find(l => {
         const t = l.title.toUpperCase();
-        return t.includes(`SC${num}`) || t.includes(`SC${numInt}`) || new RegExp(`\\b0*${numInt}\\b`).test(t);
+        // Exact match or ScXXX prefix
+        if (t.includes(`SC${num}`) || t.startsWith(`${numInt} `) || t.startsWith(`SC${numInt} `)) {
+            confidence = 100;
+            return true;
+        }
+        return false;
     });
+
+    if (!match) {
+        match = lists.find(l => {
+            const t = l.title.toUpperCase();
+            const re = new RegExp(`\\b0*${numInt}\\b`);
+            if (re.test(t)) {
+                confidence = 75;
+                return true;
+            }
+            return false;
+        });
+    }
+
     if (!match) return <p className="text-[10px] text-red-400/70 mt-0.5">⚠ No matching list found — will be skipped</p>;
-    return <p className="text-[10px] text-green-400/70 mt-0.5">→ {match.title}</p>;
+
+    const color = confidence === 100 ? "text-green-400" : "text-yellow-400";
+    const bgColor = confidence === 100 ? "bg-green-500/10" : "bg-yellow-500/10";
+
+    return (
+        <div className="flex items-center gap-x-2 mt-1">
+            <div className={`flex items-center gap-x-1 px-1.5 py-0.5 rounded ${bgColor} border border-white/5`}>
+                <span className={`text-[8px] font-bold uppercase tracking-tighter ${color}`}>{confidence}% Match</span>
+                <span className="text-[10px] text-white/40">→</span>
+                <span className="text-[10px] text-white/70 font-medium truncate max-w-[150px]">{match.title}</span>
+            </div>
+        </div>
+    );
 }
