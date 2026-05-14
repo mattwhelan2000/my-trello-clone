@@ -98,7 +98,22 @@ function parseOneLineSchedule(text: string): OneLineDay[] {
             continue;
         }
 
-        if (!currentDay) continue;
+        if (!currentDay) {
+            // Check if this looks like a scene heading even without a current day
+            const sceneHeadingRe = /^([A-Z0-9]+(?:[-A-Z0-9/]+)*)?\s*(?:START|END|PART|CONT|PT\d*|PARTIAL|PTL)?\s*(INT\.|EXT\.|I\/E\.|INT\/EXT\.?|INT|EXT|I\/E)\s+(.+)/i;
+            if (sceneHeadingRe.test(line) || /^(INT\.|EXT\.|I\/E\.|INT|EXT|I\/E)\s+(.+)/i.test(line)) {
+                currentDay = {
+                    shootDay: "UNASSIGNED",
+                    isSecondUnit: false,
+                    date: "",
+                    shootTime: "",
+                    scenes: []
+                };
+                days.push(currentDay);
+            } else {
+                continue;
+            }
+        }
 
         // Mid-day 2nd Unit detection: "- 2nd UNIT TO SHOOT DAY#3 - NIGHT SHOOT"
         if (/-?\s*2nd\s+UNIT\s+TO\s+SHOOT/i.test(line)) {

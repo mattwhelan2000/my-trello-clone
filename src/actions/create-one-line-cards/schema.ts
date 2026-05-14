@@ -6,6 +6,8 @@ export const OneLineSceneSchema = z.object({
     location: z.string(),
     timeOfDay: z.string(),
     description: z.string(),
+    listId: z.string().optional(),
+    isOmitted: z.boolean().optional(),
 });
 
 export const OneLineDaySchema = z.object({

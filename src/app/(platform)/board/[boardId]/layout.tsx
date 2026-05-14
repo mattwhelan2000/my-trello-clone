@@ -66,6 +66,7 @@ export default async function BoardIdLayout({
                 <BoardEnhancements boardId={board.id} />
                 <BoardOptions 
                     boardId={board.id} 
+                    boardTitle={board.title}
                     listsCount={listsCount} 
                     cardsCount={cardsCount} 
                     initialGoogleSheetId={board.googleSheetId} 

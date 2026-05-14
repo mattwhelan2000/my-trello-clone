@@ -32,6 +32,9 @@ interface BoardStore {
 
     isDateOrder: boolean;
     setIsDateOrder: (val: boolean) => void;
+
+    showFullList: boolean;
+    setShowFullList: (val: boolean) => void;
 }
 
 export const useBoardStore = create<BoardStore>((set) => ({
@@ -71,4 +74,7 @@ export const useBoardStore = create<BoardStore>((set) => ({
 
     isDateOrder: false,
     setIsDateOrder: (isDateOrder) => set({ isDateOrder }),
+
+    showFullList: false,
+    setShowFullList: (showFullList) => set({ showFullList }),
 }));

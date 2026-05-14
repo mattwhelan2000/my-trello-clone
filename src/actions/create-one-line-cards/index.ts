@@ -62,7 +62,9 @@ export const createOneLineCards = actionClient
 
         for (const day of days) {
             for (const scene of day.scenes) {
-                const listId = fuzzyMatchList(scene.sceneNum, lists);
+                if (scene.isOmitted) continue;
+
+                const listId = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
                 if (!listId) continue; // No matching list found — skip
 
                 const isNight = /NIGHT|DUSK|DAWN/.test(scene.timeOfDay.toUpperCase());
@@ -91,15 +93,13 @@ export const createOneLineCards = actionClient
                     isSyncedWithSheet: false,
                 });
 
-                // Label: Only add if it's NIGHT/DUSK/DAWN
-                if (isNight) {
-                    labelsToInsert.push({
-                        id: crypto.randomUUID(),
-                        cardId,
-                        title: scene.timeOfDay || "NIGHT",
-                        color: "#1e3a5f",
-                    });
-                }
+                // Label: DAY or NIGHT
+                labelsToInsert.push({
+                    id: crypto.randomUUID(),
+                    cardId,
+                    title: scene.timeOfDay || "DAY",
+                    color: isNight ? "#1e3a5f" : "#ca8a04",
+                });
 
                 // 2nd unit label
                 if (day.isSecondUnit) {

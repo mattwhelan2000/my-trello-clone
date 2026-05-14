@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from "react";
 import {
     X, Upload, FileText, Download, CalendarDays, Loader2,
-    CheckSquare, Square, ChevronDown, ChevronRight, Film, Sun, Moon, AlertTriangle, Clock
+    CheckSquare, Square, ChevronDown, ChevronRight, Film, Sun, Moon, AlertTriangle, Clock, Calendar
 } from "lucide-react";
 import { CalendarExportDialog } from "./CalendarExportDialog";
 
@@ -33,7 +33,7 @@ interface OneLineScheduleDialogProps {
 
 type Step = "upload" | "preview";
 
-export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: OneLineScheduleDialogProps) {
+export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, boardLists }: OneLineScheduleDialogProps) {
     const [step, setStep] = useState<Step>("upload");
     const [isDragging, setIsDragging] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -44,6 +44,8 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
     const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
     const [showCalendarExport, setShowCalendarExport] = useState(false);
+    const [manualAssignments, setManualAssignments] = useState<Record<string, string>>({});
+    const [omittedScenes, setOmittedScenes] = useState<Set<string>>(new Set());
 
     // ------- helpers -------
     const dayKey = (d: OneLineDay) => `${d.shootDay}-${d.isSecondUnit ? "2U" : "main"}`;
@@ -130,7 +132,21 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
         setError(null);
         try {
             const { createOneLineCards } = await import("@/actions/create-one-line-cards");
-            const result = await createOneLineCards({ boardId, days: enabledDays, lists: boardLists });
+            const result = await createOneLineCards({ 
+                boardId, 
+                days: enabledDays.map((day) => {
+                    const originalDayIndex = days.indexOf(day);
+                    return {
+                        ...day,
+                        scenes: day.scenes.map((scene, si) => ({
+                            ...scene,
+                            listId: manualAssignments[`${originalDayIndex}-${si}`],
+                            isOmitted: omittedScenes.has(`${originalDayIndex}-${si}`)
+                        }))
+                    };
+                }), 
+                lists: boardLists 
+            });
             if (result?.serverError) throw new Error(result.serverError);
             if (result?.data?.created !== undefined) {
                 setSuccessMsg(`✅ Created ${result.data.created} card(s) on the board.`);
@@ -265,7 +281,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
                                 </div>
                             </div>
 
-                            {days.map(day => {
+                            {days.map((day, di) => {
                                 const key = dayKey(day);
                                 const enabled = !disabledDays.has(key);
                                 const expanded = expandedDays.has(key);
@@ -311,10 +327,26 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
                                                     const isNight = /NIGHT|DUSK|DAWN/.test(scene.timeOfDay.toUpperCase());
                                                     return (
                                                         <div key={si} className="flex items-start gap-x-3 p-3 rounded-lg bg-white/5 border border-white/8">
-                                                            <div className="flex-shrink-0 mt-0.5">
+                                                            <div className="flex-shrink-0 mt-1">
+                                                                <input 
+                                                                    type="checkbox"
+                                                                    checked={omittedScenes.has(`${di}-${si}`)}
+                                                                    onChange={(e) => {
+                                                                        setOmittedScenes(prev => {
+                                                                            const next = new Set(prev);
+                                                                            if (e.target.checked) next.add(`${di}-${si}`);
+                                                                            else next.delete(`${di}-${si}`);
+                                                                            return next;
+                                                                        });
+                                                                    }}
+                                                                    className="h-4 w-4 rounded border-white/20 bg-white/10 text-yellow-400 focus:ring-yellow-400"
+                                                                    title="Omit this scene"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-shrink-0 mt-0.5 ml-1">
                                                                 {isNight ? <Moon className="h-3.5 w-3.5 text-blue-400" /> : <Sun className="h-3.5 w-3.5 text-yellow-400" />}
                                                             </div>
-                                                            <div className="flex-1 min-w-0">
+                                                            <div className={`flex-1 min-w-0 ${omittedScenes.has(`${di}-${si}`) ? "opacity-40 grayscale" : ""}`}>
                                                                 <div className="flex items-center gap-x-2 flex-wrap gap-y-1">
                                                                     <span className="text-xs font-bold text-white/80">Sc{scene.sceneNum}</span>
                                                                     <span className="text-[10px] font-semibold text-white/40">{scene.intExt}</span>
@@ -324,8 +356,29 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
                                                                 {scene.description && (
                                                                     <p className="text-[11px] text-white/40 mt-1 line-clamp-2">{scene.description}</p>
                                                                 )}
-                                                                {/* Fuzzy match preview */}
-                                                                <FuzzyMatchPreview sceneNum={scene.sceneNum} lists={boardLists} />
+                                                                {/* Fuzzy match preview & manual override */}
+                                                                <div className="mt-2 flex flex-col gap-y-2">
+                                                                    <FuzzyMatchPreview sceneNum={scene.sceneNum} lists={boardLists} manualId={manualAssignments[`${di}-${si}`]} />
+                                                                    <div className="flex items-center gap-x-2">
+                                                                        <label className="text-[10px] text-white/50 whitespace-nowrap">Assign to:</label>
+                                                                        <select 
+                                                                            className="bg-black/40 border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white outline-none focus:border-yellow-400/50 flex-1 max-w-[200px]"
+                                                                            value={manualAssignments[`${di}-${si}`] || ""}
+                                                                            onChange={(e) => {
+                                                                                setManualAssignments(prev => ({
+                                                                                    ...prev,
+                                                                                    [`${di}-${si}`]: e.target.value
+                                                                                }));
+                                                                            }}
+                                                                        >
+                                                                            <option value="">(Auto-detect)</option>
+                                                                            <option value="omit">-- Omit --</option>
+                                                                            {boardLists.map(l => (
+                                                                                <option key={l.id} value={l.id}>{l.title}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     );
@@ -399,7 +452,24 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
 }
 
 // Mini component: shows which board list this scene matches (fuzzy)
-function FuzzyMatchPreview({ sceneNum, lists }: { sceneNum: string; lists: { id: string; title: string }[] }) {
+function FuzzyMatchPreview({ sceneNum, lists, manualId }: { sceneNum: string; lists: { id: string; title: string }[]; manualId?: string }) {
+    if (manualId === "omit") {
+        return <p className="text-[10px] text-orange-400 mt-0.5 italic">Skipped (Manual Omit)</p>;
+    }
+    
+    if (manualId) {
+        const manualMatch = lists.find(l => l.id === manualId);
+        return (
+            <div className="flex items-center gap-x-2 mt-1">
+                <div className="flex items-center gap-x-1 px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-400/20">
+                    <span className="text-[8px] font-bold uppercase tracking-tighter text-blue-400">Manual</span>
+                    <span className="text-[10px] text-white/40">→</span>
+                    <span className="text-[10px] text-white/70 font-medium truncate max-w-[150px]">{manualMatch?.title || "Unknown List"}</span>
+                </div>
+            </div>
+        );
+    }
+
     if (!sceneNum || sceneNum === "?") {
         return <p className="text-[10px] text-red-400/70 mt-0.5">⚠ No scene number — will be skipped</p>;
     }
@@ -430,7 +500,7 @@ function FuzzyMatchPreview({ sceneNum, lists }: { sceneNum: string; lists: { id:
         });
     }
 
-    if (!match) return <p className="text-[10px] text-red-400/70 mt-0.5">⚠ No matching list found — will be skipped</p>;
+    if (!match) return <p className="text-[10px] text-red-400/70 mt-0.5 font-bold">⚠ NO MATCHING LIST FOUND</p>;
 
     const color = confidence === 100 ? "text-green-400" : "text-yellow-400";
     const bgColor = confidence === 100 ? "bg-green-500/10" : "bg-yellow-500/10";

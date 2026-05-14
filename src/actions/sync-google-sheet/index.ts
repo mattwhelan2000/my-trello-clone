@@ -12,13 +12,13 @@ export const syncGoogleSheet = actionClient
         try {
             const board = await db.board.findUnique({
                 where: { id: boardId },
-                include: { 
-                    lists: { 
+                include: {
+                    lists: {
                         orderBy: { order: 'asc' },
-                        include: { 
-                            cards: { orderBy: { order: 'asc' } } 
-                        } 
-                    } 
+                        include: {
+                            cards: { orderBy: { order: 'asc' } }
+                        }
+                    }
                 }
             });
 
@@ -35,7 +35,7 @@ export const syncGoogleSheet = actionClient
             }
 
             let authClient: any;
-            
+
             if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
                 try {
                     let credentials;
@@ -73,7 +73,7 @@ export const syncGoogleSheet = actionClient
                 console.log(`Tab '${tabName}' not found. Falling back to default A:Z range.`);
                 const fallbackResponse = await sheets.spreadsheets.values.get({
                     spreadsheetId: board.googleSheetId,
-                    range: 'A:Z', 
+                    range: 'A:Z',
                 });
                 rows = fallbackResponse.data.values || [];
             }
@@ -130,7 +130,7 @@ export const syncGoogleSheet = actionClient
                 const firstRow = groupRows[0];
                 const intExt = firstRow[INT_EXT_IDX] ? String(firstRow[INT_EXT_IDX]).trim() : "";
                 const length = firstRow[LENGTH_IDX] ? String(firstRow[LENGTH_IDX]).trim() : "";
-                
+
                 let constructedTitle = sceneNum;
                 if (intExt) constructedTitle += ` ${intExt}`;
                 if (length) constructedTitle += ` - ${length}`;
@@ -145,7 +145,7 @@ export const syncGoogleSheet = actionClient
                 // Analysis of List
                 let targetList = board.lists.find(l => l.title.startsWith(sceneNum));
                 const listAction = !targetList ? "CREATE" : (targetList.title !== constructedTitle ? "UPDATE" : "NONE");
-                
+
                 if (analyze) {
                     const sceneChanges = {
                         sceneNum,
@@ -195,16 +195,16 @@ export const syncGoogleSheet = actionClient
 
                 const applyCardSync = async (idx: number, defaultTitle: string, newTitle: string | undefined, newDesc: string | undefined, extras?: any) => {
                     const finalTitle = newTitle || defaultTitle;
-                    
+
                     // Skip if disabled by user
                     if (disabledCards.includes(`${sceneNum}|${finalTitle}`)) return;
 
                     const existing = sortedCards[idx];
-                    let data: any = { 
-                        title: finalTitle, 
-                        description: newDesc || "", 
+                    let data: any = {
+                        title: finalTitle,
+                        description: newDesc || "",
                         isSyncedWithSheet: true,
-                        ...extras 
+                        ...extras
                     };
 
                     if (globalColor) {
@@ -243,7 +243,7 @@ export const syncGoogleSheet = actionClient
                         if (!vfxTitle) continue;
 
                         const shotCount = row[SHOT_COUNT_IDX] ? String(row[SHOT_COUNT_IDX]).trim() : "";
-                        
+
                         if (skipZeroVfx && (!shotCount || shotCount === "0")) continue;
 
                         const assets = row[ASSETS_IDX] ? String(row[ASSETS_IDX]).trim() : "";
@@ -263,7 +263,7 @@ export const syncGoogleSheet = actionClient
 
             revalidatePath(`/board/${board.id}`);
             return { success: true };
-            
+
         } catch (error: any) {
             console.error("Google Sheets Sync Error:", error);
             throw new Error(error.message || "Failed to sync with Google Sheets.");
