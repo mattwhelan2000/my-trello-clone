@@ -102,7 +102,7 @@ function parseOneLineSchedule(text: string): OneLineDay[] {
 
         // Scene Heading detection
         // Format: "24A I/E THE ARMORY BUILDING" or "43 EXT THE ARMORY BUILDING" or "60 Start EXT ..."
-        const sceneHeadingRe = /^([A-Z0-9]+(?:[-A-Z0-9/]+)*)?\s*(?:START|PART|CONT|PT)?\s*(INT\.|EXT\.|I\/E\.|INT\/EXT\.?|INT|EXT|I\/E)\s+(.+)/i;
+        const sceneHeadingRe = /^([A-Z0-9]+(?:[-A-Z0-9/]+)*)?\s*(?:START|PART|CONT|PT|PARTIAL)?\s*(INT\.|EXT\.|I\/E\.|INT\/EXT\.?|INT|EXT|I\/E)\s+(.+)/i;
         let headingMatch = line.match(sceneHeadingRe);
 
         // Handle split headings or missing scene numbers
