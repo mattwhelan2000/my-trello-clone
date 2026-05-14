@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from "react";
 import {
     X, Upload, FileText, Download, CalendarDays, Loader2,
-    CheckSquare, Square, ChevronDown, ChevronRight, Film, Sun, Moon, AlertTriangle
+    CheckSquare, Square, ChevronDown, ChevronRight, Film, Sun, Moon, AlertTriangle, Clock
 } from "lucide-react";
 
 export interface OneLineScene {
@@ -18,6 +18,7 @@ export interface OneLineDay {
     shootDay: string;
     isSecondUnit: boolean;
     date: string;
+    shootTime?: string;
     scenes: OneLineScene[];
 }
 
@@ -278,6 +279,11 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
                                                 {day.date && (
                                                     <span className="flex items-center gap-x-1 text-xs text-white/50">
                                                         <CalendarDays className="h-3 w-3" />{day.date}
+                                                    </span>
+                                                )}
+                                                {day.shootTime && (
+                                                    <span className="flex items-center gap-x-1 text-[10px] text-blue-300/60 bg-blue-500/10 px-2 py-0.5 rounded-full ml-2">
+                                                        <Clock className="h-2.5 w-2.5" />{day.shootTime}
                                                     </span>
                                                 )}
                                                 <span className="ml-auto text-xs text-white/30">{day.scenes.length} scene{day.scenes.length !== 1 ? "s" : ""}</span>

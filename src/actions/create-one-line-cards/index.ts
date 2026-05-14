@@ -73,9 +73,10 @@ export const createOneLineCards = actionClient
                 const unitLabel = day.isSecondUnit ? " (2U)" : "";
                 const cardTitle = `DAY ${day.shootDay}${unitLabel}`;
 
-                // Description: date + scene description
+                // Description: date + shoot time + scene description
                 const descParts: string[] = [];
                 if (day.date) descParts.push(day.date);
+                if (day.shootTime) descParts.push(day.shootTime);
                 if (scene.description) descParts.push(scene.description);
 
                 cardsToInsert.push({

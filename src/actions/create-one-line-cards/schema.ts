@@ -12,6 +12,7 @@ export const OneLineDaySchema = z.object({
     shootDay: z.string(),
     isSecondUnit: z.boolean(),
     date: z.string(),
+    shootTime: z.string().optional(),
     scenes: z.array(OneLineSceneSchema),
 });
 
