@@ -30,6 +30,8 @@ interface BoardStore {
     visibleListIds: string[];
     setVisibleListIds: (ids: string[]) => void;
 
+    isDateOrder: boolean;
+    setIsDateOrder: (val: boolean) => void;
 }
 
 export const useBoardStore = create<BoardStore>((set) => ({
@@ -67,4 +69,6 @@ export const useBoardStore = create<BoardStore>((set) => ({
     visibleListIds: [],
     setVisibleListIds: (visibleListIds) => set({ visibleListIds }),
 
+    isDateOrder: false,
+    setIsDateOrder: (isDateOrder) => set({ isDateOrder }),
 }));

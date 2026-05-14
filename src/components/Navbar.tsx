@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutDashboard, Plus, ChevronLeft, X } from "lucide-react";
+import { LayoutDashboard, Plus, ChevronLeft, X, Calendar } from "lucide-react";
 import { useBoardStore } from "@/hooks/use-board-store";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
@@ -12,6 +12,7 @@ export const Navbar = () => {
     const pathname = usePathname();
     const boardIdMatch = pathname?.match(/\/board\/([^/]+)/);
     const boardId = boardIdMatch ? boardIdMatch[1] : null;
+    const { isDateOrder, setIsDateOrder } = useBoardStore();
     const [isMounted, setIsMounted] = useState(false);
     
     useEffect(() => {
@@ -112,18 +113,28 @@ export const Navbar = () => {
             <div className="ml-auto flex items-center gap-x-3">
 
                 {isOnBoard && (
-                    <div className="flex items-center gap-x-2">
-                        <span className="text-white/60 text-xs font-medium whitespace-nowrap">BG Opacity</span>
-                        <input
-                            type="range"
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={bgOpacity}
-                            onChange={(e) => onOpacityChange(parseFloat(e.target.value))}
-                            className="w-24 h-1.5 accent-white cursor-pointer"
-                        />
-                        <span className="text-white/50 text-xs w-7 text-right">{Math.round(bgOpacity * 100)}%</span>
+                    <div className="flex items-center gap-x-4">
+                        <div className="flex items-center gap-x-2">
+                            <span className="text-white/60 text-xs font-medium whitespace-nowrap">BG Opacity</span>
+                            <input
+                                type="range"
+                                min={0}
+                                max={1}
+                                step={0.01}
+                                value={bgOpacity}
+                                onChange={(e) => onOpacityChange(parseFloat(e.target.value))}
+                                className="w-24 h-1.5 accent-white cursor-pointer"
+                            />
+                            <span className="text-white/50 text-xs w-7 text-right">{Math.round(bgOpacity * 100)}%</span>
+                        </div>
+                        <div className="w-[1px] h-4 bg-white/10" />
+                        <button
+                            onClick={() => setIsDateOrder(!isDateOrder)}
+                            className={`flex items-center gap-x-2 px-3 py-1.5 rounded-md text-xs font-bold transition shadow-sm border ${isDateOrder ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_10px_rgba(79,70,229,0.4)]' : 'bg-black/20 border-white/10 text-white/60 hover:bg-black/30 hover:text-white'}`}
+                        >
+                            <Calendar className="h-3.5 w-3.5" />
+                            {isDateOrder ? "DATE ORDER" : "SORT BY DATE"}
+                        </button>
                     </div>
                 )}
                 <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold cursor-pointer text-sm">

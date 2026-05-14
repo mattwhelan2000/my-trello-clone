@@ -85,6 +85,7 @@ export const ListContainer = ({
         setVisibleListCount,
         visibleListIds,
         setVisibleListIds,
+        isDateOrder,
     } = useBoardStore();
 
     const { addToast } = useToast();
@@ -100,6 +101,30 @@ export const ListContainer = ({
             addToast("Failed to bulk update cards", "error");
         }
     });
+
+    const sortedData = useMemo(() => {
+        if (!isDateOrder) return orderedData;
+
+        return [...orderedData].sort((a, b) => {
+            // Find "DAY" card for each list to get the shoot date
+            const dayCardA = a.cards.find(c => c.title.toUpperCase().startsWith("DAY "));
+            const dayCardB = b.cards.find(c => c.title.toUpperCase().startsWith("DAY "));
+
+            // If no day card, push to the end
+            const dateA = dayCardA?.dueDate ? new Date(dayCardA.dueDate).getTime() : Infinity;
+            const dateB = dayCardB?.dueDate ? new Date(dayCardB.dueDate).getTime() : Infinity;
+
+            if (dateA !== dateB) return dateA - dateB;
+
+            // Secondary sort: Scene number (from list title, e.g. "Sc001" -> 1)
+            const sceneA = parseInt(a.title.replace(/\D/g, ""), 10) || 0;
+            const sceneB = parseInt(b.title.replace(/\D/g, ""), 10) || 0;
+            
+            if (sceneA !== sceneB) return sceneA - sceneB;
+            
+            return a.order - b.order;
+        });
+    }, [orderedData, isDateOrder]);
 
     const { execute: executeUpdateListOrder, isExecuting: isLoadingList } = useSafeAction(updateListOrder, {
         onSuccess: () => {
@@ -511,7 +536,7 @@ export const ListContainer = ({
             </div>
 
             <ol className="flex gap-x-3 h-full">
-                {orderedData.map((list, index) => {
+                {sortedData.map((list, index) => {
                     return (
                         <ListItem
                             key={list.id}
@@ -527,7 +552,7 @@ export const ListContainer = ({
                             onMoveList={handleMoveList}
                             onMoveCard={handleMoveCard}
                             isFirst={index === 0}
-                            isLast={index === orderedData.length - 1}
+                            isLast={index === sortedData.length - 1}
                         />
                     );
                 })}
