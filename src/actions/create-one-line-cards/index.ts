@@ -91,13 +91,15 @@ export const createOneLineCards = actionClient
                     isSyncedWithSheet: false,
                 });
 
-                // Label: DAY or NIGHT
-                labelsToInsert.push({
-                    id: crypto.randomUUID(),
-                    cardId,
-                    title: scene.timeOfDay || "DAY",
-                    color: isNight ? "#1e3a5f" : "#ca8a04",
-                });
+                // Label: Only add if it's NIGHT/DUSK/DAWN
+                if (isNight) {
+                    labelsToInsert.push({
+                        id: crypto.randomUUID(),
+                        cardId,
+                        title: scene.timeOfDay || "NIGHT",
+                        color: "#1e3a5f",
+                    });
+                }
 
                 // 2nd unit label
                 if (day.isSecondUnit) {
