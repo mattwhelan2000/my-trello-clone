@@ -100,9 +100,26 @@ function parseOneLineSchedule(text: string): OneLineDay[] {
 
         if (!currentDay) continue;
 
+        // Mid-day 2nd Unit detection: "- 2nd UNIT TO SHOOT DAY#3 - NIGHT SHOOT"
+        if (/-?\s*2nd\s+UNIT\s+TO\s+SHOOT/i.test(line)) {
+            const shootDayMatch = line.match(/DAY#?\s*(\d+[A-Z]?)/i);
+            const shootDay = shootDayMatch ? shootDayMatch[1] : currentDay.shootDay;
+            
+            // Create a new entry for the 2nd unit portion of this day
+            currentDay = {
+                shootDay,
+                isSecondUnit: true,
+                date: currentDay.date,
+                shootTime: "", // usually different call times
+                scenes: []
+            };
+            days.push(currentDay);
+            continue;
+        }
+
         // Scene Heading detection
-        // Format: "24A I/E THE ARMORY BUILDING" or "43 EXT THE ARMORY BUILDING" or "60 Start EXT ..."
-        const sceneHeadingRe = /^([A-Z0-9]+(?:[-A-Z0-9/]+)*)?\s*(?:START|PART|CONT|PT|PARTIAL)?\s*(INT\.|EXT\.|I\/E\.|INT\/EXT\.?|INT|EXT|I\/E)\s+(.+)/i;
+        // Format: "24A I/E THE ARMORY BUILDING" or "43 EXT THE ARMORY BUILDING" or "60 Start EXT ..." or "135 PT2 INT ..."
+        const sceneHeadingRe = /^([A-Z0-9]+(?:[-A-Z0-9/]+)*)?\s*(?:START|END|PART|CONT|PT\d*|PARTIAL|PTL)?\s*(INT\.|EXT\.|I\/E\.|INT\/EXT\.?|INT|EXT|I\/E)\s+(.+)/i;
         let headingMatch = line.match(sceneHeadingRe);
 
         // Handle split headings or missing scene numbers

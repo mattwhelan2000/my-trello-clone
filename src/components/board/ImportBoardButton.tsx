@@ -37,6 +37,12 @@ export const ImportBoardButton = () => {
         reader.onload = (event) => {
             try {
                 const json = JSON.parse(event.target?.result as string);
+                
+                // Detect One-Line Schedule JSON (Array of days)
+                if (Array.isArray(json) && json.length > 0 && (json[0].shootDay || json[0].scenes)) {
+                    setError("This is a One-Line Schedule JSON. Use 'Import One-Line Schedule' in Board Settings.");
+                    return;
+                }
 
                 // Do basic validation before sending to the server
                 if (!json.title || !Array.isArray(json.lists)) {
