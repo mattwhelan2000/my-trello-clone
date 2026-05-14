@@ -41,8 +41,6 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
     const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-    if (!isOpen) return null;
-
     // ------- helpers -------
     const dayKey = (d: OneLineDay) => `${d.shootDay}-${d.isSecondUnit ? "2U" : "main"}`;
 
@@ -161,6 +159,8 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardLists }: 
         if (t.includes("DUSK") || t.includes("DAWN")) return { bg: "#7c3aed", text: "#ddd6fe" };
         return { bg: "#854d0e", text: "#fef08a" };
     };
+
+    if (!isOpen) return null;
 
     return (
         <div
