@@ -235,7 +235,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                 <span className="px-5 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-yellow-950 font-bold text-sm rounded-lg transition shadow-lg">
                                     Browse Files
                                 </span>
-                                <input type="file" accept=".pdf,.json,application/pdf,application/json" className="sr-only" onChange={onFileChange} />
+                                <input id="oneline-file-input" name="oneline-file-input" type="file" accept=".pdf,.json,application/pdf,application/json" className="sr-only" onChange={onFileChange} />
                             </label>
                         </div>
 
@@ -308,6 +308,8 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                     {deleteExistingDayCards ? <CheckSquare className="h-4 w-4 text-red-400" /> : <Square className="h-4 w-4 text-white/30" />}
                                 </div>
                                 <input 
+                                    id="delete-day-cards-check"
+                                    name="delete-day-cards-check"
                                     type="checkbox" 
                                     className="sr-only" 
                                     checked={deleteExistingDayCards}
@@ -324,6 +326,8 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                     {splitListsForMultiDayScenes ? <CheckSquare className="h-4 w-4 text-blue-400" /> : <Square className="h-4 w-4 text-white/30" />}
                                 </div>
                                 <input 
+                                    id="split-lists-check"
+                                    name="split-lists-check"
                                     type="checkbox" 
                                     className="sr-only" 
                                     checked={splitListsForMultiDayScenes}
@@ -341,6 +345,8 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                         {cloneCardsInSplitLists ? <CheckSquare className="h-4 w-4 text-green-400" /> : <Square className="h-4 w-4 text-white/30" />}
                                     </div>
                                     <input 
+                                        id="clone-cards-check"
+                                        name="clone-cards-check"
                                         type="checkbox" 
                                         className="sr-only" 
                                         checked={cloneCardsInSplitLists}
@@ -420,6 +426,8 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                                         <div key={si} className="flex items-start gap-x-3 p-3 rounded-lg bg-white/5 border border-white/8">
                                                             <div className="flex-shrink-0 mt-1">
                                                                 <input 
+                                                                    id={`omit-scene-${di}-${si}`}
+                                                                    name={`omit-scene-${di}-${si}`}
                                                                     type="checkbox"
                                                                     checked={omittedScenes.has(`${di}-${si}`)}
                                                                     onChange={(e) => {
@@ -453,6 +461,8 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                                                     <div className="flex items-center gap-x-2">
                                                                         <label className="text-[10px] text-white/50 whitespace-nowrap">Assign to:</label>
                                                                         <select 
+                                                                            id={`assign-scene-${di}-${si}`}
+                                                                            name={`assign-scene-${di}-${si}`}
                                                                             className="bg-black/40 border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white outline-none focus:border-yellow-400/50 flex-1 max-w-[200px]"
                                                                             value={manualAssignments[`${di}-${si}`] || ""}
                                                                             onChange={(e) => {
