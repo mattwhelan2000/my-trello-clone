@@ -247,13 +247,26 @@ export const createOneLineCards = actionClient
 /** Try to parse a date string like "Monday, June 9th, 2026" or "June 9th, 2026" into a Date */
 function parseDateString(str: string): Date | null {
     try {
+        const currentYear = new Date().getFullYear();
         // Remove day-of-week prefix
         let cleaned = str.replace(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*,?\s+/i, "").trim();
         // Remove ordinal suffixes (nd, rd, th, st)
         cleaned = cleaned.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
         
+        // If year is missing (no 4-digit number starting with 20), append current year
+        if (!/\b(20\d{2})\b/.test(cleaned)) {
+            cleaned = `${cleaned}, ${currentYear}`;
+        }
+        
         const d = new Date(cleaned);
         if (isNaN(d.getTime())) return null;
+        
+        // If the date is valid but somehow in a weird year (e.g. 2001 if someone typed '01'), 
+        // and we want to assume current year:
+        if (d.getFullYear() < 2000 || d.getFullYear() > 2100) {
+            d.setFullYear(currentYear);
+        }
+        
         return d;
     } catch {
         return null;

@@ -268,6 +268,39 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                 {/* ---- STEP: PREVIEW ---- */}
                 {step === "preview" && (
                     <>
+                        {/* Year Mismatch Warning */}
+                        {(() => {
+                            const currentYear = new Date().getFullYear();
+                            const mismatchedDays = days.filter(d => {
+                                if (!d.date) return false;
+                                // Handle ordinal suffixes first
+                                let cleaned = d.date.replace(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*,?\s+/i, "").trim();
+                                cleaned = cleaned.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
+                                
+                                // If year is missing in the string, new Date(cleaned) will use current year
+                                // We want to see if the string *explicitly* has a different year
+                                const yearMatch = d.date.match(/\b(20\d{2})\b/);
+                                if (yearMatch && parseInt(yearMatch[1], 10) !== currentYear) return true;
+                                return false;
+                            });
+
+                            if (mismatchedDays.length > 0) {
+                                return (
+                                    <div className="mx-6 mt-4 p-3 bg-orange-900/30 border border-orange-500/30 rounded-xl flex items-start gap-x-3">
+                                        <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1">
+                                            <p className="text-xs font-bold text-orange-300">Year Mismatch Detected</p>
+                                            <p className="text-[10px] text-orange-200/70">
+                                                Some dates in the schedule (e.g. Day {mismatchedDays[0].shootDay}) appear to be for a year other than {currentYear}. 
+                                                All cards will be created with the current year ({currentYear}) unless corrected.
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
+
                         {/* Global Options Checkboxes */}
                         <div className="px-6 py-3 bg-white/5 border-b border-white/10 flex flex-col gap-y-2">
                             <label className="flex items-center gap-x-3 cursor-pointer group">
