@@ -6,6 +6,7 @@ import {
     CheckSquare, Square, ChevronDown, ChevronRight, Film, Sun, Moon, AlertTriangle, Clock, Calendar
 } from "lucide-react";
 import { CalendarExportDialog } from "./CalendarExportDialog";
+import { createOneLineCards } from "@/actions/create-one-line-cards";
 
 export interface OneLineScene {
     sceneNum: string;
@@ -134,7 +135,6 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
         setIsCreating(true);
         setError(null);
         try {
-            const { createOneLineCards } = await import("@/actions/create-one-line-cards");
             const result = await createOneLineCards({ 
                 boardId, 
                 days: enabledDays.map((day) => {
