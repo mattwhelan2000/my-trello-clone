@@ -46,6 +46,8 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
     const [showCalendarExport, setShowCalendarExport] = useState(false);
     const [manualAssignments, setManualAssignments] = useState<Record<string, string>>({});
     const [omittedScenes, setOmittedScenes] = useState<Set<string>>(new Set());
+    const [deleteExistingDayCards, setDeleteExistingDayCards] = useState(false);
+    const [splitListsForMultiDayScenes, setSplitListsForMultiDayScenes] = useState(false);
 
     // ------- helpers -------
     const dayKey = (d: OneLineDay) => `${d.shootDay}-${d.isSecondUnit ? "2U" : "main"}`;
@@ -145,7 +147,9 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                         }))
                     };
                 }), 
-                lists: boardLists 
+                lists: boardLists,
+                deleteExistingDayCards,
+                splitListsForMultiDayScenes
             });
             if (result?.serverError) throw new Error(result.serverError);
             if (result?.data?.created !== undefined) {
@@ -262,6 +266,40 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                 {/* ---- STEP: PREVIEW ---- */}
                 {step === "preview" && (
                     <>
+                        {/* Global Options Checkboxes */}
+                        <div className="px-6 py-3 bg-white/5 border-b border-white/10 flex flex-col gap-y-2">
+                            <label className="flex items-center gap-x-3 cursor-pointer group">
+                                <div className={`p-0.5 rounded border transition ${deleteExistingDayCards ? "bg-red-500/20 border-red-500/50" : "bg-white/5 border-white/10 group-hover:border-white/20"}`}>
+                                    {deleteExistingDayCards ? <CheckSquare className="h-4 w-4 text-red-400" /> : <Square className="h-4 w-4 text-white/30" />}
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only" 
+                                    checked={deleteExistingDayCards}
+                                    onChange={e => setDeleteExistingDayCards(e.target.checked)}
+                                />
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-white/80">Delete existing "DAY" cards</span>
+                                    <span className="text-[10px] text-white/40">Removes all cards with a "DAY" label from the board before importing.</span>
+                                </div>
+                            </label>
+
+                            <label className="flex items-center gap-x-3 cursor-pointer group">
+                                <div className={`p-0.5 rounded border transition ${splitListsForMultiDayScenes ? "bg-blue-500/20 border-blue-500/50" : "bg-white/5 border-white/10 group-hover:border-white/20"}`}>
+                                    {splitListsForMultiDayScenes ? <CheckSquare className="h-4 w-4 text-blue-400" /> : <Square className="h-4 w-4 text-white/30" />}
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    className="sr-only" 
+                                    checked={splitListsForMultiDayScenes}
+                                    onChange={e => setSplitListsForMultiDayScenes(e.target.checked)}
+                                />
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-white/80">Create list copies for multi-day scenes</span>
+                                    <span className="text-[10px] text-white/40">If a scene is shot over multiple days, copies of the list will be created (Pt.1/N, Pt.2/N, etc.)</span>
+                                </div>
+                            </label>
+                        </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                             {/* Summary bar */}
                             <div className="flex items-center justify-between mb-2 px-1">

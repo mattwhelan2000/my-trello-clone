@@ -32,14 +32,81 @@ function fuzzyMatchList(sceneNum: string, lists: { id: string; title: string }[]
 
 export const createOneLineCards = actionClient
     .schema(CreateOneLineCardsSchema)
-    .action(async ({ parsedInput: { boardId, days, lists } }) => {
+    .action(async ({ parsedInput: { boardId, days, lists, deleteExistingDayCards, splitListsForMultiDayScenes } }) => {
         const cardsToInsert: any[] = [];
         const labelsToInsert: any[] = [];
 
+        // 1. Delete existing DAY cards if requested
+        if (deleteExistingDayCards) {
+            await db.card.deleteMany({
+                where: {
+                    list: { boardId },
+                    labels: { some: { title: "DAY" } }
+                }
+            });
+        }
+
+        // 2. Pre-calculate list splits for multi-day scenes
+        const listDayUsage: Record<string, string[]> = {}; // listId -> unique day labels
+        for (const day of days) {
+            for (const scene of day.scenes) {
+                if (scene.isOmitted) continue;
+                const lid = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
+                if (!lid) continue;
+                if (!listDayUsage[lid]) listDayUsage[lid] = [];
+                const dayLabel = `${day.shootDay}${day.isSecondUnit ? "2U" : ""}`;
+                if (!listDayUsage[lid].includes(dayLabel)) {
+                    listDayUsage[lid].push(dayLabel);
+                }
+            }
+        }
+
+        const listIdOverrides: Record<string, string> = {}; // "listId-dayLabel" -> targetListId
+        if (splitListsForMultiDayScenes) {
+            for (const lid of Object.keys(listDayUsage)) {
+                const dayLabels = listDayUsage[lid];
+                if (dayLabels.length > 1) {
+                    const originalList = await db.list.findUnique({ where: { id: lid } });
+                    if (!originalList) continue;
+                    
+                    const originalTitle = originalList.title;
+                    const N = dayLabels.length;
+
+                    // Update original list title
+                    await db.list.update({
+                        where: { id: lid },
+                        data: { title: `${originalTitle} Pt.1/${N}` }
+                    });
+                    listIdOverrides[`${lid}-${dayLabels[0]}`] = lid;
+
+                    // Create N-1 copies
+                    for (let i = 1; i < N; i++) {
+                        const newList = await db.list.create({
+                            data: {
+                                boardId,
+                                title: `${originalTitle} Pt.${i+1}/${N}`,
+                                order: originalList.order + (i * 0.001), // Keep them adjacent
+                            }
+                        });
+                        listIdOverrides[`${lid}-${dayLabels[i]}`] = newList.id;
+                    }
+                }
+            }
+        }
+
         // Pre-fetch existing card orders per list so we append
-        const listIds = new Set(days.flatMap(d => d.scenes.map(s => fuzzyMatchList(s.sceneNum, lists))).filter(Boolean) as string[]);
+        const targetListIds = new Set<string>();
+        for (const day of days) {
+            for (const scene of day.scenes) {
+                const lid = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
+                if (lid) targetListIds.add(lid);
+            }
+        }
+        // Also add any new lists created from overrides
+        Object.values(listIdOverrides).forEach(id => targetListIds.add(id));
+
         const existingCards = await db.card.findMany({
-            where: { listId: { in: Array.from(listIds) } },
+            where: { listId: { in: Array.from(targetListIds) } },
             select: { listId: true, order: true },
             orderBy: { order: "desc" },
         });
@@ -64,21 +131,25 @@ export const createOneLineCards = actionClient
             for (const scene of day.scenes) {
                 if (scene.isOmitted) continue;
 
-                const listId = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
-                if (!listId) continue; // No matching list found — skip
+                const baseListId = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
+                if (!baseListId) continue; 
+
+                // Resolve list ID with potential overrides (multi-day split)
+                const dayLabel = `${day.shootDay}${day.isSecondUnit ? "2U" : ""}`;
+                const listId = listIdOverrides[`${baseListId}-${dayLabel}`] || baseListId;
 
                 const isNight = /NIGHT|DUSK|DAWN/.test(scene.timeOfDay.toUpperCase());
-                const cardColor = isNight ? "#1e3a5f" : "#fef08a"; // dark blue or yellow
+                const cardColor = isNight ? "#1e3a5f" : "#fef08a"; 
                 const fontColor = isNight ? "#ffffff" : "#1a1a1a";
 
                 const cardId = crypto.randomUUID();
                 const unitLabel = day.isSecondUnit ? " (2U)" : "";
                 const cardTitle = `DAY ${day.shootDay}${unitLabel}`;
 
-                // Description: date + shoot time + scene description
+                // Description: ensure date is included as text
                 const descParts: string[] = [];
-                if (day.date) descParts.push(day.date);
-                if (day.shootTime) descParts.push(day.shootTime);
+                if (day.date) descParts.push(`DATE: ${day.date}`);
+                if (day.shootTime) descParts.push(`TIME: ${day.shootTime}`);
                 if (scene.description) descParts.push(scene.description);
 
                 cardsToInsert.push({
@@ -124,11 +195,14 @@ export const createOneLineCards = actionClient
         return { created: cardsToInsert.length };
     });
 
-/** Try to parse a date string like "Monday, June 9, 2026" or "June 9, 2026" into a Date */
+/** Try to parse a date string like "Monday, June 9th, 2026" or "June 9th, 2026" into a Date */
 function parseDateString(str: string): Date | null {
     try {
         // Remove day-of-week prefix
-        const cleaned = str.replace(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*,?\s+/i, "").trim();
+        let cleaned = str.replace(/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*,?\s+/i, "").trim();
+        // Remove ordinal suffixes (nd, rd, th, st)
+        cleaned = cleaned.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
+        
         const d = new Date(cleaned);
         if (isNaN(d.getTime())) return null;
         return d;

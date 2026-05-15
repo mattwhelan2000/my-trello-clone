@@ -25,4 +25,6 @@ export const CreateOneLineCardsSchema = z.object({
         id: z.string(),
         title: z.string(),
     })),
+    deleteExistingDayCards: z.boolean().optional(),
+    splitListsForMultiDayScenes: z.boolean().optional(),
 });
