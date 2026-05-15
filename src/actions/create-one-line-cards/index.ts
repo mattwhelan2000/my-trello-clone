@@ -66,7 +66,19 @@ export const createOneLineCards = actionClient
             for (const lid of Object.keys(listDayUsage)) {
                 const dayLabels = listDayUsage[lid];
                 if (dayLabels.length > 1) {
-                    const originalList = await db.list.findUnique({ where: { id: lid } });
+                    const originalList = await db.list.findUnique({ 
+                        where: { id: lid },
+                        include: { 
+                            cards: {
+                                include: {
+                                    labels: true,
+                                    checklists: {
+                                        include: { items: true }
+                                    }
+                                }
+                            }
+                        }
+                    });
                     if (!originalList) continue;
                     
                     const originalTitle = originalList.title;
@@ -89,6 +101,43 @@ export const createOneLineCards = actionClient
                             }
                         });
                         listIdOverrides[`${lid}-${dayLabels[i]}`] = newList.id;
+
+                        // Clone cards if requested
+                        if (cloneCardsInSplitLists && originalList.cards.length > 0) {
+                            for (const card of originalList.cards) {
+                                await db.card.create({
+                                    data: {
+                                        listId: newList.id,
+                                        title: card.title,
+                                        description: card.description,
+                                        order: card.order,
+                                        color: card.color,
+                                        fontColor: card.fontColor,
+                                        dueDate: card.dueDate,
+                                        isSyncedWithSheet: card.isSyncedWithSheet,
+                                        labels: {
+                                            create: card.labels.map(l => ({
+                                                title: l.title,
+                                                color: l.color,
+                                            }))
+                                        },
+                                        checklists: {
+                                            create: card.checklists.map(c => ({
+                                                title: c.title,
+                                                order: c.order,
+                                                items: {
+                                                    create: c.items.map(item => ({
+                                                        title: item.title,
+                                                        order: item.order,
+                                                        isCompleted: item.isCompleted,
+                                                    }))
+                                                }
+                                            }))
+                                        }
+                                    }
+                                });
+                            }
+                        }
                     }
                 }
             }

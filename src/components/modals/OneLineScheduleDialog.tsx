@@ -48,6 +48,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
     const [omittedScenes, setOmittedScenes] = useState<Set<string>>(new Set());
     const [deleteExistingDayCards, setDeleteExistingDayCards] = useState(false);
     const [splitListsForMultiDayScenes, setSplitListsForMultiDayScenes] = useState(false);
+    const [cloneCardsInSplitLists, setCloneCardsInSplitLists] = useState(false);
 
     // ------- helpers -------
     const dayKey = (d: OneLineDay) => `${d.shootDay}-${d.isSecondUnit ? "2U" : "main"}`;
@@ -149,7 +150,8 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                 }), 
                 lists: boardLists,
                 deleteExistingDayCards,
-                splitListsForMultiDayScenes
+                splitListsForMultiDayScenes,
+                cloneCardsInSplitLists
             });
             if (result?.serverError) throw new Error(result.serverError);
             if (result?.data?.created !== undefined) {
@@ -299,6 +301,24 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                     <span className="text-[10px] text-white/40">If a scene is shot over multiple days, copies of the list will be created (Pt.1/N, Pt.2/N, etc.)</span>
                                 </div>
                             </label>
+
+                            {splitListsForMultiDayScenes && (
+                                <label className="flex items-center gap-x-3 cursor-pointer group ml-6">
+                                    <div className={`p-0.5 rounded border transition ${cloneCardsInSplitLists ? "bg-green-500/20 border-green-500/50" : "bg-white/5 border-white/10 group-hover:border-white/20"}`}>
+                                        {cloneCardsInSplitLists ? <CheckSquare className="h-4 w-4 text-green-400" /> : <Square className="h-4 w-4 text-white/30" />}
+                                    </div>
+                                    <input 
+                                        type="checkbox" 
+                                        className="sr-only" 
+                                        checked={cloneCardsInSplitLists}
+                                        onChange={e => setCloneCardsInSplitLists(e.target.checked)}
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-white/80">Clone all cards in list</span>
+                                        <span className="text-[10px] text-white/40">When creating "Pt" lists, copy all existing cards from the original list into the new parts.</span>
+                                    </div>
+                                </label>
+                            )}
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                             {/* Summary bar */}
