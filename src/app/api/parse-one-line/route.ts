@@ -48,158 +48,238 @@ export interface OneLineDay {
 function parseOneLineSchedule(text: string): OneLineDay[] {
     const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
     const days: OneLineDay[] = [];
-    let currentDay: OneLineDay | null = null;
-
-    // Patterns
-    // "DAY #1 - MON, JUNE 1ST/ Sun: ..."
-    const dayStartRe = /^DAY\s+#?(\d+[A-Z]?)/i;
-    // "End of Day# 1 -- Monday, June 1, 2026"
-    const dayEndRe = /^End of Day/i;
-
-    for (let i = 0; i < lines.length; i++) {
+    
+    let i = 0;
+    while (i < lines.length) {
         const line = lines[i];
 
-        const dayMatch = line.match(dayStartRe);
-        if (dayMatch) {
-            const shootDay = dayMatch[1].toUpperCase();
-            const is2U = /2ND|SECOND|2U/i.test(line);
+        // 1. Detect Day Start: "DAY #1 - MON, JUNE 1ST"
+        const dayStartMatch = line.match(/^DAY\s+#?(\d+[A-Z]?)/i);
+        if (dayStartMatch) {
+            const shootDay = dayStartMatch[1].toUpperCase();
+            // 2nd Unit detection: Be strict to avoid matching date ordinals like "JUNE 2ND"
+            // Look for "2nd Unit" or "2U" or "Second Unit" as distinct phrases
+            const is2U = /\b(?:2nd\s+Unit|2U|Second\s+Unit)\b/i.test(line);
+            
+            // Extract date from start line if possible (e.g. "JUNE 1ST")
+            // We'll refine this later with the "End of Day" date which is more complete.
+            const dateInHeader = line.split("/")[0].split("-").slice(1).join("-").trim();
 
-            // try to get date from start line
-            const dateMatch = line.match(/(?:MON|TUE|WED|THU|FRI|SAT|SUN)\w*,?\s+(JAN\w*|FEB\w*|MAR\w*|APR\w*|MAY|JUN\w*|JUL\w*|AUG\w*|SEP\w*|OCT\w*|NOV\w*|DEC\w*)\s+\d{1,2}(?:ST|ND|RD|TH)?/i);
-            const rawDate = dateMatch ? dateMatch[0] : "";
+            let shootTimeLine = "";
+            let dayTextContent: string[] = [line];
+            let scenes: OneLineScene[] = [];
+            
+            i++;
+            // Collect lines until "End of Day"
+            while (i < lines.length && !/^End of Day/i.test(lines[i])) {
+                const dayLine = lines[i];
+                dayTextContent.push(dayLine);
+                
+                // Check for Crew Call / Wrap
+                if (/CREW\s*CALL|CAMERA\s*WRAP/i.test(dayLine)) {
+                    shootTimeLine = dayLine;
+                }
+                
+                i++;
+            }
 
-            // check for shoot times on the next few lines
-            let times = "";
-            for (let j = 1; j <= 2 && i + j < lines.length; j++) {
-                if (/CREW CALL|LUNCH|WRAP/i.test(lines[i + j])) {
-                    times = lines[i + j];
-                    break;
+            let footerLine = "";
+            if (i < lines.length && /^End of Day/i.test(lines[i])) {
+                footerLine = lines[i];
+                dayTextContent.push(footerLine);
+            }
+
+            // Extract real date from footer: "End of Day# 1 -- Monday, June 1, 2026"
+            let finalDate = dateInHeader;
+            const realDateMatch = footerLine.match(/--\s*((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[A-Za-z,\s0-9]+)\s*--/i);
+            if (realDateMatch) {
+                finalDate = realDateMatch[1].trim();
+            } else {
+                // Fallback: try to find a full date in the footer if the regex failed
+                const dateParts = footerLine.split("--");
+                if (dateParts.length >= 2) {
+                    const potentialDate = dateParts[1].trim();
+                    if (potentialDate.length > 5) finalDate = potentialDate;
                 }
             }
 
-            currentDay = {
+            // Now parse scenes from the collected dayTextContent
+            scenes = extractScenesFromDayBlock(dayTextContent);
+
+            days.push({
                 shootDay,
                 isSecondUnit: is2U,
-                date: rawDate,
-                shootTime: times,
-                scenes: []
-            };
-            days.push(currentDay);
-            continue;
+                date: finalDate,
+                shootTime: shootTimeLine,
+                scenes
+            });
         }
+        i++;
+    }
 
-        if (dayEndRe.test(line) && currentDay) {
-            // Real date often in footer: "End of Day# 1 -- Monday, June 1, 2026 -- 3 3/8 Pages"
-            const realDateMatch = line.match(/--\s*((?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[A-Za-z,\s0-9]+)\s*--/i);
-            if (realDateMatch) {
-                currentDay.date = realDateMatch[1].trim();
-            }
-            currentDay = null;
-            continue;
-        }
-
-        if (!currentDay) {
-            // Check if this looks like a scene heading even without a current day
-            const sceneHeadingRe = /^([A-Z0-9]+(?:[-A-Z0-9/]+)*)?\s*(?:START|END|PART|CONT|PT\d*|PARTIAL|PTL)?\s*(INT\.|EXT\.|I\/E\.|INT\/EXT\.?|INT|EXT|I\/E)\s+(.+)/i;
-            if (sceneHeadingRe.test(line) || /^(INT\.|EXT\.|I\/E\.|INT|EXT|I\/E)\s+(.+)/i.test(line)) {
-                currentDay = {
-                    shootDay: "UNASSIGNED",
-                    isSecondUnit: false,
-                    date: "",
-                    shootTime: "",
-                    scenes: []
-                };
-                days.push(currentDay);
+    const mergeDuplicateDays = (dayList: OneLineDay[]): OneLineDay[] => {
+        const merged: OneLineDay[] = [];
+        for (const day of dayList) {
+            const existing = merged.find(d => d.shootDay === day.shootDay && d.isSecondUnit === day.isSecondUnit);
+            if (existing) {
+                existing.scenes.push(...day.scenes);
+                if (!existing.shootTime && day.shootTime) {
+                    existing.shootTime = day.shootTime;
+                }
+                if (!existing.date && day.date) {
+                    existing.date = day.date;
+                }
             } else {
+                merged.push(day);
+            }
+        }
+        return merged;
+    };
+
+    if (days.length === 0) {
+        return mergeDuplicateDays(parseOneLineScheduleFallback(text));
+    }
+
+    return mergeDuplicateDays(days);
+}
+
+function extractScenesFromDayBlock(rawLines: string[]): OneLineScene[] {
+    const scenes: OneLineScene[] = [];
+
+    // ---------------------------------------------------------------
+    // Pre-pass: merge split scene headers.
+    // Some PDFs break a scene entry across 2-3 lines, e.g.:
+    //   "118/117"        ← scene number
+    //   "PT"             ← modifier
+    //   "EXT BUILDING"   ← the actual INT/EXT line
+    // We detect this pattern and join them into one line before parsing.
+    // ---------------------------------------------------------------
+    const intExtRe = /^(INT\.|EXT\.|I\/E\.|INT\/EXT\.?|INT|EXT|I\/E)\s+/i;
+    // Allow optional spaces, slashes, and modifier words (e.g. "56 PT/57") in scene-number-only lines
+    const sceneNumOnlyRe = /^([0-9][A-Z0-9\/\-\.]*(?:\s+[A-Z0-9\/\-\.]+)*)\s*$/i;
+    // Avoid matching lines that contain INT/EXT keywords as distinct words
+    const intExtWordRe = /\b(INT\.|EXT\.|I\/E\.|INT\/EXT\.?|INT|EXT|I\/E)\b/i;
+    // Known modifier tokens that can appear on their own line
+    const modifierOnlyRe = /^(PT\d*|Start|End|Part|Partial|PTL|VFX|Contd|Cont['’]d|Cont|Con['’]t)\s*$/i;
+    // Short stray token: 1–4 uppercase letters that are not a known INT/EXT keyword
+    const shortStrayRe = /^[A-Z]{1,4}$/i;
+
+    const lines: string[] = [];
+    for (let k = 0; k < rawLines.length; k++) {
+        const cur = rawLines[k];
+        const next = rawLines[k + 1] ?? "";
+        const afterNext = rawLines[k + 2] ?? "";
+
+        if (sceneNumOnlyRe.test(cur) && !intExtWordRe.test(cur)) {
+            if (modifierOnlyRe.test(next) && intExtRe.test(afterNext)) {
+                // Pattern: "118/117" + "PT" + "EXT BUILDING ..."
+                lines.push(`${cur.trim()} ${next.trim()} ${afterNext.trim()}`);
+                k += 2;
+                continue;
+            }
+            // Check for split modifier (e.g. cur ends in "P" and next is "T")
+            if (cur.endsWith("P") && next.trim() === "T" && intExtRe.test(afterNext)) {
+                lines.push(`${cur.trim()}T ${afterNext.trim()}`);
+                k += 2;
+                continue;
+            }
+            // Stray short token (e.g. "T") between scene number and INT/EXT
+            if (shortStrayRe.test(next.trim()) && !modifierOnlyRe.test(next) && intExtRe.test(afterNext)) {
+                // Drop the stray token, merge scene number directly with INT/EXT line
+                lines.push(`${cur.trim()} ${afterNext.trim()}`);
+                k += 2;
+                continue;
+            }
+            if (intExtRe.test(next)) {
+                // Pattern: "118/117" + "EXT BUILDING ..."
+                lines.push(`${cur.trim()} ${next.trim()}`);
+                k += 1;
                 continue;
             }
         }
 
-        // Mid-day 2nd Unit detection: "- 2nd UNIT TO SHOOT DAY#3 - NIGHT SHOOT"
-        if (/-?\s*2nd\s+UNIT\s+TO\s+SHOOT/i.test(line)) {
-            const shootDayMatch = line.match(/DAY#?\s*(\d+[A-Z]?)/i);
-            const shootDay = shootDayMatch ? shootDayMatch[1] : currentDay.shootDay;
-            
-            // Create a new entry for the 2nd unit portion of this day
-            currentDay = {
-                shootDay,
-                isSecondUnit: true,
-                date: currentDay.date,
-                shootTime: "", // usually different call times
-                scenes: []
-            };
-            days.push(currentDay);
-            continue;
-        }
-
-        // Scene Heading detection
-        // Format: "24A I/E THE ARMORY BUILDING" or "43 EXT THE ARMORY BUILDING" or "60 Start EXT ..." or "135 PT2 INT ..."
-        const sceneHeadingRe = /^([A-Z0-9]+(?:[-A-Z0-9/]+)*)?\s*(?:START|END|PART|CONT|PT\d*|PARTIAL|PTL)?\s*(INT\.|EXT\.|I\/E\.|INT\/EXT\.?|INT|EXT|I\/E)\s+(.+)/i;
-        let headingMatch = line.match(sceneHeadingRe);
-
-        // Handle split headings or missing scene numbers
-        if (!headingMatch && /^(INT\.|EXT\.|I\/E\.|INT|EXT|I\/E)\s+(.+)/i.test(line)) {
-            const h2 = line.match(/^(INT\.|EXT\.|I\/E\.|INT|EXT|I\/E)\s+(.+)/i);
-            let sNum = "?";
-            if (i > 0 && /^[A-Z0-9/-]+$/.test(lines[i - 1].replace(/\s/g, ""))) {
-                sNum = lines[i - 1].trim();
+        if (modifierOnlyRe.test(cur) && intExtRe.test(next)) {
+            // Orphaned modifier — attach to previous line's scene number and merge
+            const prev = lines[lines.length - 1] ?? "";
+            if (prev && !intExtRe.test(prev)) {
+                lines[lines.length - 1] = `${prev.trim()} ${cur.trim()} ${next.trim()}`;
+                k += 1;
+                continue;
             }
-            if (h2) headingMatch = [line, sNum, h2[1], h2[2]];
         }
 
-        if (headingMatch) {
-            let sceneNum = headingMatch[1] ? headingMatch[1].trim() : "?";
-            sceneNum = sceneNum.replace(/start/i, "").trim();
+        lines.push(cur);
+    }
 
-            const intExt = headingMatch[2].toUpperCase().replace(/\.$/, "");
-            let location = headingMatch[3].trim();
+    // ---------------------------------------------------------------
+    // Find where the first real scene starts (for "day context")
+    // ---------------------------------------------------------------
+    const fullSceneRe = /^([A-Z0-9][\w\/\-\.\s\'’]*?(?:\s+(?:Start|End|PT|Part|Partial|PTL|VFX|Contd|Cont['’]d|Cont|Con['’]t))?)\s+(INT\.|EXT\.|I\/E\.|INT|EXT|I\/E|INT\/EXT)\s+(.+)/i;
+
+    let firstSceneIndex = -1;
+    for (let k = 0; k < lines.length; k++) {
+        if (fullSceneRe.test(lines[k])) {
+            firstSceneIndex = k;
+            break;
+        }
+    }
+    const dayContext = firstSceneIndex > 0 ? lines.slice(0, firstSceneIndex) : [];
+
+    // ---------------------------------------------------------------
+    // Main scene-extraction loop
+    // ---------------------------------------------------------------
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const sceneHeaderMatch = line.match(fullSceneRe);
+
+        if (sceneHeaderMatch) {
+            const sceneNum = sceneHeaderMatch[1].trim();
+            const intExt = sceneHeaderMatch[2].toUpperCase().replace(/\.$/, "");
+            let location = sceneHeaderMatch[3].trim();
             let timeOfDay = "DAY";
 
-            // Extract time of day if it's on the same line (e.g. "... - DAY")
+            // Time-of-day extraction from location string (e.g. "... - NIGHT")
             const todMatch = location.match(/-\s*(DAY|NIGHT|DUSK|DAWN|CONT.*|LATER|MAGIC HOUR|TWILIGHT)/i);
             if (todMatch) {
                 timeOfDay = todMatch[1].toUpperCase();
                 location = location.replace(todMatch[0], "").trim();
-            } else {
-                // Peek next lines for TOD like "DAY Pgs" or "NIGHT Pgs"
-                for (let j = 1; j <= 3 && i + j < lines.length; j++) {
-                    const nextL = lines[i + j];
-                    if (/^(DAY|NIGHT|DUSK|DAWN|CONT.*|LATER)/i.test(nextL)) {
-                        timeOfDay = nextL.split(/\s+/)[0].toUpperCase();
-                        break;
-                    }
-                    if (nextL.includes("DAY Pgs") || nextL.includes("NIGHT Pgs")) {
-                        timeOfDay = nextL.includes("NIGHT") ? "NIGHT" : "DAY";
+            }
+
+            // Collect description lines until the next scene header / footer
+            let descriptionLines: string[] = [];
+            let j = i + 1;
+            while (j < lines.length) {
+                const nextLine = lines[j];
+                if (fullSceneRe.test(nextLine)) break;
+                if (/^End of Day/i.test(nextLine)) break;
+                if (/^Total Featured/i.test(nextLine)) break;
+                descriptionLines.push(nextLine);
+                j++;
+            }
+
+            // Check descriptionLines for an explicit TOD marker (e.g. standalone "NIGHT" line)
+            if (timeOfDay === "DAY") {
+                for (const dl of descriptionLines) {
+                    if (/^(NIGHT|DUSK|DAWN)$/i.test(dl.trim())) {
+                        timeOfDay = dl.trim().toUpperCase();
                         break;
                     }
                 }
             }
 
-            // Description extraction
-            let desc = "";
-            if (i + 1 < lines.length) {
-                const nextLine = lines[i + 1];
-                // If it's not a heading or metadata line, it's a description
-                if (!/^(DAY|NIGHT|DUSK|DAWN|X=|F=|BG=|P=|INT|EXT)/i.test(nextLine) && !/^\d+\s+(INT|EXT)/i.test(nextLine)) {
-                    desc = nextLine.replace(/\d+\s*\d*\/\d*\s*$/, "").trim(); // Strip page counts
-                }
-            }
+            const combinedDescription = [
+                ...dayContext,
+                "-----------------------------------",
+                line,
+                ...descriptionLines
+            ].join("\n").trim();
 
-            currentDay.scenes.push({
-                sceneNum,
-                intExt,
-                location,
-                timeOfDay,
-                description: desc
-            });
+            scenes.push({ sceneNum, intExt, location, timeOfDay, description: combinedDescription });
+            i = j - 1;
         }
     }
 
-    if (days.length === 0) {
-        return parseOneLineScheduleFallback(text);
-    }
-
-    return days;
+    return scenes;
 }
 
 function parseOneLineScheduleFallback(text: string): OneLineDay[] {

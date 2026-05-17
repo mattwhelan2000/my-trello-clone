@@ -6,7 +6,7 @@ import {
     CheckSquare, Square, ChevronDown, ChevronRight, Film, Sun, Moon, AlertTriangle, Clock, Calendar
 } from "lucide-react";
 import { CalendarExportDialog } from "./CalendarExportDialog";
-import { createOneLineCards } from "@/actions/create-one-line-cards";
+import { createOneLineCards, getExistingListDays, getBoardLists } from "@/actions/create-one-line-cards";
 
 export interface OneLineScene {
     sceneNum: string;
@@ -50,6 +50,24 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
     const [deleteExistingDayCards, setDeleteExistingDayCards] = useState(false);
     const [splitListsForMultiDayScenes, setSplitListsForMultiDayScenes] = useState(false);
     const [cloneCardsInSplitLists, setCloneCardsInSplitLists] = useState(false);
+    const [logs, setLogs] = useState<string[]>([]);
+    const [showConsole, setShowConsole] = useState(false);
+    const [unscheduledAssignments, setUnscheduledAssignments] = useState<Record<string, { shootDay: string; isSecondUnit: boolean; timeOfDay: string }>>({});
+    const [showUnscheduledSection, setShowUnscheduledSection] = useState(false);
+    const [lists, setLists] = useState<{ id: string; title: string }[]>(boardLists);
+
+    // Load fresh board lists from DB to prevent state sync issues
+    React.useEffect(() => {
+        if (isOpen) {
+            getBoardLists(boardId)
+                .then(fetched => {
+                    if (fetched?.length) {
+                        setLists(fetched);
+                    }
+                })
+                .catch(err => console.error("Failed to fetch fresh board lists:", err));
+        }
+    }, [isOpen, boardId]);
 
     // ------- helpers -------
     const dayKey = (d: OneLineDay) => `${d.shootDay}-${d.isSecondUnit ? "2U" : "main"}`;
@@ -72,6 +90,24 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
 
     const enabledDays = days.filter(d => !disabledDays.has(dayKey(d)));
 
+    // Collect all matched board list IDs from manualAssignments or automatic auto-assignment
+    const matchedListIds = new Set<string>();
+    days.forEach((day, di) => {
+        day.scenes.forEach((scene, si) => {
+            const listId = manualAssignments[`${di}-${si}`] || fuzzyMatchList(scene.sceneNum, lists);
+            if (listId && listId !== "omit") {
+                matchedListIds.add(listId);
+            }
+        });
+    });
+
+    // Find all board lists that represent scenes but are NOT matched/assigned to any scene in the schedule
+    const unscheduledLists = lists.filter(list => {
+        const sceneNum = extractSceneNumFromTitle(list.title);
+        if (!sceneNum) return false;
+        return !matchedListIds.has(list.id);
+    });
+
     // ------- file handling -------
     const processFile = async (file: File) => {
         setError(null);
@@ -84,6 +120,27 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                 if (!loaded?.length) throw new Error("No days found in JSON.");
                 setDays(loaded);
                 setExpandedDays(new Set(loaded.slice(0, 3).map(dayKey)));
+                
+                // Pre-populate manual assignments based on fuzzy matching on import
+                const initialAssignments: Record<string, string> = {};
+                loaded.forEach((day, di) => {
+                    day.scenes.forEach((scene, si) => {
+                        const matchedId = fuzzyMatchList(scene.sceneNum, lists);
+                        if (matchedId) {
+                            initialAssignments[`${di}-${si}`] = matchedId;
+                        }
+                    });
+                });
+                setManualAssignments(initialAssignments);
+
+                // Fetch and auto-assign days to unmatched lists based on existing board cards
+                try {
+                    const existingAssignments = await getExistingListDays(boardId);
+                    setUnscheduledAssignments(existingAssignments);
+                } catch (err) {
+                    console.error("Failed to load existing day cards:", err);
+                }
+
                 setStep("preview");
             } catch (e: any) {
                 setError("Could not parse JSON: " + e.message);
@@ -103,6 +160,27 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                 if (!loaded?.length) throw new Error("No shooting days found in the PDF. Please check the format or use the JSON import.");
                 setDays(loaded);
                 setExpandedDays(new Set(loaded.slice(0, 3).map(dayKey)));
+
+                // Pre-populate manual assignments based on fuzzy matching on import
+                const initialAssignments: Record<string, string> = {};
+                loaded.forEach((day, di) => {
+                    day.scenes.forEach((scene, si) => {
+                        const matchedId = fuzzyMatchList(scene.sceneNum, lists);
+                        if (matchedId) {
+                            initialAssignments[`${di}-${si}`] = matchedId;
+                        }
+                    });
+                });
+                setManualAssignments(initialAssignments);
+
+                // Fetch and auto-assign days to unmatched lists based on existing board cards
+                try {
+                    const existingAssignments = await getExistingListDays(boardId);
+                    setUnscheduledAssignments(existingAssignments);
+                } catch (err) {
+                    console.error("Failed to load existing day cards:", err);
+                }
+
                 setStep("preview");
             } catch (e: any) {
                 setError(e.message);
@@ -134,31 +212,68 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
     const onCreateCards = async () => {
         setIsCreating(true);
         setError(null);
+        setLogs(["Initiating card creation..."]);
         try {
             const result = await createOneLineCards({ 
                 boardId, 
                 days: enabledDays.map((day) => {
                     const originalDayIndex = days.indexOf(day);
+                    const dayScenes = day.scenes.map((scene, si) => ({
+                        ...scene,
+                        listId: manualAssignments[`${originalDayIndex}-${si}`],
+                        isOmitted: omittedScenes.has(`${originalDayIndex}-${si}`)
+                    }));
+
+                    // Find manually assigned unscheduled board lists for this shoot day
+                    const assignedUnscheduled = Object.entries(unscheduledAssignments)
+                        .filter(([_, assign]) => {
+                            const dayKeyOfAssign = `${assign.shootDay}-${assign.isSecondUnit ? "2U" : "main"}`;
+                            return dayKeyOfAssign === dayKey(day);
+                        })
+                        .map(([listId, assign]) => {
+                            const list = lists.find(l => l.id === listId);
+                            const sceneNum = extractSceneNumFromTitle(list?.title || "") || "?";
+                            return {
+                                sceneNum,
+                                intExt: list?.title.toUpperCase().includes("INT") ? "INT" : list?.title.toUpperCase().includes("EXT") ? "EXT" : "I/E",
+                                location: list?.title.replace(/^SC\d+\s*|^SCENE\s*\d+\s*|^\d+\s*/i, "") || "",
+                                timeOfDay: assign.timeOfDay,
+                                description: "Manually scheduled board scene.",
+                                listId
+                            };
+                        });
+
                     return {
                         ...day,
-                        scenes: day.scenes.map((scene, si) => ({
-                            ...scene,
-                            listId: manualAssignments[`${originalDayIndex}-${si}`],
-                            isOmitted: omittedScenes.has(`${originalDayIndex}-${si}`)
-                        }))
+                        scenes: [...dayScenes, ...assignedUnscheduled]
                     };
                 }), 
-                lists: boardLists,
+                lists: lists,
                 deleteExistingDayCards,
                 splitListsForMultiDayScenes,
                 cloneCardsInSplitLists
             });
-            if (result?.serverError) throw new Error(result.serverError);
+            
+            if (result?.data?.logs) {
+                setLogs(result.data.logs);
+            }
+
+            if (result?.data?.error) {
+                setError(result.data.error);
+                setShowConsole(true);
+                return;
+            }
+
+            if (result?.serverError) {
+                throw new Error(result.serverError);
+            }
+
             if (result?.data?.created !== undefined) {
                 setSuccessMsg(`✅ Created ${result.data.created} card(s) on the board.`);
             }
         } catch (e: any) {
             setError(e.message || "Failed to create cards.");
+            setShowConsole(true);
         } finally {
             setIsCreating(false);
         }
@@ -360,6 +475,108 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                             )}
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {/* Unscheduled Board Scenes Section */}
+                            {unscheduledLists.length > 0 && (
+                                <div className="border border-orange-500/20 bg-orange-500/5 rounded-xl p-3 mb-4">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowUnscheduledSection(!showUnscheduledSection)}
+                                        className="w-full flex items-center justify-between text-left"
+                                    >
+                                        <div className="flex items-center gap-x-2 text-orange-400">
+                                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                                            <div className="text-xs font-bold">
+                                                {unscheduledLists.length} Board Scenes NOT matched to a day in the PDF
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-x-1.5 text-[10px] bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 font-semibold px-2 py-0.5 rounded transition">
+                                            <span>{showUnscheduledSection ? "Collapse" : "Review & Assign Day"}</span>
+                                            {showUnscheduledSection ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                        </div>
+                                    </button>
+
+                                    {showUnscheduledSection && (
+                                        <div className="mt-3 space-y-2 border-t border-orange-500/10 pt-3 max-h-[250px] overflow-y-auto pr-1">
+                                            <p className="text-[10px] text-white/50 leading-relaxed italic mb-2">
+                                                These lists exist on your board but were not detected in the imported PDF. You can optionally force-schedule them below:
+                                            </p>
+                                            {unscheduledLists.map((list) => {
+                                                const assignment = unscheduledAssignments[list.id] || { shootDay: "", isSecondUnit: false, timeOfDay: "DAY" };
+                                                const sceneNum = extractSceneNumFromTitle(list.title) || "?";
+                                                
+                                                return (
+                                                    <div key={list.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 bg-slate-900/60 border border-white/5 rounded-lg text-xs">
+                                                        <div className="flex items-center gap-x-2 min-w-0">
+                                                            <div className="bg-orange-500/10 text-orange-400 font-bold px-1.5 py-0.5 rounded text-[10px]">
+                                                                Sc{sceneNum}
+                                                            </div>
+                                                            <span className="font-semibold text-white/80 truncate max-w-[200px]" title={list.title}>
+                                                                {list.title.replace(/^SC\d+\s*|^SCENE\s*\d+\s*|^\d+\s*/i, "") || "Untitled List"}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-x-2 flex-wrap">
+                                                            {/* Day Select */}
+                                                            <select
+                                                                className="bg-slate-800 border border-white/10 rounded px-2 py-1 text-[11px] text-white outline-none focus:border-orange-500/50 cursor-pointer"
+                                                                value={assignment.shootDay ? `${assignment.shootDay}-${assignment.isSecondUnit ? "2U" : "main"}` : ""}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    setUnscheduledAssignments(prev => {
+                                                                        const next = { ...prev };
+                                                                        if (!val) {
+                                                                            delete next[list.id];
+                                                                        } else {
+                                                                            const is2U = val.endsWith("-2U");
+                                                                            const shootDay = val.replace(/-2U|-main$/, "");
+                                                                            next[list.id] = {
+                                                                                shootDay,
+                                                                                isSecondUnit: is2U,
+                                                                                timeOfDay: assignment.timeOfDay || "DAY"
+                                                                            };
+                                                                        }
+                                                                        return next;
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <option value="">-- Unassigned --</option>
+                                                                {days.map(d => (
+                                                                    <option key={dayKey(d)} value={dayKey(d)}>
+                                                                        Day {d.shootDay} {d.isSecondUnit ? "(2U)" : ""}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+
+                                                            {/* Label Select */}
+                                                            {assignment.shootDay && (
+                                                                <select
+                                                                    className="bg-slate-800 border border-white/10 rounded px-2 py-1 text-[11px] text-white outline-none focus:border-orange-500/50 cursor-pointer"
+                                                                    value={assignment.timeOfDay}
+                                                                    onChange={(e) => {
+                                                                        setUnscheduledAssignments(prev => ({
+                                                                            ...prev,
+                                                                            [list.id]: {
+                                                                                ...prev[list.id],
+                                                                                timeOfDay: e.target.value
+                                                                            }
+                                                                        }));
+                                                                    }}
+                                                                >
+                                                                    <option value="DAY">☀️ DAY</option>
+                                                                    <option value="NIGHT">🌙 NIGHT</option>
+                                                                    <option value="DUSK">🌆 DUSK</option>
+                                                                    <option value="DAWN">🌅 DAWN</option>
+                                                                </select>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Summary bar */}
                             <div className="flex items-center justify-between mb-2 px-1">
                                 <span className="text-xs text-white/50">
@@ -457,7 +674,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                                                 )}
                                                                 {/* Fuzzy match preview & manual override */}
                                                                 <div className="mt-2 flex flex-col gap-y-2">
-                                                                    <FuzzyMatchPreview sceneNum={scene.sceneNum} lists={boardLists} manualId={manualAssignments[`${di}-${si}`]} />
+                                                                    <FuzzyMatchPreview sceneNum={scene.sceneNum} lists={lists} manualId={manualAssignments[`${di}-${si}`]} />
                                                                     <div className="flex items-center gap-x-2">
                                                                         <label className="text-[10px] text-white/50 whitespace-nowrap">Assign to:</label>
                                                                         <select 
@@ -474,9 +691,15 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                                                         >
                                                                             <option value="">(Auto-detect)</option>
                                                                             <option value="omit">-- Omit --</option>
-                                                                            {boardLists.map(l => (
-                                                                                <option key={l.id} value={l.id}>{l.title}</option>
-                                                                            ))}
+                                                                            {lists.map(l => {
+                                                                                const assign = unscheduledAssignments[l.id];
+                                                                                const daySuffix = assign?.shootDay ? ` (Day ${assign.shootDay}${assign.isSecondUnit ? "2U" : ""})` : "";
+                                                                                return (
+                                                                                    <option key={l.id} value={l.id}>
+                                                                                        {l.title}{daySuffix}
+                                                                                    </option>
+                                                                                );
+                                                                            })}
                                                                         </select>
                                                                     </div>
                                                                 </div>
@@ -493,13 +716,44 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                             {error && (
                                 <div className="flex items-start gap-x-3 p-4 bg-red-900/30 rounded-xl border border-red-500/30">
                                     <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-                                    <p className="text-sm text-red-300">{error}</p>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-red-300">Import Error</p>
+                                        <p className="text-xs text-red-400/80">{error}</p>
+                                    </div>
                                 </div>
                             )}
 
                             {successMsg && (
                                 <div className="p-4 bg-green-900/30 rounded-xl border border-green-500/30">
                                     <p className="text-sm text-green-300 font-semibold">{successMsg}</p>
+                                </div>
+                            )}
+
+                            {/* Error Console */}
+                            {(logs.length > 0 || showConsole) && (
+                                <div className="mt-4 border border-white/10 rounded-xl overflow-hidden bg-black/40">
+                                    <button 
+                                        onClick={() => setShowConsole(!showConsole)}
+                                        className="w-full flex items-center justify-between px-4 py-2 bg-white/5 hover:bg-white/10 transition"
+                                    >
+                                        <div className="flex items-center gap-x-2">
+                                            <FileText className="h-4 w-4 text-blue-400" />
+                                            <span className="text-xs font-bold uppercase tracking-wider text-white/60">Import Console / Logs</span>
+                                        </div>
+                                        {showConsole ? <ChevronDown className="h-4 w-4 text-white/40" /> : <ChevronRight className="h-4 w-4 text-white/40" />}
+                                    </button>
+                                    
+                                    {showConsole && (
+                                        <div className="p-4 max-h-[200px] overflow-y-auto font-mono text-[10px] space-y-1 bg-black/60">
+                                            {logs.length === 0 && <p className="text-white/20 italic">No logs available.</p>}
+                                            {logs.map((log, i) => (
+                                                <div key={i} className={`flex gap-x-2 ${log.startsWith("⚠") ? "text-yellow-400" : log.startsWith("ERR") || log.startsWith("FAILED") ? "text-red-400" : "text-white/60"}`}>
+                                                    <span className="text-white/20 select-none">[{i+1}]</span>
+                                                    <span>{log}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -575,44 +829,112 @@ function FuzzyMatchPreview({ sceneNum, lists, manualId }: { sceneNum: string; li
         return <p className="text-[10px] text-red-400/70 mt-0.5">⚠ No scene number — will be skipped</p>;
     }
     
-    const num = sceneNum.replace(/\D/g, "").padStart(3, "0");
-    const numInt = parseInt(sceneNum.replace(/\D/g, ""), 10);
-    
-    let confidence = 0;
-    let match = lists.find(l => {
-        const t = l.title.toUpperCase();
-        // Exact match or ScXXX prefix
-        if (t.includes(`SC${num}`) || t.startsWith(`${numInt} `) || t.startsWith(`SC${numInt} `)) {
-            confidence = 100;
-            return true;
-        }
-        return false;
-    });
-
-    if (!match) {
-        match = lists.find(l => {
-            const t = l.title.toUpperCase();
-            const re = new RegExp(`\\b0*${numInt}\\b`);
-            if (re.test(t)) {
-                confidence = 75;
-                return true;
-            }
-            return false;
-        });
+    const matchedId = fuzzyMatchList(sceneNum, lists);
+    if (!matchedId) {
+        return <p className="text-[10px] text-red-400/70 mt-0.5 font-bold">⚠ NO MATCHING LIST FOUND</p>;
     }
 
-    if (!match) return <p className="text-[10px] text-red-400/70 mt-0.5 font-bold">⚠ NO MATCHING LIST FOUND</p>;
-
-    const color = confidence === 100 ? "text-green-400" : "text-yellow-400";
-    const bgColor = confidence === 100 ? "bg-green-500/10" : "bg-yellow-500/10";
+    const matchedList = lists.find(l => l.id === matchedId);
+    if (!matchedList) {
+        return <p className="text-[10px] text-red-400/70 mt-0.5 font-bold">⚠ NO MATCHING LIST FOUND</p>;
+    }
 
     return (
         <div className="flex items-center gap-x-2 mt-1">
-            <div className={`flex items-center gap-x-1 px-1.5 py-0.5 rounded ${bgColor} border border-white/5`}>
-                <span className={`text-[8px] font-bold uppercase tracking-tighter ${color}`}>{confidence}% Match</span>
+            <div className="flex items-center gap-x-1 px-1.5 py-0.5 rounded bg-green-500/10 border border-white/5">
+                <span className="text-[8px] font-bold uppercase tracking-tighter text-green-400">Auto Match</span>
                 <span className="text-[10px] text-white/40">→</span>
-                <span className="text-[10px] text-white/70 font-medium truncate max-w-[150px]">{match.title}</span>
+                <span className="text-[10px] text-white/70 font-medium truncate max-w-[150px]">{matchedList.title}</span>
             </div>
         </div>
     );
+}
+
+const MODIFIER_SUFFIXES = new Set(["PT", "VFX", "PTL", "END", "START", "ST", "PART", "CONT", "CONTD", "CONT'D", "CON'T"]);
+
+export interface ParsedSceneToken {
+    numInt: number;
+    num: string; // padded to 3 digits, e.g. "012"
+    suffix: string; // "A", "B", etc. (modifier suffixes stripped!)
+}
+
+export function parseSceneToken(token: string): ParsedSceneToken | null {
+    if (!token || token === "?") return null;
+
+    // Standardize to uppercase and trim
+    let clean = token.toUpperCase().trim();
+
+    // Remove common prefixes if present, e.g. "SCENE ", "SC.", "SC " or "SC"
+    clean = clean.replace(/^(?:SCENE|SC\.|SC)\s*/i, "");
+
+    // Extract leading digits
+    const numMatch = clean.match(/^(\d+)/);
+    if (!numMatch) return null;
+
+    const numInt = parseInt(numMatch[1], 10);
+    const numStr = numMatch[1];
+    const numPadded = numStr.padStart(3, "0");
+
+    // Get the remainder of the string after the digits
+    let remainder = clean.substring(numStr.length).trim();
+
+    // Strip common punctuation or dividers (like spaces, slashes, hyphens, dots, parenthesis) at the start of remainder
+    remainder = remainder.replace(/^[\s\/\-\.\(\)]+/, "");
+
+    // Extract the trailing letters/tokens
+    const letterMatch = remainder.match(/^([A-Z0-9]+)/);
+    let rawSuffix = letterMatch ? letterMatch[1] : "";
+
+    // Strip modifier suffixes if rawSuffix starts with or is equal to one of them
+    let suffix = "";
+    if (rawSuffix) {
+        // If rawSuffix is a known modifier, or starts with one followed by digits (e.g. "PT1")
+        const isModifier = Array.from(MODIFIER_SUFFIXES).some(mod => {
+            const re = new RegExp(`^${mod}\\d*$`, "i");
+            return re.test(rawSuffix);
+        });
+        if (!isModifier && rawSuffix.length <= 2 && !/^\d+$/.test(rawSuffix)) {
+            suffix = rawSuffix;
+        }
+    }
+
+    return {
+        numInt,
+        num: numPadded,
+        suffix
+    };
+}
+
+export function extractSceneNumFromTitle(title: string): string | null {
+    const parsed = parseSceneToken(title);
+    if (!parsed) return null;
+    return `${parsed.numInt}${parsed.suffix}`;
+}
+
+export function fuzzyMatchList(sceneNum: string, lists: { id: string; title: string }[]): string | null {
+    // If sceneNum has slashes, hyphens, or other delimiters (e.g. "105/104PT" or "56 PT/57"), split them!
+    const tokens = sceneNum.split(/[\/\-+&]/).map(t => t.trim()).filter(Boolean);
+    
+    for (const token of tokens) {
+        const parsedScene = parseSceneToken(token);
+        if (!parsedScene) continue;
+
+        // Search for a list that parses to the same clean scene number and suffix!
+        let match = lists.find(l => {
+            const parsedList = parseSceneToken(l.title);
+            if (!parsedList) return false;
+            return parsedList.numInt === parsedScene.numInt && parsedList.suffix === parsedScene.suffix;
+        });
+
+        if (match) return match.id;
+
+        // Word-boundary fallback if no exact structured match is found:
+        match = lists.find(l => {
+            const re = new RegExp(`\\b0*${parsedScene.numInt}${parsedScene.suffix}\\b`, "i");
+            return re.test(l.title);
+        });
+        if (match) return match.id;
+    }
+
+    return null;
 }

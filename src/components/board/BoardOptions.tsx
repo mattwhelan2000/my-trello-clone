@@ -15,6 +15,7 @@ import { pushGoogleSheet } from "@/actions/push-google-sheet";
 import { updateListColors } from "@/actions/update-list-colors";
 import { bulkIngestImages } from "@/actions/bulk-ingest-images";
 import { migrateDriveUrls } from "@/actions/migrate-drive-urls";
+import { deleteEmptyLists } from "@/actions/delete-empty-lists";
 import { useToast } from "@/components/ui/Toast";
 import { formatImageUrl } from "@/lib/format-image-url";
 
@@ -470,7 +471,20 @@ export const BoardOptions = ({ boardId, boardTitle, listsCount, cardsCount, init
         }
     });
 
-    const anyLoading = isUpdatingBoard || isExporting || isExportingCSV || isSyncing || isPushing || isIngesting || isFetchingFolder || isMigrating || isReverting || isDeletingLabel;
+    const { execute: executeDeleteEmptyLists, isExecuting: isDeletingEmptyLists } = useSafeAction(deleteEmptyLists, {
+        onSuccess: ({ data }) => {
+            if (data?.success) {
+                addToast(`Successfully deleted ${data.count} empty lists`, "success");
+                setIsOpen(false);
+            }
+        },
+        onError: (error) => {
+            console.error(error);
+            addToast("Failed to delete empty lists", "error");
+        }
+    });
+
+    const anyLoading = isUpdatingBoard || isExporting || isExportingCSV || isSyncing || isPushing || isIngesting || isFetchingFolder || isMigrating || isReverting || isDeletingLabel || isDeletingEmptyLists;
     if (!isMounted) return null;
 
     return (
@@ -960,6 +974,19 @@ export const BoardOptions = ({ boardId, boardTitle, listsCount, cardsCount, init
                         >
                             <AlertTriangle className="h-4 w-4" />
                             {isMigrating ? "Migrating..." : "Repair Broken Images"}
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                if (confirm("Are you sure you want to delete all lists that contain zero cards?")) {
+                                    executeDeleteEmptyLists({ boardId });
+                                }
+                            }}
+                            disabled={anyLoading}
+                            className="bg-red-50 text-red-700 w-full rounded-sm text-sm font-bold py-1.5 hover:bg-red-100 transition flex items-center justify-center gap-x-2 border border-red-200"
+                        >
+                            <Trash className="h-4 w-4" />
+                            {isDeletingEmptyLists ? "Deleting..." : "Delete Empty Lists"}
                         </button>
 
                         <div className="border-t border-neutral-200 pt-2">

@@ -6,44 +6,128 @@ import { CreateOneLineCardsSchema } from "./schema";
 import { revalidatePath } from "next/cache";
 
 // Fuzzy match: returns the list ID whose title best matches the scene number
+// Modifier abbreviations that can be concatenated onto a scene number.
+// These are NOT scene-variant letters — they must be stripped before suffix detection.
+// e.g. "104PT" → base scene 104 (PT = "part"),  "24VFX" → base scene 24
+const MODIFIER_SUFFIXES = new Set(["PT", "VFX", "PTL", "END", "START", "ST", "PART", "CONT", "CONTD", "CONT'D", "CON'T"]);
+
+interface ParsedSceneToken {
+    numInt: number;
+    num: string; // padded to 3 digits, e.g. "012"
+    suffix: string; // "A", "B", etc. (modifier suffixes stripped!)
+}
+
+function parseSceneToken(token: string): ParsedSceneToken | null {
+    if (!token || token === "?") return null;
+
+    // Standardize to uppercase and trim
+    let clean = token.toUpperCase().trim();
+
+    // Remove common prefixes if present, e.g. "SCENE ", "SC.", "SC " or "SC"
+    clean = clean.replace(/^(?:SCENE|SC\.|SC)\s*/i, "");
+
+    // Extract leading digits
+    const numMatch = clean.match(/^(\d+)/);
+    if (!numMatch) return null;
+
+    const numInt = parseInt(numMatch[1], 10);
+    const numStr = numMatch[1];
+    const numPadded = numStr.padStart(3, "0");
+
+    // Get the remainder of the string after the digits
+    let remainder = clean.substring(numStr.length).trim();
+
+    // Strip common punctuation or dividers (like spaces, slashes, hyphens, dots, parenthesis) at the start of remainder
+    remainder = remainder.replace(/^[\s\/\-\.\(\)]+/, "");
+
+    // Extract the trailing letters/tokens
+    const letterMatch = remainder.match(/^([A-Z0-9]+)/);
+    let rawSuffix = letterMatch ? letterMatch[1] : "";
+
+    // Strip modifier suffixes if rawSuffix starts with or is equal to one of them
+    let suffix = "";
+    if (rawSuffix) {
+        // If rawSuffix is a known modifier, or starts with one followed by digits (e.g. "PT1")
+        const isModifier = Array.from(MODIFIER_SUFFIXES).some(mod => {
+            const re = new RegExp(`^${mod}\\d*$`, "i");
+            return re.test(rawSuffix);
+        });
+        if (!isModifier && rawSuffix.length <= 2 && !/^\d+$/.test(rawSuffix)) {
+            suffix = rawSuffix;
+        }
+    }
+
+    return {
+        numInt,
+        num: numPadded,
+        suffix
+    };
+}
+
 function fuzzyMatchList(sceneNum: string, lists: { id: string; title: string }[]): string | null {
-    if (!sceneNum || sceneNum === "?") return null;
+    // If sceneNum has slashes, hyphens, or other delimiters (e.g. "105/104PT" or "56 PT/57"), split them!
+    const tokens = sceneNum.split(/[\/\-+&]/).map(t => t.trim()).filter(Boolean);
+    
+    for (const token of tokens) {
+        const parsedScene = parseSceneToken(token);
+        if (!parsedScene) continue;
 
-    const num = sceneNum.replace(/\D/g, "").padStart(3, "0");
-    const numInt = parseInt(sceneNum.replace(/\D/g, ""), 10);
+        // Search for a list that parses to the same clean scene number and suffix!
+        let match = lists.find(l => {
+            const parsedList = parseSceneToken(l.title);
+            if (!parsedList) return false;
+            return parsedList.numInt === parsedScene.numInt && parsedList.suffix === parsedScene.suffix;
+        });
 
-    // 1. Exact padded match — e.g. "Sc001"
-    let match = lists.find(l => {
-        const t = l.title.toUpperCase();
-        return t.includes(`SC${num}`) || t.includes(`SC${numInt}`) || t.startsWith(`SC${num}`) || t.startsWith(`SC${numInt}`);
-    });
-    if (match) return match.id;
+        if (match) return match.id;
 
-    // 2. Contains the number anywhere
-    match = lists.find(l => {
-        const t = l.title.toUpperCase();
-        const re = new RegExp(`\\b0*${numInt}\\b`);
-        return re.test(t);
-    });
-    if (match) return match.id;
+        // Word-boundary fallback if no exact structured match is found:
+        match = lists.find(l => {
+            const re = new RegExp(`\\b0*${parsedScene.numInt}${parsedScene.suffix}\\b`, "i");
+            return re.test(l.title);
+        });
+        if (match) return match.id;
+    }
 
     return null;
 }
 
+
 export const createOneLineCards = actionClient
     .schema(CreateOneLineCardsSchema)
-    .action(async ({ parsedInput: { boardId, days, lists, deleteExistingDayCards, splitListsForMultiDayScenes } }) => {
+    .action(async ({ parsedInput: { boardId, days, lists, deleteExistingDayCards, splitListsForMultiDayScenes, cloneCardsInSplitLists } }) => {
+        const logs: string[] = [];
         const cardsToInsert: any[] = [];
         const labelsToInsert: any[] = [];
 
-        // 1. Delete existing DAY cards if requested
+        logs.push(`Starting import for board ${boardId}.`);
+        logs.push(`Processing ${days.length} shooting days.`);
+
+        // 1. Delete existing DAY/NIGHT cards if requested
         if (deleteExistingDayCards) {
-            await db.card.deleteMany({
+            const deleted = await db.card.deleteMany({
                 where: {
                     list: { boardId },
-                    labels: { some: { title: "DAY" } }
+                    OR: [
+                        {
+                            labels: {
+                                some: {
+                                    title: {
+                                        in: ["DAY", "NIGHT", "DUSK", "DAWN", "TWILIGHT", "LATER", "2ND UNIT"]
+                                    }
+                                }
+                            }
+                        },
+                        { title: { startsWith: "DAY " } },
+                        { title: { startsWith: "Day " } },
+                        { title: { startsWith: "day " } },
+                        { title: { startsWith: "DAY#" } },
+                        { title: { startsWith: "Day#" } },
+                        { title: { startsWith: "day#" } }
+                    ]
                 }
             });
+            logs.push(`Deleted ${deleted.count} existing DAY/NIGHT cards.`);
         }
 
         // 2. Pre-calculate list splits for multi-day scenes
@@ -52,7 +136,10 @@ export const createOneLineCards = actionClient
             for (const scene of day.scenes) {
                 if (scene.isOmitted) continue;
                 const lid = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
-                if (!lid) continue;
+                if (!lid) {
+                    logs.push(`⚠ WARNING: Scene ${scene.sceneNum} (Day ${day.shootDay}) could not be matched to any list and will be skipped.`);
+                    continue;
+                }
                 if (!listDayUsage[lid]) listDayUsage[lid] = [];
                 const dayLabel = `${day.shootDay}${day.isSecondUnit ? "2U" : ""}`;
                 if (!listDayUsage[lid].includes(dayLabel)) {
@@ -63,6 +150,7 @@ export const createOneLineCards = actionClient
 
         const listIdOverrides: Record<string, string> = {}; // "listId-dayLabel" -> targetListId
         if (splitListsForMultiDayScenes) {
+            logs.push(`Multi-day list splitting is ENABLED.`);
             for (const lid of Object.keys(listDayUsage)) {
                 const dayLabels = listDayUsage[lid];
                 if (dayLabels.length > 1) {
@@ -79,10 +167,14 @@ export const createOneLineCards = actionClient
                             }
                         }
                     });
-                    if (!originalList) continue;
+                    if (!originalList) {
+                        logs.push(`ERR: Original list ${lid} not found for splitting.`);
+                        continue;
+                    }
                     
                     const originalTitle = originalList.title;
                     const N = dayLabels.length;
+                    logs.push(`Splitting list "${originalTitle}" into ${N} parts.`);
 
                     // Update original list title
                     await db.list.update({
@@ -101,9 +193,11 @@ export const createOneLineCards = actionClient
                             }
                         });
                         listIdOverrides[`${lid}-${dayLabels[i]}`] = newList.id;
+                        logs.push(`Created part ${i+1}/${N}: "${newList.title}"`);
 
                         // Clone cards if requested
                         if (cloneCardsInSplitLists && originalList.cards.length > 0) {
+                            logs.push(`Cloning ${originalList.cards.length} cards to "${newList.title}"`);
                             for (const card of originalList.cards) {
                                 await db.card.create({
                                     data: {
@@ -143,7 +237,7 @@ export const createOneLineCards = actionClient
             }
         }
 
-        // Pre-fetch existing card orders per list so we append
+        // 3. Pre-fetch existing card orders per list
         const targetListIds = new Set<string>();
         for (const day of days) {
             for (const scene of day.scenes) {
@@ -151,42 +245,47 @@ export const createOneLineCards = actionClient
                 if (lid) targetListIds.add(lid);
             }
         }
-        // Also add any new lists created from overrides
         Object.values(listIdOverrides).forEach(id => targetListIds.add(id));
 
         const existingCards = await db.card.findMany({
             where: { listId: { in: Array.from(targetListIds) } },
             select: { listId: true, order: true },
-            orderBy: { order: "desc" },
+            orderBy: { order: "asc" }, // Order by asc to find min
         });
 
-        const listMaxOrder: Record<string, number> = {};
+        const listMinOrder: Record<string, number> = {};
         for (const card of existingCards) {
-            if (listMaxOrder[card.listId] === undefined || card.order > listMaxOrder[card.listId]) {
-                listMaxOrder[card.listId] = card.order;
+            if (listMinOrder[card.listId] === undefined || card.order < listMinOrder[card.listId]) {
+                listMinOrder[card.listId] = card.order;
             }
         }
-        const listCounters: Record<string, number> = {};
-        const getNextOrder = (listId: string) => {
-            if (listCounters[listId] === undefined) {
-                listCounters[listId] = (listMaxOrder[listId] ?? -1) + 1;
-            } else {
-                listCounters[listId]++;
-            }
-            return listCounters[listId];
-        };
+
+        // Count how many new cards will be added to each list to calculate start offset
+        const listNewCardCounts: Record<string, number> = {};
+        const cardsByList: Record<string, any[]> = {};
 
         for (const day of days) {
             for (const scene of day.scenes) {
                 if (scene.isOmitted) continue;
-
                 const baseListId = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
-                if (!baseListId) continue; 
-
-                // Resolve list ID with potential overrides (multi-day split)
+                if (!baseListId) continue;
                 const dayLabel = `${day.shootDay}${day.isSecondUnit ? "2U" : ""}`;
                 const listId = listIdOverrides[`${baseListId}-${dayLabel}`] || baseListId;
+                
+                listNewCardCounts[listId] = (listNewCardCounts[listId] || 0) + 1;
+                if (!cardsByList[listId]) cardsByList[listId] = [];
+                cardsByList[listId].push({ day, scene });
+            }
+        }
 
+        // Generate cards with correct orders (Top of list)
+        for (const listId of Object.keys(cardsByList)) {
+            const minOrder = listMinOrder[listId] ?? 0;
+            const newCount = listNewCardCounts[listId];
+            
+            cardsByList[listId].forEach((item, index) => {
+                const { day, scene } = item;
+                
                 const isNight = /NIGHT|DUSK|DAWN/.test(scene.timeOfDay.toUpperCase());
                 const cardColor = isNight ? "#1e3a5f" : "#fef08a"; 
                 const fontColor = isNight ? "#ffffff" : "#1a1a1a";
@@ -195,25 +294,26 @@ export const createOneLineCards = actionClient
                 const unitLabel = day.isSecondUnit ? " (2U)" : "";
                 const cardTitle = `DAY ${day.shootDay}${unitLabel}`;
 
-                // Description: ensure date is included as text
                 const descParts: string[] = [];
                 if (day.date) descParts.push(`DATE: ${day.date}`);
                 if (day.shootTime) descParts.push(`TIME: ${day.shootTime}`);
                 if (scene.description) descParts.push(scene.description);
+
+                // Position 1: order = minOrder - newCount + index
+                const cardOrder = minOrder - newCount + index;
 
                 cardsToInsert.push({
                     id: cardId,
                     listId,
                     title: cardTitle,
                     description: descParts.join("\n"),
-                    order: getNextOrder(listId),
+                    order: cardOrder,
                     color: cardColor,
                     fontColor,
                     dueDate: day.date ? parseDateString(day.date) : null,
                     isSyncedWithSheet: false,
                 });
 
-                // Label: DAY or NIGHT
                 labelsToInsert.push({
                     id: crypto.randomUUID(),
                     cardId,
@@ -221,7 +321,6 @@ export const createOneLineCards = actionClient
                     color: isNight ? "#1e3a5f" : "#ca8a04",
                 });
 
-                // 2nd unit label
                 if (day.isSecondUnit) {
                     labelsToInsert.push({
                         id: crypto.randomUUID(),
@@ -230,18 +329,24 @@ export const createOneLineCards = actionClient
                         color: "#7c3aed",
                     });
                 }
-            }
+                
+                const listTitle = lists.find(l => l.id === listId)?.title || listId;
+                logs.push(`Queued card (Pos 1) for Scene ${scene.sceneNum} on Day ${day.shootDay} -> List "${listTitle}"`);
+            });
         }
 
         if (cardsToInsert.length === 0) {
-            throw new Error("No cards could be matched to existing lists. Ensure scene numbers match list titles.");
+            logs.push(`FAILED: No cards could be matched to existing lists.`);
+            return { error: "No cards could be matched to existing lists. Check the console for details.", logs };
         }
 
         await db.card.createMany({ data: cardsToInsert });
         await db.label.createMany({ data: labelsToInsert });
 
+        logs.push(`Successfully created ${cardsToInsert.length} cards and ${labelsToInsert.length} labels.`);
+
         revalidatePath(`/board/${boardId}`);
-        return { created: cardsToInsert.length };
+        return { created: cardsToInsert.length, logs };
     });
 
 /** Try to parse a date string like "Monday, June 9th, 2026" or "June 9th, 2026" into a Date */
@@ -271,4 +376,68 @@ function parseDateString(str: string): Date | null {
     } catch {
         return null;
     }
+}
+
+/** Fetch existing day cards for lists on a given board to allow auto-assignment of unmatched scenes */
+export async function getExistingListDays(boardId: string): Promise<Record<string, { shootDay: string; isSecondUnit: boolean; timeOfDay: string }>> {
+    const cards = await db.card.findMany({
+        where: {
+            list: { boardId },
+            OR: [
+                { title: { startsWith: "DAY " } },
+                { title: { startsWith: "Day " } },
+                { title: { startsWith: "day " } },
+                { title: { startsWith: "DAY#" } },
+                { title: { startsWith: "Day#" } },
+                { title: { startsWith: "day#" } }
+            ]
+        },
+        select: {
+            listId: true,
+            title: true,
+            labels: {
+                select: {
+                    title: true
+                }
+            }
+        }
+    });
+
+    const result: Record<string, { shootDay: string; isSecondUnit: boolean; timeOfDay: string }> = {};
+    for (const card of cards) {
+        const title = card.title.toUpperCase();
+        const dayMatch = title.match(/DAY\s*#?\s*(\d+)/i);
+        if (dayMatch) {
+            const shootDay = dayMatch[1];
+            const is2U = /\b(?:2U|2ND\s*UNIT)\b/i.test(title);
+            
+            let timeOfDay = "DAY";
+            if (card.labels.some((l: any) => l.title === "NIGHT") || /\bNIGHT\b/i.test(title)) {
+                timeOfDay = "NIGHT";
+            } else if (card.labels.some((l: any) => l.title === "DUSK") || /\bDUSK\b/i.test(title)) {
+                timeOfDay = "DUSK";
+            } else if (card.labels.some((l: any) => l.title === "DAWN") || /\bDAWN\b/i.test(title)) {
+                timeOfDay = "DAWN";
+            }
+            
+            result[card.listId] = {
+                shootDay,
+                isSecondUnit: is2U,
+                timeOfDay
+            };
+        }
+    }
+    return result;
+}
+
+/** Fetch lists for a given board directly from the server to bypass client-side state latency */
+export async function getBoardLists(boardId: string): Promise<{ id: string; title: string }[]> {
+    return await db.list.findMany({
+        where: { boardId },
+        orderBy: { order: "asc" },
+        select: {
+            id: true,
+            title: true
+        }
+    });
 }

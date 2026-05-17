@@ -10,20 +10,75 @@ interface CalendarExportDialogProps {
     days: any[]; // OneLineDay[]
 }
 
+const TIMEZONES = [
+    { id: "Europe/Budapest", label: "Budapest (CET/CEST - UTC+2)", tzname: "CEST", standardTzname: "CET", offsetFrom: "+0100", offsetTo: "+0200" },
+    { id: "Europe/London", label: "London (GMT/BST - UTC+1)", tzname: "BST", standardTzname: "GMT", offsetFrom: "+0000", offsetTo: "+0100" },
+    { id: "America/New_York", label: "New York / Atlanta (EST/EDT - UTC-4)", tzname: "EDT", standardTzname: "EST", offsetFrom: "-0500", offsetTo: "-0400" },
+    { id: "America/Chicago", label: "Chicago / New Orleans (CST/CDT - UTC-5)", tzname: "CDT", standardTzname: "CST", offsetFrom: "-0600", offsetTo: "-0500" },
+    { id: "America/Los_Angeles", label: "Los Angeles (PST/PDT - UTC-7)", tzname: "PDT", standardTzname: "PST", offsetFrom: "-0800", offsetTo: "-0700" },
+    { id: "Australia/Sydney", label: "Sydney (AEST/AEDT - UTC+11)", tzname: "AEDT", standardTzname: "AEST", offsetFrom: "+1000", offsetTo: "+1100" },
+    { id: "UTC", label: "UTC / GMT (Zulu Time)", tzname: "UTC", standardTzname: "UTC", offsetFrom: "+0000", offsetTo: "+0000" }
+];
+
 export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: CalendarExportDialogProps) {
     const [title, setTitle] = useState(boardTitle);
     const [exportType, setExportType] = useState<"ical" | "google" | "both">("both");
+    const [selectedTz, setSelectedTz] = useState("Europe/Budapest");
 
     if (!isOpen) return null;
 
+    const parseTimeToStandard = (timeStr: string): { ical: string; google: string } | null => {
+        if (!timeStr) return null;
+        
+        // Match formats like "6AM", "5.30 PM", "6:30 PM", "5:30PM", "12PM", "12 AM"
+        const match = timeStr.trim().match(/(\d+)(?::|\.)?(\d+)?\s*(AM|PM)/i);
+        if (!match) return null;
+        
+        let hours = parseInt(match[1], 10);
+        const minutes = match[2] || "00";
+        const ampm = match[3].toUpperCase();
+        
+        // Standardise hours for 24h
+        let hours24 = hours;
+        if (ampm === "PM" && hours < 12) hours24 += 12;
+        if (ampm === "AM" && hours === 12) hours24 = 0;
+
+        // Standardise hours for 12h (AM/PM)
+        let hours12 = hours;
+        if (hours === 0) hours12 = 12;
+        
+        const icalTime = `${hours24.toString().padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+        const googleTime = `${hours12}:${minutes.padStart(2, '0')} ${ampm}`;
+        
+        return { ical: icalTime, google: googleTime };
+    };
+
     const generateIcal = () => {
+        const tz = TIMEZONES.find(t => t.id === selectedTz) || TIMEZONES[0];
         let ics = [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
             `PRODID:-//Trello Clone//${title}//EN`,
             "CALSCALE:GREGORIAN",
             "METHOD:PUBLISH",
-            `X-WR-CALNAME:${title}`
+            `X-WR-CALNAME:${title}`,
+            "BEGIN:VTIMEZONE",
+            `TZID:${tz.id}`,
+            "BEGIN:DAYLIGHT",
+            `TZOFFSETFROM:${tz.offsetFrom}`,
+            `TZOFFSETTO:${tz.offsetTo}`,
+            `TZNAME:${tz.tzname}`,
+            "DTSTART:19700329T020000",
+            "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+            "END:DAYLIGHT",
+            "BEGIN:STANDARD",
+            `TZOFFSETFROM:${tz.offsetTo}`,
+            `TZOFFSETTO:${tz.offsetFrom}`,
+            `TZNAME:${tz.standardTzname}`,
+            "DTSTART:19701025T030000",
+            "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+            "END:STANDARD",
+            "END:VTIMEZONE"
         ];
 
         days.forEach(day => {
@@ -32,15 +87,45 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
             const dateObj = new Date(day.date);
             if (isNaN(dateObj.getTime())) return;
 
-            const yyyymmdd = dateObj.toISOString().split('T')[0].replace(/-/g, '');
+            // Extract local parts directly to be 100% immune to UTC date timezone shifting
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dayNum = String(dateObj.getDate()).padStart(2, '0');
+            const yyyymmdd = `${year}${month}${dayNum}`;
             
+            let startTime = "06:00:00";
+            
+            if (day.shootTime) {
+                const callMatch = day.shootTime.match(/CREW\s*CALL:\s*(\d+(?::|\.)?\d*?\s*(?:AM|PM))/i);
+                if (callMatch) {
+                    const parsed = parseTimeToStandard(callMatch[1]);
+                    if (parsed) startTime = parsed.ical;
+                }
+            }
+
+            // End time defaults to 11.5 hours after start time (5:30 PM for 6:00 AM call)
+            // But if CAMERA WRAP or WRAP is found, use that
+            let endTime = "17:30:00";
+            if (startTime === "07:00:00") endTime = "18:30:00"; // Default 11.5h shift for 7AM call
+
+            if (day.shootTime) {
+                const wrapMatch = day.shootTime.match(/(?:CAMERA\s*)?WRAP:\s*(\d+(?::|\.)?\d*?\s*(?:AM|PM))/i);
+                if (wrapMatch) {
+                    const parsed = parseTimeToStandard(wrapMatch[1]);
+                    if (parsed) endTime = parsed.ical;
+                }
+            }
+
+            const startStr = `${yyyymmdd}T${startTime.replace(/:/g, '')}`;
+            const endStr = `${yyyymmdd}T${endTime.replace(/:/g, '')}`;
+
             const scenesSummary = day.scenes.map((s: any) => s.sceneNum).filter((n: string) => n !== "?").join(", ");
             const summary = `DAY #${day.shootDay}${day.isSecondUnit ? " (2U)" : ""}: ${scenesSummary}`;
             
             const description = [
                 day.shootTime ? `SCHEDULE: ${day.shootTime}` : "",
                 "SCENES:",
-                ...day.scenes.map((s: any) => ` - Sc${s.sceneNum} (${s.intExt}) ${s.location}: ${s.description}`)
+                ...day.scenes.map((s: any) => ` - Sc${s.sceneNum} (${s.intExt}) ${s.location}: ${s.description.replace(/\n/g, '\\n')}`)
             ].filter(Boolean).join("\\n");
 
             const location = day.scenes[0]?.location || "";
@@ -48,8 +133,8 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
             ics.push("BEGIN:VEVENT");
             ics.push(`UID:${day.shootDay}-${day.isSecondUnit ? '2U' : 'main'}-${Date.now()}@trello.goodthinc.com`);
             ics.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`);
-            ics.push(`DTSTART;VALUE=DATE:${yyyymmdd}`);
-            ics.push(`DTEND;VALUE=DATE:${yyyymmdd}`); // All day events usually end on the same day or next day start
+            ics.push(`DTSTART;TZID=${tz.id}:${startStr}`);
+            ics.push(`DTEND;TZID=${tz.id}:${endStr}`);
             ics.push(`SUMMARY:${summary}`);
             ics.push(`DESCRIPTION:${description}`);
             ics.push(`LOCATION:${location}`);
@@ -67,19 +152,35 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
             const dateObj = new Date(day.date);
             if (isNaN(dateObj.getTime())) return null;
 
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dayNum = String(dateObj.getDate()).padStart(2, '0');
+            
             const scenesSummary = day.scenes.map((s: any) => s.sceneNum).filter((n: string) => n !== "?").join(", ");
             const subject = `DAY #${day.shootDay}${day.isSecondUnit ? " (2U)" : ""}: ${scenesSummary}`;
             
-            const startDate = dateObj.toLocaleDateString('en-US');
+            // Format strictly as MM/DD/YYYY using local parts to prevent UTC shifting
+            const startDate = `${month}/${dayNum}/${year}`;
             
-            // Try to extract times
-            let startTime = "9:00 AM";
-            let endTime = "7:00 PM";
+            let startTime = "6:00 AM";
+            let endTime = "5:30 PM";
+
             if (day.shootTime) {
-                const callMatch = day.shootTime.match(/CREW CALL:\s*(\d+(?:\.\d+)?\s*(?:AM|PM))/i);
-                if (callMatch) startTime = callMatch[1];
-                const wrapMatch = day.shootTime.match(/WRAP:\s*(\d+(?:\.\d+)?\s*(?:AM|PM))/i);
-                if (wrapMatch) endTime = wrapMatch[1];
+                const callMatch = day.shootTime.match(/CREW\s*CALL:\s*(\d+(?::|\.)?\d*?\s*(?:AM|PM))/i);
+                if (callMatch) {
+                    const parsed = parseTimeToStandard(callMatch[1]);
+                    if (parsed) startTime = parsed.google;
+                }
+            }
+
+            if (startTime === "7:00 AM") endTime = "6:30 PM"; // Default 11.5h shift for 7AM call
+
+            if (day.shootTime) {
+                const wrapMatch = day.shootTime.match(/(?:CAMERA\s*)?WRAP:\s*(\d+(?::|\.)?\d*?\s*(?:AM|PM))/i);
+                if (wrapMatch) {
+                    const parsed = parseTimeToStandard(wrapMatch[1]);
+                    if (parsed) endTime = parsed.google;
+                }
             }
 
             const description = [
@@ -158,10 +259,40 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
                             type="text" 
                             value={title} 
                             onChange={(e) => setTitle(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition font-medium"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition font-medium text-white"
                             placeholder="Calendar Title"
                         />
                     </div>
+
+                    {/* Timezone Selector */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-white/50 uppercase tracking-wider">Shoot Timezone</label>
+                        <select
+                            value={selectedTz}
+                            onChange={(e) => setSelectedTz(e.target.value)}
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition font-medium text-white cursor-pointer"
+                        >
+                            {TIMEZONES.map((tz) => (
+                                <option key={tz.id} value={tz.id} className="bg-slate-900 text-white">
+                                    {tz.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Timezone Info */}
+                    {(() => {
+                        const tz = TIMEZONES.find(t => t.id === selectedTz) || TIMEZONES[0];
+                        return (
+                            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-start gap-x-3 text-emerald-400">
+                                <Calendar className="h-4 w-4 shrink-0 mt-0.5" />
+                                <div className="text-xs">
+                                    <span className="font-bold">{tz.id.split("/")[1] || tz.id} Timezone Active ({tz.tzname})</span>
+                                    <p className="text-emerald-400/70 mt-1">Crew Calls and Camera Wraps are automatically matched and formatted for {tz.label.split(" (")[0]}.</p>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Format Selection */}
                     <div className="space-y-2">

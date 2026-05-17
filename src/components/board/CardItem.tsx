@@ -308,7 +308,7 @@ const CardItemInner = ({
                                 {data.labels.map((label: any) => (
                                     <div 
                                         key={label.id} 
-                                        className="h-2 w-3 rounded-[2px]" 
+                                        className="h-2 w-3 rounded-[2px] " 
                                         style={{ backgroundColor: label.color }} 
                                         title={label.title} 
                                     />
@@ -332,6 +332,12 @@ const CardItemInner = ({
                                 data.title
                             )}
                         </div>
+                        {data.dueDate && (
+                            <div className={`flex items-center gap-x-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${isPastDue ? 'bg-red-500/20 text-red-700' : isDueSoon ? 'bg-yellow-500/20 text-yellow-700' : 'bg-black/10'}`} style={{ color: isPastDue || isDueSoon ? undefined : (data.fontColor || "#172b4d") }} title={`Due: ${formattedDueDate}`}>
+                                <Clock className="h-2.5 w-2.5" />
+                                <span>{formattedDueDate}</span>
+                            </div>
+                        )}
                         {data.syncGroupId && (
                             <span title="Instanced">
                                 <Layers className="h-3 w-3 text-blue-500 shrink-0" />
