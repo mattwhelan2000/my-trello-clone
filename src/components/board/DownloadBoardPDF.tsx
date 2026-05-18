@@ -430,9 +430,37 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                                 const base64 = await fetchImageAsBase64(attach.url);
                                 if (base64) {
                                     try {
-                                        checkPageBreak(50);
-                                        doc.addImage(base64, "JPEG", margin + 14, yOffset + 3, 70, 40);
-                                        yOffset += 44;
+                                        const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+                                            const img = new window.Image();
+                                            img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+                                            img.onerror = () => resolve({ width: 0, height: 0 });
+                                            img.src = base64;
+                                        });
+
+                                        const match = base64.match(/^data:image\/(png|jpeg|jpg|webp);base64,/i);
+                                        let format = match ? match[1].toUpperCase() : "JPEG";
+                                        if (format === "JPG") format = "JPEG";
+
+                                        let drawWidth = 70;
+                                        let drawHeight = 40;
+
+                                        if (dims.width && dims.height) {
+                                            const maxWidth = 140; // Allow it to be a bit wider
+                                            const maxHeight = 100;
+                                            const ratio = dims.width / dims.height;
+
+                                            drawWidth = maxWidth;
+                                            drawHeight = maxWidth / ratio;
+
+                                            if (drawHeight > maxHeight) {
+                                                drawHeight = maxHeight;
+                                                drawWidth = maxHeight * ratio;
+                                            }
+                                        }
+
+                                        checkPageBreak(drawHeight + 10);
+                                        doc.addImage(base64, format, margin + 14, yOffset + 3, drawWidth, drawHeight);
+                                        yOffset += drawHeight + 4;
                                     } catch (e) {
                                         console.warn("Failed base64 print in pdf, skipping image...", e);
                                     }
