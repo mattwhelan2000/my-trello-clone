@@ -5,6 +5,7 @@ import { Download, FileText, CheckSquare, Square, Loader2, X, Calendar, Layers, 
 import { jsPDF } from "jspdf";
 import { PDFDocument } from "pdf-lib";
 import { useToast } from "@/components/ui/Toast";
+import { formatImageUrl } from "@/lib/format-image-url";
 import { exportBoard } from "@/actions/export-board";
 
 interface DownloadBoardPDFProps {
@@ -129,8 +130,18 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
 
     const fetchImageAsBase64 = async (url: string): Promise<string | null> => {
         try {
-            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
-            const response = await fetch(proxyUrl);
+            let fetchUrl = url;
+            const formatted = formatImageUrl(url);
+            if (formatted) {
+                fetchUrl = formatted;
+            }
+
+            // Only proxy if it's not already proxied
+            if (!fetchUrl.startsWith('/') && !fetchUrl.includes('/api/proxy-image')) {
+                fetchUrl = `/api/proxy-image?url=${encodeURIComponent(fetchUrl)}`;
+            }
+
+            const response = await fetch(fetchUrl);
             if (!response.ok) return null;
             const blob = await response.blob();
             return new Promise((resolve) => {
@@ -147,8 +158,15 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
 
     const downloadPdfBuffer = async (url: string): Promise<ArrayBuffer | null> => {
         try {
-            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
-            const response = await fetch(proxyUrl);
+            let fetchUrl = url;
+            const formatted = formatImageUrl(url);
+            if (formatted) fetchUrl = formatted;
+
+            if (!fetchUrl.startsWith('/') && !fetchUrl.includes('/api/proxy-image')) {
+                fetchUrl = `/api/proxy-image?url=${encodeURIComponent(fetchUrl)}`;
+            }
+
+            const response = await fetch(fetchUrl);
             if (!response.ok) return null;
             return await response.arrayBuffer();
         } catch (error) {
@@ -185,9 +203,10 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                     for (const card of list.cards || []) {
                         if (card.title.toUpperCase().startsWith("DAY ") || card.title.toUpperCase().startsWith("DAY#")) continue;
                         for (const attach of card.attachments || []) {
-                            const isImage = attach.type === "IMAGE" || attach.thumbnailUrl;
+                            const isPDF = attach.url.toLowerCase().endsWith(".pdf") || attach.url.toLowerCase().includes("pdf");
+                            const isImage = attach.type === "IMAGE" || !!attach.thumbnailUrl || attach.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) !== null || ((attach.url.includes("dropbox.com") || attach.url.includes("drive.google.com")) && !isPDF);
                             const isGMap = attach.url.includes("google.com/maps") || attach.url.includes("maps.app.goo.gl");
-                            if (isImage && !isGMap && !attach.url.includes("drive.google.com")) {
+                            if (isImage && !isGMap) {
                                 totalImagesToDownload++;
                             }
                         }
@@ -382,9 +401,9 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                         for (const attach of card.attachments) {
                             checkPageBreak(12);
 
-                            const isImage = attach.type === "IMAGE" || attach.thumbnailUrl;
+                            const isPDF = attach.url.toLowerCase().endsWith(".pdf") || attach.url.toLowerCase().includes("pdf");
+                            const isImage = attach.type === "IMAGE" || !!attach.thumbnailUrl || attach.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) !== null || ((attach.url.includes("dropbox.com") || attach.url.includes("drive.google.com")) && !isPDF);
                             const isGMap = attach.url.includes("google.com/maps") || attach.url.includes("maps.app.goo.gl");
-                            const isPDF = attach.url.toLowerCase().endsWith(".pdf");
 
                             doc.setFont("helvetica", "bold");
                             doc.setFontSize(9);
@@ -402,7 +421,7 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                                 pdfAttachments.push(attach.url);
                             }
 
-                            if (includeImages && isImage && !isGMap && !attach.url.includes("drive.google.com")) {
+                            if (includeImages && isImage && !isGMap) {
                                 imagesDownloaded++;
                                 setGenerationStatus(`Downloading image ${imagesDownloaded} of ${totalImagesToDownload}...`);
                                 setProgress({ current: imagesDownloaded, total: totalImagesToDownload });
