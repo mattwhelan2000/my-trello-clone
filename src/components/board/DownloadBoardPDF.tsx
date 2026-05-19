@@ -7,6 +7,7 @@ import { PDFDocument } from "pdf-lib";
 import { useToast } from "@/components/ui/Toast";
 import { formatImageUrl } from "@/lib/format-image-url";
 import { exportBoard } from "@/actions/export-board";
+import { useBoardStore } from "@/hooks/use-board-store";
 
 interface DownloadBoardPDFProps {
     boardId: string;
@@ -14,6 +15,15 @@ interface DownloadBoardPDFProps {
 }
 
 export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps) => {
+    const { 
+        query: searchQuery, 
+        searchCards, 
+        searchLists, 
+        searchInvert, 
+        selectedLabels,
+        isFilterEnabled
+    } = useBoardStore();
+
     const [isOpen, setIsOpen] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     
@@ -79,15 +89,50 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
         };
     };
 
+    const isCardVisible = (card: any, listTitle: string) => {
+        const query = (searchQuery || "").toLowerCase().trim();
+        const terms = query.split(',').map(t => t.trim()).filter(t => t !== "");
+        const isFilterActive = isFilterEnabled && (terms.length > 0 || selectedLabels.size > 0);
+
+        if (!isFilterActive) return true;
+        if (card.title.toUpperCase().startsWith("DAY ") || card.title.toUpperCase().startsWith("DAY#")) return true;
+
+        const isListMatch = searchLists && terms.length > 0 && terms.every(term => listTitle.toLowerCase().includes(term));
+        let matchesLabels = selectedLabels.size === 0 || (card.labels && card.labels.some((l: any) => selectedLabels.has(l.title)));
+        let matchesSearch = true;
+        
+        if (terms.length > 0) {
+            const isCardMatch = searchCards && terms.every(term => 
+                card.title.toLowerCase().includes(term) ||
+                (card.description && card.description.toLowerCase().includes(term))
+            );
+            matchesSearch = isListMatch || isCardMatch;
+        }
+
+        let isVisible = matchesLabels && matchesSearch;
+        
+        if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
+            isVisible = !isVisible;
+        }
+        return isVisible;
+    };
+
+    const filteredFullLists = useMemo(() => {
+        return fullLists.map(list => ({
+            ...list,
+            cards: list.cards ? list.cards.filter((card: any) => isCardVisible(card, list.title)) : []
+        }));
+    }, [fullLists, searchQuery, searchCards, searchLists, searchInvert, selectedLabels, isFilterEnabled]);
+
     // UI Grouping
     const displayGroups = useMemo(() => {
         if (exportOrder === "board") {
-            return [{ label: "All Scenes (Board Order)", lists: [...fullLists].sort((a,b) => a.order - b.order) }];
+            return [{ label: "All Scenes (Board Order)", lists: [...filteredFullLists].sort((a,b) => a.order - b.order) }];
         } else {
             const dayGroups: Record<string, { dayNum: number; dayLabel: string; dueDate: Date | null; lists: any[] }> = {};
             const unscheduledLists: any[] = [];
             
-            fullLists.forEach(list => {
+            filteredFullLists.forEach(list => {
                 const dayInfo = getListDay(list);
                 if (dayInfo) {
                     const key = `day-${dayInfo.dayNum}`;
@@ -112,7 +157,7 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
             if (unscheduledLists.length > 0) result.push({ label: "Unscheduled Scenes", lists: unscheduledLists });
             return result;
         }
-    }, [fullLists, exportOrder]);
+    }, [filteredFullLists, exportOrder]);
 
     if (!isMounted) return null;
 
@@ -123,7 +168,7 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
         setSelectedListIds(newSet);
     };
 
-    const selectAll = () => setSelectedListIds(new Set(fullLists.map(l => l.id)));
+    const selectAll = () => setSelectedListIds(new Set(filteredFullLists.map(l => l.id)));
     const selectNone = () => setSelectedListIds(new Set());
 
     const yieldToRender = () => new Promise(resolve => setTimeout(resolve, 5));
@@ -193,7 +238,7 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
             const margin = 20;
             const contentWidth = pageWidth - (margin * 2);
             
-            const selectedLists = fullLists.filter(l => selectedListIds.has(l.id));
+            const selectedLists = filteredFullLists.filter(l => selectedListIds.has(l.id));
             const pdfAttachments: string[] = [];
 
             // Pre-calculate items to download for progress
