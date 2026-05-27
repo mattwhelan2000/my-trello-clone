@@ -35,6 +35,7 @@ export const ListItem = ({
     isLast,
     searchInvert = false,
     selectedLabels = new Set(),
+    showFullList = false,
 }: {
     data: any;
     index: number;
