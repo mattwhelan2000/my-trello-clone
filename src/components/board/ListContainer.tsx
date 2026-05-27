@@ -86,6 +86,7 @@ export const ListContainer = ({
         visibleListIds,
         setVisibleListIds,
         isDateOrder,
+        showFullList,
     } = useBoardStore();
 
     const { addToast } = useToast();
@@ -211,26 +212,58 @@ export const ListContainer = ({
         const query = (searchQuery || "").toLowerCase().trim();
         const terms = query.split(',').map(t => t.trim()).filter(t => t !== "");
         const results: any[] = [];
+        const isFilterActive = terms.length > 0 || selectedLabels.size > 0;
         
         orderedData.forEach(list => {
             const isListMatch = searchLists && terms.length > 0 && terms.every(term => list.title.toLowerCase().includes(term));
             
-            list.cards.forEach(card => {
-                let matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
-                let matchesSearch = true;
-                
-                if (terms.length > 0) {
-                    const isCardMatch = searchCards && terms.every(term => 
-                        card.title.toLowerCase().includes(term) ||
-                        (card.description && card.description.toLowerCase().includes(term))
-                    );
-                    matchesSearch = isListMatch || isCardMatch;
-                }
+            let listHasMatch = false;
+            if (showFullList && isFilterActive) {
+                listHasMatch = list.cards.some(card => {
+                    let matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
+                    let matchesSearch = true;
+                    
+                    if (terms.length > 0) {
+                        const isCardMatch = searchCards && terms.every(term => 
+                            card.title.toLowerCase().includes(term) ||
+                            (card.description && card.description.toLowerCase().includes(term))
+                        );
+                        matchesSearch = isListMatch || isCardMatch;
+                    }
 
-                let isVisible = matchesLabels && matchesSearch;
+                    let isVisible = matchesLabels && matchesSearch;
+                    
+                    if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
+                        isVisible = !isVisible;
+                    }
+                    return isVisible;
+                });
+            }
+
+            list.cards.forEach(card => {
+                let isVisible = true;
                 
-                if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
-                    isVisible = !isVisible;
+                if (isFilterActive) {
+                    if (showFullList && listHasMatch) {
+                        isVisible = true;
+                    } else {
+                        let matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
+                        let matchesSearch = true;
+                        
+                        if (terms.length > 0) {
+                            const isCardMatch = searchCards && terms.every(term => 
+                                card.title.toLowerCase().includes(term) ||
+                                (card.description && card.description.toLowerCase().includes(term))
+                            );
+                            matchesSearch = isListMatch || isCardMatch;
+                        }
+
+                        isVisible = matchesLabels && matchesSearch;
+                        
+                        if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
+                            isVisible = !isVisible;
+                        }
+                    }
                 }
 
                 if (isVisible) {
@@ -240,7 +273,7 @@ export const ListContainer = ({
         });
         
         return results;
-    }, [orderedData, searchQuery, searchCards, searchLists, selectedLabels, searchInvert]);
+    }, [orderedData, searchQuery, searchCards, searchLists, selectedLabels, searchInvert, showFullList]);
 
 
     // 2. Compute which lists should be visible (if they match search or have visible cards)
@@ -547,6 +580,7 @@ export const ListContainer = ({
                             searchLists={searchLists}
                             searchInvert={searchInvert}
                             selectedLabels={selectedLabels}
+                            showFullList={showFullList}
                             listColorSwatches={listColorSwatches}
                             textColorSwatches={textColorSwatches}
                             onMoveList={handleMoveList}

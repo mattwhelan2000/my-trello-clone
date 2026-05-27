@@ -522,7 +522,16 @@ export const BoardOptions = ({ boardId, boardTitle, listsCount, cardsCount, init
                                     <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider text-left">Board Filters</span>
                                     <span className="text-[9px] text-neutral-400 leading-tight text-left">Toggle visibility by label</span>
                                 </div>
-                                <div className="flex items-center gap-x-2">
+                                <div className="flex items-center gap-x-3">
+                                    <label className="flex items-center gap-x-1 cursor-pointer group" title="Show all cards in list if any card matches filter">
+                                        <input
+                                            type="checkbox"
+                                            checked={showFullList}
+                                            onChange={(e) => setShowFullList(e.target.checked)}
+                                            className="h-3 w-3 rounded border-neutral-300 text-purple-600 focus:ring-purple-600"
+                                        />
+                                        <span className="text-[9px] font-bold text-purple-600 group-hover:text-purple-700 transition uppercase tracking-tighter mt-[1px]">Show List</span>
+                                    </label>
                                     {selectedLabels.size > 0 && (
                                         <button onClick={() => setSelectedLabels(new Set())} className="text-[10px] text-blue-600 hover:underline font-semibold">Clear</button>
                                     )}
@@ -708,15 +717,6 @@ export const BoardOptions = ({ boardId, boardTitle, listsCount, cardsCount, init
                                             className="h-3.5 w-3.5 rounded border-neutral-300 text-red-600 focus:ring-red-600"
                                         />
                                         <span className="text-[10px] font-bold text-red-600 group-hover:text-red-700 transition uppercase tracking-tighter">Invert</span>
-                                    </label>
-                                    <label className="flex items-center gap-x-2 cursor-pointer group text-neutral-800">
-                                        <input
-                                            type="checkbox"
-                                            checked={showFullList}
-                                            onChange={(e) => setShowFullList(e.target.checked)}
-                                            className="h-3.5 w-3.5 rounded border-neutral-300 text-purple-600 focus:ring-purple-600"
-                                        />
-                                        <span className="text-[10px] font-bold text-purple-600 group-hover:text-purple-700 transition uppercase tracking-tighter">Show List</span>
                                     </label>
                                 </div>
                             </div>

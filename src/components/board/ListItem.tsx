@@ -49,6 +49,7 @@ export const ListItem = ({
     isFirst?: boolean;
     isLast?: boolean;
     selectedLabels?: Set<string>;
+    showFullList?: boolean;
 }) => {
     const [title, setTitle] = useState(data.title);
     const [isEditing, setIsEditing] = useState(false);
@@ -603,43 +604,76 @@ export const ListItem = ({
 
                 {/* Cards Wrapper */}
                 <ol className="mx-1 px-1 py-2 flex flex-col gap-y-2 mt-2 min-h-[2px] flex-1 overflow-y-scroll">
-                    {data.cards.map((card: any, idx: number) => {
-                        // 1. Label Filter Check
-                        let matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
-                        
-                        // 2. Search Filter Check
+                    {(() => {
                         const query = (searchQuery || "").trim().toLowerCase();
                         const terms = query.split(',').map(t => t.trim()).filter(t => t !== "");
-                        const isListMatched = (terms.length > 0 && searchLists && terms.every(term => data.title.toLowerCase().includes(term))) || false;
+                        const isFilterActive = terms.length > 0 || selectedLabels.size > 0;
                         
-                        let matchesCardSearch = true;
-                        if (terms.length > 0) {
-                            const isCardMatch = searchCards && terms.every(term => 
-                                card.title.toLowerCase().includes(term) ||
-                                (card.description && card.description.toLowerCase().includes(term))
+                        let listHasMatch = false;
+                        if (showFullList && isFilterActive) {
+                            listHasMatch = data.cards.some((card: any) => {
+                                let matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
+                                const isListMatched = (terms.length > 0 && searchLists && terms.every(term => data.title.toLowerCase().includes(term))) || false;
+                                
+                                let matchesCardSearch = true;
+                                if (terms.length > 0) {
+                                    const isCardMatch = searchCards && terms.every(term => 
+                                        card.title.toLowerCase().includes(term) ||
+                                        (card.description && card.description.toLowerCase().includes(term))
+                                    );
+                                    matchesCardSearch = isListMatched || isCardMatch;
+                                }
+
+                                let isVisible = matchesLabels && matchesCardSearch;
+                                
+                                if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
+                                    isVisible = !isVisible;
+                                }
+                                return isVisible;
+                            });
+                        }
+
+                        return data.cards.map((card: any, idx: number) => {
+                            let isVisible = true;
+                            
+                            if (isFilterActive) {
+                                if (showFullList && listHasMatch) {
+                                    isVisible = true;
+                                } else {
+                                    let matchesLabels = selectedLabels.size === 0 || card.labels.some((l: any) => selectedLabels.has(l.title));
+                                    const isListMatched = (terms.length > 0 && searchLists && terms.every(term => data.title.toLowerCase().includes(term))) || false;
+                                    
+                                    let matchesCardSearch = true;
+                                    if (terms.length > 0) {
+                                        const isCardMatch = searchCards && terms.every(term => 
+                                            card.title.toLowerCase().includes(term) ||
+                                            (card.description && card.description.toLowerCase().includes(term))
+                                        );
+                                        matchesCardSearch = isListMatched || isCardMatch;
+                                    }
+
+                                    isVisible = matchesLabels && matchesCardSearch;
+                                    
+                                    if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
+                                        isVisible = !isVisible;
+                                    }
+                                }
+                            }
+
+                            return (
+                                <div key={card.id} style={{ display: isVisible ? 'block' : 'none' }}>
+                                    <CardItem 
+                                        index={idx} 
+                                        data={card} 
+                                        boardId={data.boardId} 
+                                        onMoveCard={onMoveCard}
+                                        isFirstCard={idx === 0}
+                                        isLastCard={idx === data.cards.length - 1}
+                                    />
+                                </div>
                             );
-                            matchesCardSearch = isListMatched || isCardMatch;
-                        }
-
-                        let isVisible = matchesLabels && matchesCardSearch;
-                        
-                        if (searchInvert && (terms.length > 0 || selectedLabels.size > 0)) {
-                            isVisible = !isVisible;
-                        }
-
-                        return (
-                            <div key={card.id} style={{ display: isVisible ? 'block' : 'none' }}>
-                                <CardItem 
-                                    index={idx} 
-                                    data={card} 
-                                    boardId={data.boardId} 
-                                    onMoveCard={onMoveCard}
-                                    isFirstCard={idx === 0}
-                                    isLastCard={idx === data.cards.length - 1}
-                                />
-                            </div>
-                        );
-                    })}
+                        });
+                    })()}
                 </ol>
                 {/* Add Card Button or Form */}
                 <div className="pt-2 px-2 pb-2">
