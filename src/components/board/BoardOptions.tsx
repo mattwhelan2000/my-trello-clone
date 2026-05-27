@@ -718,6 +718,15 @@ export const BoardOptions = ({ boardId, boardTitle, listsCount, cardsCount, init
                                         />
                                         <span className="text-[10px] font-bold text-red-600 group-hover:text-red-700 transition uppercase tracking-tighter">Invert</span>
                                     </label>
+                                    <label className="flex items-center gap-x-2 cursor-pointer group text-neutral-800">
+                                        <input
+                                            type="checkbox"
+                                            checked={showFullList}
+                                            onChange={(e) => setShowFullList(e.target.checked)}
+                                            className="h-3.5 w-3.5 rounded border-neutral-300 text-purple-600 focus:ring-purple-600"
+                                        />
+                                        <span className="text-[10px] font-bold text-purple-600 group-hover:text-purple-700 transition uppercase tracking-tighter">Show List</span>
+                                    </label>
                                 </div>
                             </div>
                         </div>

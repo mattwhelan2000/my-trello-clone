@@ -17,7 +17,12 @@ export default async function HomePage() {
 
   let buildTime = "Unknown";
   try {
-    const stats = fs.statSync(path.join(process.cwd(), "package.json"));
+    // Try to get the build time from the Next.js build directory
+    const buildFile = fs.existsSync(path.join(process.cwd(), ".next/BUILD_ID")) 
+      ? path.join(process.cwd(), ".next/BUILD_ID")
+      : path.join(process.cwd(), "package.json");
+      
+    const stats = fs.statSync(buildFile);
     buildTime = stats.mtime.toLocaleString("en-GB", { 
       day: "2-digit", 
       month: "2-digit", 
