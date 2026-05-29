@@ -29,28 +29,55 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
 
     const parseTimeToStandard = (timeStr: string): { ical: string; google: string } | null => {
         if (!timeStr) return null;
+        const cleanStr = timeStr.trim().toUpperCase();
         
-        // Match formats like "6AM", "5.30 PM", "6:30 PM", "5:30PM", "12PM", "12 AM"
-        const match = timeStr.trim().match(/(\d+)(?::|\.)?(\d+)?\s*(AM|PM)/i);
-        if (!match) return null;
-        
-        let hours = parseInt(match[1], 10);
-        const minutes = match[2] || "00";
-        const ampm = match[3].toUpperCase();
-        
-        // Standardise hours for 24h
-        let hours24 = hours;
-        if (ampm === "PM" && hours < 12) hours24 += 12;
-        if (ampm === "AM" && hours === 12) hours24 = 0;
+        // 1. Try to match AM/PM format (e.g. "6AM", "5.30 PM", "6:30 PM", "12PM")
+        const ampmMatch = cleanStr.match(/(\d+)(?::|\.)?(\d+)?\s*(AM|PM)/i);
+        if (ampmMatch) {
+            let hours = parseInt(ampmMatch[1], 10);
+            const minutes = ampmMatch[2] || "00";
+            const ampm = ampmMatch[3].toUpperCase();
+            
+            let hours24 = hours;
+            if (ampm === "PM" && hours < 12) hours24 += 12;
+            if (ampm === "AM" && hours === 12) hours24 = 0;
 
-        // Standardise hours for 12h (AM/PM)
-        let hours12 = hours;
-        if (hours === 0) hours12 = 12;
+            let hours12 = hours;
+            if (hours === 0) hours12 = 12;
+            
+            const icalTime = `${hours24.toString().padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+            const googleTime = `${hours12}:${minutes.padStart(2, '0')} ${ampm}`;
+            
+            return { ical: icalTime, google: googleTime };
+        }
+
+        // 2. Try to match 24h format (e.g. "06:00", "18:00", "06.00", "18.00")
+        const match24 = cleanStr.match(/^(\d{1,2})(?::|\.)(\d{2})$/);
+        if (match24) {
+            const hours24 = parseInt(match24[1], 10);
+            const minutes = match24[2];
+            const ampm = hours24 >= 12 ? "PM" : "AM";
+            const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+            
+            const icalTime = `${hours24.toString().padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
+            const googleTime = `${hours12}:${minutes.padStart(2, '0')} ${ampm}`;
+            return { ical: icalTime, google: googleTime };
+        }
+
+        // 3. Try a single number (e.g. "6" or "18")
+        const singleMatch = cleanStr.match(/^(\d{1,2})$/);
+        if (singleMatch) {
+            const hours24 = parseInt(singleMatch[1], 10);
+            if (hours24 >= 0 && hours24 <= 23) {
+                const ampm = hours24 >= 12 ? "PM" : "AM";
+                const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+                const icalTime = `${hours24.toString().padStart(2, '0')}:00:00`;
+                const googleTime = `${hours12}:00 ${ampm}`;
+                return { ical: icalTime, google: googleTime };
+            }
+        }
         
-        const icalTime = `${hours24.toString().padStart(2, '0')}:${minutes.padStart(2, '0')}:00`;
-        const googleTime = `${hours12}:${minutes.padStart(2, '0')} ${ampm}`;
-        
-        return { ical: icalTime, google: googleTime };
+        return null;
     };
 
     const generateIcal = () => {
@@ -96,7 +123,7 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
             let startTime = "06:00:00";
             
             if (day.shootTime) {
-                const callMatch = day.shootTime.match(/CREW\s*CALL:\s*(\d+(?::|\.)?\d*?\s*(?:AM|PM))/i);
+                const callMatch = day.shootTime.match(/CREW\s*CALL:\s*(\d+(?::|\.)?\d*\s*(?:AM|PM)?)/i);
                 if (callMatch) {
                     const parsed = parseTimeToStandard(callMatch[1]);
                     if (parsed) startTime = parsed.ical;
@@ -109,7 +136,7 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
             if (startTime === "07:00:00") endTime = "18:30:00"; // Default 11.5h shift for 7AM call
 
             if (day.shootTime) {
-                const wrapMatch = day.shootTime.match(/(?:CAMERA\s*)?WRAP:\s*(\d+(?::|\.)?\d*?\s*(?:AM|PM))/i);
+                const wrapMatch = day.shootTime.match(/(?:CAMERA\s*)?WRAP:\s*(\d+(?::|\.)?\d*\s*(?:AM|PM)?)/i);
                 if (wrapMatch) {
                     const parsed = parseTimeToStandard(wrapMatch[1]);
                     if (parsed) endTime = parsed.ical;
@@ -120,7 +147,17 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
             const endStr = `${yyyymmdd}T${endTime.replace(/:/g, '')}`;
 
             const scenesSummary = day.scenes.map((s: any) => s.sceneNum).filter((n: string) => n !== "?").join(", ");
-            const summary = `DAY #${day.shootDay}${day.isSecondUnit ? " (2U)" : ""}: ${scenesSummary}`;
+            
+            let unitLabel = "";
+            let unitUid = "main";
+            if (day.isSplinterUnit) {
+                unitLabel = " (SPL)";
+                unitUid = "splinter";
+            } else if (day.isSecondUnit) {
+                unitLabel = " (2U)";
+                unitUid = "2U";
+            }
+            const summary = `DAY #${day.shootDay}${unitLabel}: ${scenesSummary}`;
             
             const description = [
                 day.shootTime ? `SCHEDULE: ${day.shootTime}` : "",
@@ -131,7 +168,7 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
             const location = day.scenes[0]?.location || "";
 
             ics.push("BEGIN:VEVENT");
-            ics.push(`UID:${day.shootDay}-${day.isSecondUnit ? '2U' : 'main'}-${Date.now()}@trello.goodthinc.com`);
+            ics.push(`UID:${day.shootDay}-${unitUid}-${Date.now()}@trello.goodthinc.com`);
             ics.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`);
             ics.push(`DTSTART;TZID=${tz.id}:${startStr}`);
             ics.push(`DTEND;TZID=${tz.id}:${endStr}`);
@@ -157,26 +194,32 @@ export function CalendarExportDialog({ isOpen, onClose, boardTitle, days }: Cale
             const dayNum = String(dateObj.getDate()).padStart(2, '0');
             
             const scenesSummary = day.scenes.map((s: any) => s.sceneNum).filter((n: string) => n !== "?").join(", ");
-            const subject = `DAY #${day.shootDay}${day.isSecondUnit ? " (2U)" : ""}: ${scenesSummary}`;
+            let unitLabel = "";
+            if (day.isSplinterUnit) {
+                unitLabel = " (SPL)";
+            } else if (day.isSecondUnit) {
+                unitLabel = " (2U)";
+            }
+            const subject = `DAY #${day.shootDay}${unitLabel}: ${scenesSummary}`;
             
             // Format strictly as MM/DD/YYYY using local parts to prevent UTC shifting
             const startDate = `${month}/${dayNum}/${year}`;
             
             let startTime = "6:00 AM";
             let endTime = "5:30 PM";
-
+ 
             if (day.shootTime) {
-                const callMatch = day.shootTime.match(/CREW\s*CALL:\s*(\d+(?::|\.)?\d*?\s*(?:AM|PM))/i);
+                const callMatch = day.shootTime.match(/CREW\s*CALL:\s*(\d+(?::|\.)?\d*\s*(?:AM|PM)?)/i);
                 if (callMatch) {
                     const parsed = parseTimeToStandard(callMatch[1]);
                     if (parsed) startTime = parsed.google;
                 }
             }
-
+ 
             if (startTime === "7:00 AM") endTime = "6:30 PM"; // Default 11.5h shift for 7AM call
-
+ 
             if (day.shootTime) {
-                const wrapMatch = day.shootTime.match(/(?:CAMERA\s*)?WRAP:\s*(\d+(?::|\.)?\d*?\s*(?:AM|PM))/i);
+                const wrapMatch = day.shootTime.match(/(?:CAMERA\s*)?WRAP:\s*(\d+(?::|\.)?\d*\s*(?:AM|PM)?)/i);
                 if (wrapMatch) {
                     const parsed = parseTimeToStandard(wrapMatch[1]);
                     if (parsed) endTime = parsed.google;

@@ -60,6 +60,7 @@ function parseOneLineSchedule(text: string): OneLineDay[] {
             // 2nd Unit detection: Be strict to avoid matching date ordinals like "JUNE 2ND"
             // Look for "2nd Unit" or "2U" or "Second Unit" as distinct phrases
             const is2U = /\b(?:2nd\s+Unit|2U|Second\s+Unit)\b/i.test(line);
+            const isSplinter = /\b(?:splinter|splinter\s+unit|spl)\b/i.test(line);
             
             // Extract date from start line if possible (e.g. "JUNE 1ST")
             // We'll refine this later with the "End of Day" date which is more complete.
@@ -109,6 +110,7 @@ function parseOneLineSchedule(text: string): OneLineDay[] {
             days.push({
                 shootDay,
                 isSecondUnit: is2U,
+                isSplinterUnit: isSplinter,
                 date: finalDate,
                 shootTime: shootTimeLine,
                 scenes
@@ -120,7 +122,7 @@ function parseOneLineSchedule(text: string): OneLineDay[] {
     const mergeDuplicateDays = (dayList: OneLineDay[]): OneLineDay[] => {
         const merged: OneLineDay[] = [];
         for (const day of dayList) {
-            const existing = merged.find(d => d.shootDay === day.shootDay && d.isSecondUnit === day.isSecondUnit);
+            const existing = merged.find(d => d.shootDay === day.shootDay && d.isSecondUnit === day.isSecondUnit && d.isSplinterUnit === day.isSplinterUnit);
             if (existing) {
                 existing.scenes.push(...day.scenes);
                 if (!existing.shootTime && day.shootTime) {
@@ -303,7 +305,7 @@ function parseOneLineScheduleFallback(text: string): OneLineDay[] {
                     if (m) { dateStr = m[0]; break; }
                 }
             }
-            currentDay = { shootDay: dm[1].toUpperCase(), isSecondUnit: /2ND|SECOND|2U/i.test(line), date: dateStr, scenes: [] };
+            currentDay = { shootDay: dm[1].toUpperCase(), isSecondUnit: /2ND|SECOND|2U/i.test(line), isSplinterUnit: /splinter|spl/i.test(line), date: dateStr, scenes: [] };
             days.push(currentDay);
             continue;
         }

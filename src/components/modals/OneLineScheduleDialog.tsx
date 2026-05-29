@@ -52,7 +52,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
     const [cloneCardsInSplitLists, setCloneCardsInSplitLists] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const [showConsole, setShowConsole] = useState(false);
-    const [unscheduledAssignments, setUnscheduledAssignments] = useState<Record<string, { shootDay: string; isSecondUnit: boolean; timeOfDay: string }>>({});
+    const [unscheduledAssignments, setUnscheduledAssignments] = useState<Record<string, { shootDay: string; isSecondUnit: boolean; isSplinterUnit?: boolean; timeOfDay: string }>>({});
     const [showUnscheduledSection, setShowUnscheduledSection] = useState(false);
     const [lists, setLists] = useState<{ id: string; title: string }[]>(boardLists);
 
@@ -70,7 +70,12 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
     }, [isOpen, boardId]);
 
     // ------- helpers -------
-    const dayKey = (d: OneLineDay) => `${d.shootDay}-${d.isSecondUnit ? "2U" : "main"}`;
+    const dayKey = (d: OneLineDay) => {
+        let unit = "main";
+        if (d.isSplinterUnit) unit = "splinter";
+        else if (d.isSecondUnit) unit = "2U";
+        return `${d.shootDay}-${unit}`;
+    };
 
     const toggleDay = (key: string) => {
         setDisabledDays(prev => {
@@ -227,7 +232,10 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                     // Find manually assigned unscheduled board lists for this shoot day
                     const assignedUnscheduled = Object.entries(unscheduledAssignments)
                         .filter(([_, assign]) => {
-                            const dayKeyOfAssign = `${assign.shootDay}-${assign.isSecondUnit ? "2U" : "main"}`;
+                            let unit = "main";
+                            if (assign.isSplinterUnit) unit = "splinter";
+                            else if (assign.isSecondUnit) unit = "2U";
+                            const dayKeyOfAssign = `${assign.shootDay}-${unit}`;
                             return dayKeyOfAssign === dayKey(day);
                         })
                         .map(([listId, assign]) => {
@@ -501,7 +509,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                                 These lists exist on your board but were not detected in the imported PDF. You can optionally force-schedule them below:
                                             </p>
                                             {unscheduledLists.map((list) => {
-                                                const assignment = unscheduledAssignments[list.id] || { shootDay: "", isSecondUnit: false, timeOfDay: "DAY" };
+                                                const assignment = unscheduledAssignments[list.id] || { shootDay: "", isSecondUnit: false, isSplinterUnit: false, timeOfDay: "DAY" };
                                                 const sceneNum = extractSceneNumFromTitle(list.title) || "?";
                                                 
                                                 return (
@@ -519,7 +527,13 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                                             {/* Day Select */}
                                                             <select
                                                                 className="bg-slate-800 border border-white/10 rounded px-2 py-1 text-[11px] text-white outline-none focus:border-orange-500/50 cursor-pointer"
-                                                                value={assignment.shootDay ? `${assignment.shootDay}-${assignment.isSecondUnit ? "2U" : "main"}` : ""}
+                                                                value={(() => {
+                                                                    if (!assignment.shootDay) return "";
+                                                                    let unit = "main";
+                                                                    if (assignment.isSplinterUnit) unit = "splinter";
+                                                                    else if (assignment.isSecondUnit) unit = "2U";
+                                                                    return `${assignment.shootDay}-${unit}`;
+                                                                })()}
                                                                 onChange={(e) => {
                                                                     const val = e.target.value;
                                                                     setUnscheduledAssignments(prev => {
@@ -527,11 +541,13 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                                                         if (!val) {
                                                                             delete next[list.id];
                                                                         } else {
+                                                                            const isSplinter = val.endsWith("-splinter");
                                                                             const is2U = val.endsWith("-2U");
-                                                                            const shootDay = val.replace(/-2U|-main$/, "");
+                                                                            const shootDay = val.replace(/-2U|-splinter|-main$/, "");
                                                                             next[list.id] = {
                                                                                 shootDay,
                                                                                 isSecondUnit: is2U,
+                                                                                isSplinterUnit: isSplinter,
                                                                                 timeOfDay: assignment.timeOfDay || "DAY"
                                                                             };
                                                                         }
@@ -542,7 +558,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                                                 <option value="">-- Unassigned --</option>
                                                                 {days.map(d => (
                                                                     <option key={dayKey(d)} value={dayKey(d)}>
-                                                                        Day {d.shootDay} {d.isSecondUnit ? "(2U)" : ""}
+                                                                        Day {d.shootDay} {d.isSplinterUnit ? "(SPL)" : d.isSecondUnit ? "(2U)" : ""}
                                                                     </option>
                                                                 ))}
                                                             </select>
@@ -611,7 +627,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
 
                                             <div className="flex items-center gap-x-2 flex-1 min-w-0">
                                                 <span className="font-bold text-yellow-300 text-sm">
-                                                    DAY {day.shootDay}{day.isSecondUnit ? " (2ND UNIT)" : ""}
+                                                    DAY {day.shootDay}{day.isSplinterUnit ? " (SPLINTER UNIT)" : day.isSecondUnit ? " (2ND UNIT)" : ""}
                                                 </span>
                                                 {day.date && (
                                                     <span className="flex items-center gap-x-1 text-xs text-white/50">
@@ -693,7 +709,7 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                                                                             <option value="omit">-- Omit --</option>
                                                                             {lists.map(l => {
                                                                                 const assign = unscheduledAssignments[l.id];
-                                                                                const daySuffix = assign?.shootDay ? ` (Day ${assign.shootDay}${assign.isSecondUnit ? "2U" : ""})` : "";
+                                                                                const daySuffix = assign?.shootDay ? ` (Day ${assign.shootDay}${assign.isSplinterUnit ? "SPL" : assign.isSecondUnit ? "2U" : ""})` : "";
                                                                                 return (
                                                                                     <option key={l.id} value={l.id}>
                                                                                         {l.title}{daySuffix}

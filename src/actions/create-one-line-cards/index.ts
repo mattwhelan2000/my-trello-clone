@@ -141,7 +141,8 @@ export const createOneLineCards = actionClient
                     continue;
                 }
                 if (!listDayUsage[lid]) listDayUsage[lid] = [];
-                const dayLabel = `${day.shootDay}${day.isSecondUnit ? "2U" : ""}`;
+                const unitSuffix = (day as any).isSplinterUnit ? "SPL" : day.isSecondUnit ? "2U" : "";
+                const dayLabel = `${day.shootDay}${unitSuffix}`;
                 if (!listDayUsage[lid].includes(dayLabel)) {
                     listDayUsage[lid].push(dayLabel);
                 }
@@ -269,7 +270,8 @@ export const createOneLineCards = actionClient
                 if (scene.isOmitted) continue;
                 const baseListId = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
                 if (!baseListId) continue;
-                const dayLabel = `${day.shootDay}${day.isSecondUnit ? "2U" : ""}`;
+                const unitSuffix = (day as any).isSplinterUnit ? "SPL" : day.isSecondUnit ? "2U" : "";
+                const dayLabel = `${day.shootDay}${unitSuffix}`;
                 const listId = listIdOverrides[`${baseListId}-${dayLabel}`] || baseListId;
                 
                 listNewCardCounts[listId] = (listNewCardCounts[listId] || 0) + 1;
@@ -291,7 +293,7 @@ export const createOneLineCards = actionClient
                 const fontColor = isNight ? "#ffffff" : "#1a1a1a";
 
                 const cardId = crypto.randomUUID();
-                const unitLabel = day.isSecondUnit ? " (2U)" : "";
+                const unitLabel = (day as any).isSplinterUnit ? " (SPL)" : day.isSecondUnit ? " (2U)" : "";
                 const cardTitle = `DAY ${day.shootDay}${unitLabel}`;
 
                 const descParts: string[] = [];
@@ -327,6 +329,15 @@ export const createOneLineCards = actionClient
                         cardId,
                         title: "2ND UNIT",
                         color: "#7c3aed",
+                    });
+                }
+
+                if ((day as any).isSplinterUnit) {
+                    labelsToInsert.push({
+                        id: crypto.randomUUID(),
+                        cardId,
+                        title: "SPLINTER UNIT",
+                        color: "#db2777",
                     });
                 }
                 
@@ -403,13 +414,14 @@ export async function getExistingListDays(boardId: string): Promise<Record<strin
         }
     });
 
-    const result: Record<string, { shootDay: string; isSecondUnit: boolean; timeOfDay: string }> = {};
+    const result: Record<string, { shootDay: string; isSecondUnit: boolean; isSplinterUnit?: boolean; timeOfDay: string }> = {};
     for (const card of cards) {
         const title = card.title.toUpperCase();
         const dayMatch = title.match(/DAY\s*#?\s*(\d+)/i);
         if (dayMatch) {
             const shootDay = dayMatch[1];
             const is2U = /\b(?:2U|2ND\s*UNIT)\b/i.test(title);
+            const isSplinter = /\b(?:SPL|SPLINTER|SPLINTER\s*UNIT)\b/i.test(title);
             
             let timeOfDay = "DAY";
             if (card.labels.some((l: any) => l.title === "NIGHT") || /\bNIGHT\b/i.test(title)) {
@@ -423,6 +435,7 @@ export async function getExistingListDays(boardId: string): Promise<Record<strin
             result[card.listId] = {
                 shootDay,
                 isSecondUnit: is2U,
+                isSplinterUnit: isSplinter,
                 timeOfDay
             };
         }
