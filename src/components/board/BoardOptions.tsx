@@ -24,6 +24,7 @@ import { DownloadBoardPDF } from "./DownloadBoardPDF";
 import { IngestPreviewDialog } from "@/components/modals/IngestPreviewDialog";
 import { SyncPreviewDialog } from "@/components/modals/SyncPreviewDialog";
 import { OneLineScheduleDialog } from "@/components/modals/OneLineScheduleDialog";
+import { ShotlistDialog } from "@/components/modals/ShotlistDialog";
 
 interface BoardOptionsProps {
     boardId: string;
@@ -102,6 +103,9 @@ export const BoardOptions = ({ boardId, boardTitle, listsCount, cardsCount, init
 
     // One-Line Schedule State
     const [showOneLineDialog, setShowOneLineDialog] = useState(false);
+    
+    // Shotlist Dialog State
+    const [showShotlistDialog, setShowShotlistDialog] = useState(false);
     // boardLists comes from useBoardStore() above – already { id, title }[]
 
     const [isMounted, setIsMounted] = useState(false);
@@ -998,13 +1002,20 @@ export const BoardOptions = ({ boardId, boardTitle, listsCount, cardsCount, init
                             {isDeletingEmptyLists ? "Deleting..." : "Delete Empty Lists"}
                         </button>
 
-                        <div className="border-t border-neutral-200 pt-2">
+                        <div className="border-t border-neutral-200 pt-2 flex flex-col gap-y-2">
                             <button
                                 onClick={() => { setIsOpen(false); setShowOneLineDialog(true); }}
                                 className="bg-yellow-50 text-yellow-900 border border-yellow-200 w-full rounded-sm text-sm font-bold py-1.5 hover:bg-yellow-100 transition flex items-center justify-center gap-x-2"
                             >
                                 <Film className="h-4 w-4" />
                                 Import One-Line Schedule
+                            </button>
+                            <button
+                                onClick={() => { setIsOpen(false); setShowShotlistDialog(true); }}
+                                className="bg-purple-50 text-purple-900 border border-purple-200 w-full rounded-sm text-sm font-bold py-1.5 hover:bg-purple-100 transition flex items-center justify-center gap-x-2"
+                            >
+                                <Film className="h-4 w-4" />
+                                Import Shotlist
                             </button>
                         </div>
                     </div>
@@ -1039,6 +1050,14 @@ export const BoardOptions = ({ boardId, boardTitle, listsCount, cardsCount, init
             <OneLineScheduleDialog
                 isOpen={showOneLineDialog}
                 onClose={() => setShowOneLineDialog(false)}
+                boardId={boardId}
+                boardTitle={boardTitle}
+                boardLists={boardLists}
+            />
+
+            <ShotlistDialog
+                isOpen={showShotlistDialog}
+                onClose={() => setShowShotlistDialog(false)}
                 boardId={boardId}
                 boardTitle={boardTitle}
                 boardLists={boardLists}

@@ -17,7 +17,7 @@ interface ParsedSceneToken {
     suffix: string; // "A", "B", etc. (modifier suffixes stripped!)
 }
 
-function parseSceneToken(token: string): ParsedSceneToken | null {
+export function parseSceneToken(token: string): ParsedSceneToken | null {
     if (!token || token === "?") return null;
 
     // Standardize to uppercase and trim
@@ -64,7 +64,7 @@ function parseSceneToken(token: string): ParsedSceneToken | null {
     };
 }
 
-function fuzzyMatchList(sceneNum: string, lists: { id: string; title: string }[]): string | null {
+export function fuzzyMatchList(sceneNum: string, lists: { id: string; title: string }[]): string | null {
     // If sceneNum has slashes, hyphens, or other delimiters (e.g. "105/104PT" or "56 PT/57"), split them!
     const tokens = sceneNum.split(/[\/\-+&]/).map(t => t.trim()).filter(Boolean);
     
