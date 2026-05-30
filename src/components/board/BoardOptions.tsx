@@ -305,8 +305,7 @@ export const BoardOptions = ({ boardId, boardTitle, listsCount, cardsCount, init
             setIsOpen(false);
         },
         onError: (error) => {
-            console.error(error);
-            addToast("Failed to update list colors", "error");
+            toast.error(error?.message || "Failed to update list colors");
         }
     });
 

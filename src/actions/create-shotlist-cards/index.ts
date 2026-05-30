@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { actionClient } from "@/lib/create-safe-action";
 import { CreateShotlistCardsSchema } from "./schema";
 import { revalidatePath } from "next/cache";
-import { fuzzyMatchList, parseSceneToken } from "../create-one-line-cards";
+import { fuzzyMatchList, parseSceneToken } from "@/lib/scene-matching";
 
 export const createShotlistCards = actionClient
     .schema(CreateShotlistCardsSchema)

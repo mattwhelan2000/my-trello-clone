@@ -86,7 +86,7 @@ export const bulkIngestImages = actionClient
             const cardMap = new Map(existingCards.map(c => [`${c.listId}_${c.title.toLowerCase()}`, c]));
 
             // Pre-parse files
-            const processedFiles = [];
+            const processedFiles: any[] = [];
             for (const file of allFiles) {
                 let scenePrefix: string | null = null;
                 let cardName = "";
