@@ -19,6 +19,7 @@ export interface OneLineScene {
 export interface OneLineDay {
     shootDay: string;
     isSecondUnit: boolean;
+    isSplinterUnit?: boolean;
     date: string;
     shootTime?: string;
     scenes: OneLineScene[];

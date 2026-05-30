@@ -134,7 +134,7 @@ export const createOneLineCards = actionClient
         const listDayUsage: Record<string, string[]> = {}; // listId -> unique day labels
         for (const day of days) {
             for (const scene of day.scenes) {
-                if (scene.isOmitted) continue;
+                if (scene.isOmitted || scene.listId === "omit") continue;
                 const lid = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
                 if (!lid) {
                     logs.push(`⚠ WARNING: Scene ${scene.sceneNum} (Day ${day.shootDay}) could not be matched to any list and will be skipped.`);
@@ -184,13 +184,20 @@ export const createOneLineCards = actionClient
                     });
                     listIdOverrides[`${lid}-${dayLabels[0]}`] = lid;
 
+                    const newOrderStart = originalList.order + 1;
+                    // Shift subsequent lists' order by N-1 to keep orders as Integers
+                    await db.list.updateMany({
+                        where: { boardId, order: { gte: newOrderStart } },
+                        data: { order: { increment: N - 1 } }
+                    });
+
                     // Create N-1 copies
                     for (let i = 1; i < N; i++) {
                         const newList = await db.list.create({
                             data: {
                                 boardId,
                                 title: `${originalTitle} Pt.${i+1}/${N}`,
-                                order: originalList.order + (i * 0.001), // Keep them adjacent
+                                order: originalList.order + i,
                             }
                         });
                         listIdOverrides[`${lid}-${dayLabels[i]}`] = newList.id;
@@ -219,11 +226,9 @@ export const createOneLineCards = actionClient
                                         checklists: {
                                             create: card.checklists.map(c => ({
                                                 title: c.title,
-                                                order: c.order,
                                                 items: {
                                                     create: c.items.map(item => ({
                                                         title: item.title,
-                                                        order: item.order,
                                                         isCompleted: item.isCompleted,
                                                     }))
                                                 }
@@ -242,6 +247,7 @@ export const createOneLineCards = actionClient
         const targetListIds = new Set<string>();
         for (const day of days) {
             for (const scene of day.scenes) {
+                if (scene.isOmitted || scene.listId === "omit") continue;
                 const lid = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
                 if (lid) targetListIds.add(lid);
             }
@@ -267,7 +273,7 @@ export const createOneLineCards = actionClient
 
         for (const day of days) {
             for (const scene of day.scenes) {
-                if (scene.isOmitted) continue;
+                if (scene.isOmitted || scene.listId === "omit") continue;
                 const baseListId = scene.listId || fuzzyMatchList(scene.sceneNum, lists);
                 if (!baseListId) continue;
                 const unitSuffix = (day as any).isSplinterUnit ? "SPL" : day.isSecondUnit ? "2U" : "";

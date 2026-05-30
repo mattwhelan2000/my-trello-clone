@@ -37,6 +37,7 @@ export interface OneLineScene {
 export interface OneLineDay {
     shootDay: string;       // e.g. "1", "2", "2U" (2nd unit)
     isSecondUnit: boolean;
+    isSplinterUnit?: boolean;
     date: string;           // e.g. "Monday, June 9, 2026"
     shootTime?: string;     // e.g. "CREW CALL: 6AM - LUNCH:12.00PM - CAMERA WRAP: 5.30 PM"
     scenes: OneLineScene[];
@@ -306,7 +307,7 @@ function parseOneLineScheduleFallback(text: string): OneLineDay[] {
                 }
             }
             currentDay = { shootDay: dm[1].toUpperCase(), isSecondUnit: /2ND|SECOND|2U/i.test(line), isSplinterUnit: /splinter|spl/i.test(line), date: dateStr, scenes: [] };
-            days.push(currentDay);
+            days.push(currentDay as OneLineDay);
             continue;
         }
         if (!currentDay) continue;
