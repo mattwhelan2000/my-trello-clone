@@ -177,11 +177,7 @@ export const createOneLineCards = actionClient
                     const N = dayLabels.length;
                     logs.push(`Splitting list "${originalTitle}" into ${N} parts.`);
 
-                    // Update original list title
-                    await db.list.update({
-                        where: { id: lid },
-                        data: { title: `${originalTitle} Pt.1/${N}` }
-                    });
+                    // Update original list title (User requested not to rename the first one)
                     listIdOverrides[`${lid}-${dayLabels[0]}`] = lid;
 
                     const newOrderStart = originalList.order + 1;
@@ -196,7 +192,7 @@ export const createOneLineCards = actionClient
                         const newList = await db.list.create({
                             data: {
                                 boardId,
-                                title: `${originalTitle} Pt.${i+1}/${N}`,
+                                title: `${originalTitle} Pt.${i+1}`,
                                 order: originalList.order + i,
                             }
                         });
