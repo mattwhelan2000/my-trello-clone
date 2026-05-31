@@ -267,27 +267,34 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
             const contentWidth = pageWidth - (margin * 2);
             
             const selectedLists = filteredFullLists.filter(l => selectedListIds.has(l.id));
-            const pdfAttachments: string[] = [];
-
             // Pre-calculate items to download for progress
             let totalImagesToDownload = 0;
-            if (includeImages) {
-                for (const list of selectedLists) {
-                    for (const card of list.cards || []) {
-                        if (card.title.toUpperCase().startsWith("DAY ") || card.title.toUpperCase().startsWith("DAY#")) continue;
-                        for (const attach of card.attachments || []) {
-                            const isPDF = attach.url.toLowerCase().endsWith(".pdf") || attach.url.toLowerCase().includes("pdf");
-                            const isImage = attach.type === "IMAGE" || !!attach.thumbnailUrl || attach.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) !== null || ((attach.url.includes("dropbox.com") || attach.url.includes("drive.google.com")) && !isPDF);
-                            const isGMap = attach.url.includes("google.com/maps") || attach.url.includes("maps.app.goo.gl");
-                            if (isImage && !isGMap) {
-                                totalImagesToDownload++;
-                            }
-                        }
+            let totalPdfsToDownload = 0;
+            for (const list of selectedLists) {
+                for (const card of list.cards || []) {
+                    if (card.title.toUpperCase().startsWith("DAY ") || card.title.toUpperCase().startsWith("DAY#")) continue;
+                    
+                    // Note: only counting if the card has a selected label (since we only download if selected)
+                    const hasSelectedLabel = selectedExportLabels.size === 0 || card.labels?.some((l: any) => selectedExportLabels.has(l.title));
+                    if (!hasSelectedLabel && selectedExportLabels.size > 0) continue;
+
+                    for (const attach of card.attachments || []) {
+                        const isPDF = attach.url.toLowerCase().endsWith(".pdf") || attach.url.toLowerCase().includes("pdf");
+                        const isImage = attach.type === "IMAGE" || !!attach.thumbnailUrl || attach.url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) !== null || ((attach.url.includes("dropbox.com") || attach.url.includes("drive.google.com")) && !isPDF);
+                        const isGMap = attach.url.includes("google.com/maps") || attach.url.includes("maps.app.goo.gl");
+                        
+                        if (includeImages && isImage && !isGMap) totalImagesToDownload++;
+                        if (includePDFs && isPDF) totalPdfsToDownload++;
                     }
                 }
             }
 
             let imagesDownloaded = 0;
+            let pdfsDownloaded = 0;
+
+            let runningPdfPageCount = 0;
+            const listPdfOffsetMap: Record<string, number> = {};
+            const pdfAttachmentsToInsert: { insertAfterJsPdfPage: number; buffer: ArrayBuffer }[] = [];
 
             let groupedDays: { dayNum: number; dayLabel: string; dueDate: Date | null; lists: any[] }[] = [];
             let unscheduledLists: any[] = [];
@@ -409,6 +416,8 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
 
                 const listStartPage = doc.getNumberOfPages();
                 pageMap[list.id] = listStartPage;
+                listPdfOffsetMap[list.id] = runningPdfPageCount;
+                let currentListPdfBuffers: ArrayBuffer[] = [];
 
                 doc.setFillColor(241, 245, 249);
                 doc.rect(margin, yOffset, contentWidth, 12, "F");
@@ -593,7 +602,22 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                             doc.link(margin + 14, yOffset - 3, 100, 4, { url: attach.url });
 
                             if (includePDFs && isPDF) {
-                                pdfAttachments.push(attach.url);
+                                pdfsDownloaded++;
+                                setGenerationStatus(`Downloading PDF ${pdfsDownloaded} of ${totalPdfsToDownload}...`);
+                                setProgress({ current: pdfsDownloaded, total: totalPdfsToDownload });
+                                await yieldToRender();
+
+                                const buffer = await downloadPdfBuffer(attach.url);
+                                if (buffer) {
+                                    try {
+                                        const attachDoc = await PDFDocument.load(buffer);
+                                        const numPages = attachDoc.getPageCount();
+                                        currentListPdfBuffers.push(buffer);
+                                        runningPdfPageCount += numPages;
+                                    } catch (e) {
+                                        console.warn("Invalid PDF, skipping", e);
+                                    }
+                                }
                             }
 
                             if (includeImages && isImage && !isGMap) {
@@ -649,7 +673,17 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                 }
                 yOffset += 6;
             }
-        };
+
+                if (currentListPdfBuffers.length > 0) {
+                    const insertAfter = doc.getNumberOfPages();
+                    for (const buf of currentListPdfBuffers) {
+                        pdfAttachmentsToInsert.push({ insertAfterJsPdfPage: insertAfter, buffer: buf });
+                    }
+                    // Force the next scene to start on a new page so these PDFs appear cleanly after the current scene
+                    doc.addPage();
+                    yOffset = 20;
+                }
+            };
 
             if (exportOrder === "day") {
                 for (const group of groupedDays) {
@@ -768,9 +802,16 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                     for (let d = 0; d < Math.max(5, Math.floor((dotsEndX - dotsStartX) / 1.5)); d++) dots += ".";
                     doc.text(dots, dotsStartX, tocY);
 
+                    // To calculate display page: we need the offset for the very first list in this day group
+                    const firstListInGroup = group.lists[0];
+                    let displayPage = targetPage;
+                    if (firstListInGroup && listPdfOffsetMap[firstListInGroup.id] !== undefined) {
+                        displayPage = targetPage + listPdfOffsetMap[firstListInGroup.id];
+                    }
+
                     doc.setFont("helvetica", "bold");
                     doc.setTextColor(71, 85, 105);
-                    doc.text(targetPage.toString(), dotsEndX + 2, tocY);
+                    doc.text(displayPage.toString(), dotsEndX + 2, tocY);
 
                     doc.link(colX, tocY - 4, dotsEndX - colX + 10, 5, { pageNumber: targetPage });
                     tocY += 8;
@@ -791,9 +832,15 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                         for (let d = 0; d < Math.floor((margin + contentWidth - 10 - (margin + labelWidth + 3)) / 1.5); d++) dots += ".";
                         doc.text(dots, margin + labelWidth + 3, tocY);
 
+                        const firstUnscheduled = unscheduledLists[0];
+                        let displayPage = targetPage;
+                        if (firstUnscheduled && listPdfOffsetMap[firstUnscheduled.id] !== undefined) {
+                            displayPage = targetPage + listPdfOffsetMap[firstUnscheduled.id];
+                        }
+
                         doc.setFont("helvetica", "bold");
                         doc.setTextColor(71, 85, 105);
-                        doc.text(targetPage.toString(), margin + contentWidth - 8, tocY);
+                        doc.text(displayPage.toString(), margin + contentWidth - 8, tocY);
 
                         doc.link(margin, tocY - 4, contentWidth, 5, { pageNumber: targetPage });
                     }
@@ -834,9 +881,11 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                     for (let d = 0; d < Math.max(5, Math.floor((dotsEndX - dotsStartX) / 1.5)); d++) dots += ".";
                     doc.text(dots, dotsStartX, tocY);
 
+                    const displayPage = targetPage + (listPdfOffsetMap[list.id] || 0);
+
                     doc.setFont("helvetica", "bold");
                     doc.setTextColor(71, 85, 105);
-                    doc.text(targetPage.toString(), dotsEndX + 2, tocY);
+                    doc.text(displayPage.toString(), dotsEndX + 2, tocY);
 
                     doc.link(colX, tocY - 4, dotsEndX - colX + 10, 5, { pageNumber: targetPage });
                     tocY += 8;
@@ -847,35 +896,40 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
             const mainPdfBytes = doc.output("arraybuffer");
             let finalPdfBytes: any = mainPdfBytes;
 
-            if (includePDFs && pdfAttachments.length > 0) {
-                setGenerationStatus("Merging PDF attachments...");
-                setProgress({ current: 0, total: pdfAttachments.length });
+            if (pdfAttachmentsToInsert.length > 0) {
+                setGenerationStatus("Interleaving PDF attachments...");
+                setProgress({ current: 0, total: pdfAttachmentsToInsert.length });
                 await yieldToRender();
                 
                 try {
                     const mergedPdf = await PDFDocument.create();
                     const mainDoc = await PDFDocument.load(mainPdfBytes);
                     const mainPages = await mergedPdf.copyPages(mainDoc, mainDoc.getPageIndices());
-                    mainPages.forEach(p => mergedPdf.addPage(p));
 
                     let mergedCount = 0;
-                    for (const pdfUrl of pdfAttachments) {
-                        mergedCount++;
-                        setGenerationStatus(`Downloading & merging PDF ${mergedCount} of ${pdfAttachments.length}...`);
-                        setProgress({ current: mergedCount, total: pdfAttachments.length });
-                        await yieldToRender();
+                    for (let i = 0; i < mainPages.length; i++) {
+                        // 1. Add the main jsPDF page
+                        mergedPdf.addPage(mainPages[i]);
+                        
+                        // 2. Add any PDF attachments that belong AFTER this main jsPDF page (1-indexed)
+                        const attachmentsAfterThisPage = pdfAttachmentsToInsert.filter(a => a.insertAfterJsPdfPage === (i + 1));
+                        
+                        for (const attach of attachmentsAfterThisPage) {
+                            mergedCount++;
+                            setGenerationStatus(`Merging PDF attachment ${mergedCount} of ${pdfAttachmentsToInsert.length}...`);
+                            setProgress({ current: mergedCount, total: pdfAttachmentsToInsert.length });
+                            await yieldToRender();
 
-                        const buffer = await downloadPdfBuffer(pdfUrl);
-                        if (buffer) {
                             try {
-                                const attachDoc = await PDFDocument.load(buffer);
+                                const attachDoc = await PDFDocument.load(attach.buffer);
                                 const attachPages = await mergedPdf.copyPages(attachDoc, attachDoc.getPageIndices());
                                 attachPages.forEach(p => mergedPdf.addPage(p));
                             } catch (e) {
-                                console.warn("Failed to merge PDF fragment, continuing...", pdfUrl, e);
+                                console.warn("Failed to merge PDF fragment, continuing...", e);
                             }
                         }
                     }
+
                     setGenerationStatus("Finalizing merged document...");
                     await yieldToRender();
                     finalPdfBytes = await mergedPdf.save();
