@@ -43,6 +43,9 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
     const [includeImages, setIncludeImages] = useState(true);
     const [includePDFs, setIncludePDFs] = useState(true);
 
+    const [boardLabels, setBoardLabels] = useState<{ id: string; title: string; color: string }[]>([]);
+    const [selectedExportLabels, setSelectedExportLabels] = useState<Set<string>>(new Set());
+
     useEffect(() => {
         setIsMounted(true);
     }, []);
@@ -51,6 +54,11 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
         if (isOpen) {
             setIsLoadingData(true);
             setFullLists([]);
+            fetch(`/api/boards/${boardId}/labels`)
+                .then(res => res.ok ? res.json() : [])
+                .then(data => setBoardLabels(data))
+                .catch(console.error);
+
             exportBoard({ id: boardId })
                 .then(result => {
                     if (result?.data?.lists) {
@@ -153,8 +161,8 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
             sortedGroups.forEach(g => g.lists.sort((a, b) => a.order - b.order));
             unscheduledLists.sort((a, b) => a.order - b.order);
             
-            const result = sortedGroups.map(g => ({ label: g.dayLabel, lists: g.lists }));
-            if (unscheduledLists.length > 0) result.push({ label: "Unscheduled Scenes", lists: unscheduledLists });
+            const result = sortedGroups.map(g => ({ key: `day-${g.dayNum}`, label: g.dayLabel, lists: g.lists }));
+            if (unscheduledLists.length > 0) result.push({ key: "unscheduled", label: "Unscheduled Scenes", lists: unscheduledLists });
             return result;
         }
     }, [filteredFullLists, exportOrder]);
@@ -170,6 +178,26 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
 
     const selectAll = () => setSelectedListIds(new Set(filteredFullLists.map(l => l.id)));
     const selectNone = () => setSelectedListIds(new Set());
+
+    const toggleDayGroup = (lists: any[]) => {
+        const listIds = lists.map(l => l.id);
+        const allSelected = listIds.every(id => selectedListIds.has(id));
+        const newSet = new Set(selectedListIds);
+        
+        if (allSelected) {
+            listIds.forEach(id => newSet.delete(id));
+        } else {
+            listIds.forEach(id => newSet.add(id));
+        }
+        setSelectedListIds(newSet);
+    };
+
+    const toggleExportLabel = (labelTitle: string) => {
+        const newSet = new Set(selectedExportLabels);
+        if (newSet.has(labelTitle)) newSet.delete(labelTitle);
+        else newSet.add(labelTitle);
+        setSelectedExportLabels(newSet);
+    };
 
     const yieldToRender = () => new Promise(resolve => setTimeout(resolve, 5));
 
@@ -263,6 +291,7 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
 
             let groupedDays: { dayNum: number; dayLabel: string; dueDate: Date | null; lists: any[] }[] = [];
             let unscheduledLists: any[] = [];
+            let activeGroupForName: string | null = null;
 
             if (exportOrder === "day") {
                 const dayGroups: Record<string, { dayNum: number; dayLabel: string; dueDate: Date | null; lists: any[] }> = {};
@@ -286,6 +315,12 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                 
                 groupedDays.forEach(g => g.lists.sort((a, b) => a.order - b.order));
                 unscheduledLists.sort((a, b) => a.order - b.order);
+
+                // Determine active group for naming
+                const activeGroups = [...groupedDays, { dayLabel: "Unscheduled", lists: unscheduledLists }].filter(g => g.lists.some(l => selectedListIds.has(l.id)));
+                if (activeGroups.length === 1 && activeGroups[0].dayLabel !== "Unscheduled") {
+                    activeGroupForName = activeGroups[0].dayLabel;
+                }
             } else {
                 selectedLists.sort((a, b) => a.order - b.order);
             }
@@ -395,42 +430,105 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                     yOffset += 8;
                 }
 
-                for (const card of cards) {
-                    checkPageBreak(25);
+                // --- SCENE SUMMARY ---
+                if (cards.length > 0) {
+                    const nonDayCards = cards.filter((c: any) => !(c.title.toUpperCase().startsWith("DAY ") || c.title.toUpperCase().startsWith("DAY#")));
+                    
+                    if (nonDayCards.length > 0) {
+                        doc.setFillColor(250, 250, 250);
+                        doc.setDrawColor(226, 232, 240);
+                        
+                        // Estimate height: header + lines
+                        const summaryHeight = 6 + (nonDayCards.length * 5) + 4;
+                        checkPageBreak(summaryHeight);
 
-                    if (card.title.toUpperCase().startsWith("DAY ") || card.title.toUpperCase().startsWith("DAY#")) {
-                        continue;
-                    }
-
-                    doc.setDrawColor(100, 116, 139);
-                    doc.rect(margin + 6, yOffset - 3.5, 4, 4, "D");
-
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(11);
-                    doc.setTextColor(15, 23, 42);
-                    doc.text(card.title, margin + 14, yOffset);
-                    yOffset += 6;
-
-                    if (card.labels && card.labels.length > 0) {
-                        checkPageBreak(10);
-                        let xLabel = margin + 14;
+                        doc.rect(margin + 4, yOffset, contentWidth - 8, summaryHeight, "FD");
+                        
                         doc.setFont("helvetica", "bold");
                         doc.setFontSize(8);
+                        doc.setTextColor(148, 163, 184);
+                        doc.text("SCENE SUMMARY:", margin + 8, yOffset + 5);
+                        let summaryY = yOffset + 10;
                         
-                        for (const label of card.labels) {
-                            const labelText = label.title.toUpperCase();
-                            const textWidth = doc.getTextWidth(labelText);
-                            const pillWidth = textWidth + 6;
-
-                            doc.setFillColor(219, 234, 254);
-                            doc.rect(xLabel, yOffset - 3, pillWidth, 4, "F");
+                        for (const card of nonDayCards) {
+                            doc.setFont("helvetica", "bold");
+                            doc.setFontSize(9);
+                            doc.setTextColor(51, 65, 85);
+                            doc.text(`• ${card.title}`, margin + 8, summaryY);
                             
-                            doc.setTextColor(30, 58, 138);
-                            doc.text(labelText, xLabel + 3, yOffset);
-                            xLabel += pillWidth + 3;
+                            // Draw tiny labels next to it
+                            let lX = margin + 8 + doc.getTextWidth(`• ${card.title}`) + 4;
+                            if (card.labels && card.labels.length > 0) {
+                                for (const label of card.labels) {
+                                    const lText = label.title.toUpperCase();
+                                    const lWidth = doc.getTextWidth(lText) + 4;
+                                    doc.setFillColor(226, 232, 240);
+                                    doc.rect(lX, summaryY - 2.5, lWidth, 3.5, "F");
+                                    doc.setFont("helvetica", "bold");
+                                    doc.setFontSize(6);
+                                    doc.setTextColor(100, 116, 139);
+                                    doc.text(lText, lX + 2, summaryY);
+                                    lX += lWidth + 2;
+                                }
+                            }
+                            summaryY += 5;
                         }
-                        yOffset += 6;
+                        yOffset += summaryHeight + 8;
                     }
+                }
+
+                // --- DETAILED CARD CONTENTS ---
+                if (selectedExportLabels.size > 0) {
+                    let hasPrintedDetailsHeader = false;
+
+                    for (const card of cards) {
+                        if (card.title.toUpperCase().startsWith("DAY ") || card.title.toUpperCase().startsWith("DAY#")) continue;
+
+                        const hasSelectedLabel = card.labels?.some((l: any) => selectedExportLabels.has(l.title));
+                        if (!hasSelectedLabel) continue;
+
+                        if (!hasPrintedDetailsHeader) {
+                            checkPageBreak(15);
+                            doc.setFont("helvetica", "bold");
+                            doc.setFontSize(10);
+                            doc.setTextColor(30, 41, 59);
+                            doc.text("DETAILED CONTENTS", margin + 6, yOffset);
+                            doc.setDrawColor(226, 232, 240);
+                            doc.line(margin + 6, yOffset + 2, margin + contentWidth - 6, yOffset + 2);
+                            yOffset += 10;
+                            hasPrintedDetailsHeader = true;
+                        }
+
+                        checkPageBreak(25);
+                        doc.setDrawColor(99, 102, 241);
+                        doc.rect(margin + 6, yOffset - 3.5, 4, 4, "D");
+
+                        doc.setFont("helvetica", "bold");
+                        doc.setFontSize(11);
+                        doc.setTextColor(15, 23, 42);
+                        doc.text(card.title, margin + 14, yOffset);
+                        yOffset += 6;
+
+                        if (card.labels && card.labels.length > 0) {
+                            checkPageBreak(10);
+                            let xLabel = margin + 14;
+                            doc.setFont("helvetica", "bold");
+                            doc.setFontSize(8);
+                            
+                            for (const label of card.labels) {
+                                const labelText = label.title.toUpperCase();
+                                const textWidth = doc.getTextWidth(labelText);
+                                const pillWidth = textWidth + 6;
+
+                                doc.setFillColor(219, 234, 254);
+                                doc.rect(xLabel, yOffset - 3, pillWidth, 4, "F");
+                                
+                                doc.setTextColor(30, 58, 138);
+                                doc.text(labelText, xLabel + 3, yOffset);
+                                xLabel += pillWidth + 3;
+                            }
+                            yOffset += 6;
+                        }
 
                     if (card.description) {
                         doc.setFont("helvetica", "normal");
@@ -440,6 +538,38 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                         checkPageBreak(lines.length * 5 + 5);
                         doc.text(lines, margin + 14, yOffset);
                         yOffset += (lines.length * 4.5) + 4;
+                    }
+
+                    if (card.checklists && card.checklists.length > 0) {
+                        for (const checklist of card.checklists) {
+                            checkPageBreak(15);
+                            doc.setFont("helvetica", "bold");
+                            doc.setFontSize(9.5);
+                            doc.setTextColor(71, 85, 105);
+                            doc.text(checklist.title.toUpperCase(), margin + 14, yOffset);
+                            yOffset += 5;
+
+                            if (checklist.items && checklist.items.length > 0) {
+                                doc.setFont("helvetica", "normal");
+                                doc.setFontSize(9);
+                                doc.setTextColor(15, 23, 42);
+                                
+                                for (const item of checklist.items) {
+                                    checkPageBreak(10);
+                                    doc.setDrawColor(148, 163, 184);
+                                    if (item.isCompleted) {
+                                        doc.rect(margin + 16, yOffset - 2.5, 3, 3, "F"); // Filled checkbox
+                                    } else {
+                                        doc.rect(margin + 16, yOffset - 2.5, 3, 3, "D"); // Empty checkbox
+                                    }
+                                    
+                                    const lines = doc.splitTextToSize(item.title, contentWidth - 22);
+                                    doc.text(lines, margin + 21, yOffset);
+                                    yOffset += (lines.length * 4) + 2;
+                                }
+                            }
+                            yOffset += 2;
+                        }
                     }
 
                     if (card.attachments && card.attachments.length > 0) {
@@ -516,10 +646,10 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                             yOffset += 6;
                         }
                     }
-                    yOffset += 3;
                 }
-                yOffset += 8;
-            };
+                yOffset += 6;
+            }
+        };
 
             if (exportOrder === "day") {
                 for (const group of groupedDays) {
@@ -715,7 +845,7 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
 
             // COMPILING & ATTACHMENT MERGING
             const mainPdfBytes = doc.output("arraybuffer");
-            let finalPdfBytes = mainPdfBytes;
+            let finalPdfBytes: any = mainPdfBytes;
 
             if (includePDFs && pdfAttachments.length > 0) {
                 setGenerationStatus("Merging PDF attachments...");
@@ -760,8 +890,14 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
             const blob = new Blob([finalPdfBytes], { type: "application/pdf" });
             const downloadUrl = URL.createObjectURL(blob);
             const link = document.createElement("a");
+            
+            let finalFilename = `${boardTitle.replace(/\s+/g, '-').toLowerCase()}-export.pdf`;
+            if (activeGroupForName) {
+                finalFilename = `${activeGroupForName.replace(/\s+/g, '-').toLowerCase()}-export.pdf`;
+            }
+
             link.href = downloadUrl;
-            link.download = `${boardTitle.replace(/\s+/g, '-').toLowerCase()}-export.pdf`;
+            link.download = finalFilename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -841,7 +977,33 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                                 </div>
 
                                 <div className="space-y-1.5 text-left bg-neutral-50 p-2 rounded-lg border border-neutral-200">
-                                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 block">Include Attachments</label>
+                                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 block">Include Detail & Attachments For Selected Labels</label>
+                                    <p className="text-[9px] text-neutral-400 italic mb-2 leading-tight">If no labels are selected, only Scene Summaries will be generated (no card contents or attachments).</p>
+                                    
+                                    {boardLabels.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {boardLabels.map(label => {
+                                                const isSelected = selectedExportLabels.has(label.title);
+                                                return (
+                                                    <button
+                                                        key={label.id}
+                                                        onClick={() => toggleExportLabel(label.title)}
+                                                        className={`flex items-center gap-x-1.5 px-2 py-1 rounded text-[10px] font-bold transition border ${isSelected ? 'shadow-sm' : 'opacity-60 bg-white border-neutral-200 text-neutral-600'}`}
+                                                        style={isSelected ? { backgroundColor: label.color, color: '#fff', borderColor: label.color } : {}}
+                                                    >
+                                                        {isSelected ? <CheckSquare className="h-3 w-3 shrink-0" /> : <Square className="h-3 w-3 shrink-0 opacity-40" />}
+                                                        <span className="truncate max-w-[100px]">{label.title}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="text-[10px] text-neutral-400 italic">No labels found on board.</div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1.5 text-left bg-neutral-50 p-2 rounded-lg border border-neutral-200">
+                                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1 block">Attachment Options</label>
                                     <label className="flex items-center gap-x-2 text-xs font-medium text-neutral-700 cursor-pointer">
                                         <input 
                                             type="checkbox" 
@@ -851,7 +1013,7 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                                         />
                                         <ImageIcon className="h-3.5 w-3.5 text-neutral-400" /> Download & Embed Images
                                     </label>
-                                    <label className="flex items-center gap-x-2 text-xs font-medium text-neutral-700 cursor-pointer">
+                                    <label className="flex items-center gap-x-2 text-xs font-medium text-neutral-700 cursor-pointer mt-1">
                                         <input 
                                             type="checkbox" 
                                             checked={includePDFs} 
@@ -880,26 +1042,38 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                                         </div>
                                     ) : (
                                         <div className="max-h-[200px] overflow-y-auto space-y-3 border border-neutral-200 rounded-lg p-2 bg-neutral-50/30">
-                                            {displayGroups.map((group, gIdx) => (
-                                                <div key={gIdx} className="space-y-1">
-                                                    <div className="sticky top-0 bg-neutral-50/90 backdrop-blur text-[10px] font-bold text-neutral-500 px-1 py-0.5 z-10 border-b border-neutral-200">
-                                                        {group.label}
-                                                    </div>
-                                                    {group.lists.map(list => (
-                                                        <div 
-                                                            key={list.id}
-                                                            onClick={() => toggleList(list.id)}
-                                                            className={`flex items-center gap-x-3 px-2 py-1.5 rounded-md cursor-pointer transition ml-1 ${selectedListIds.has(list.id) ? 'bg-indigo-50 text-indigo-900 font-bold' : 'hover:bg-neutral-100 text-neutral-600'}`}
-                                                        >
-                                                            <div className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 ${selectedListIds.has(list.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-neutral-300'}`}>
-                                                                {selectedListIds.has(list.id) && <div className="h-1 w-1 bg-white rounded-full" />}
-                                                            </div>
-                                                            <span className="text-xs font-semibold truncate flex-1 text-left">{list.title}</span>
-                                                            <span className="text-[9px] opacity-60">({list.cards?.length || 0})</span>
+                                            {displayGroups.map((group, gIdx) => {
+                                                const groupLists = group.lists;
+                                                const allGroupSelected = groupLists.length > 0 && groupLists.every(l => selectedListIds.has(l.id));
+                                                
+                                                return (
+                                                    <div key={gIdx} className="space-y-1">
+                                                        <div className="sticky top-0 bg-neutral-50/90 backdrop-blur px-1 py-0.5 z-10 border-b border-neutral-200 flex items-center gap-x-2">
+                                                            {exportOrder === "day" && (
+                                                                <button onClick={() => toggleDayGroup(groupLists)} className="shrink-0 flex items-center justify-center">
+                                                                    <div className={`h-3 w-3 rounded-[3px] border flex items-center justify-center transition ${allGroupSelected ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-neutral-300 hover:border-indigo-400'}`}>
+                                                                        {allGroupSelected && <CheckSquare className="h-2.5 w-2.5 text-white" />}
+                                                                    </div>
+                                                                </button>
+                                                            )}
+                                                            <span className="text-[10px] font-bold text-neutral-500 uppercase">{group.label}</span>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            ))}
+                                                        {groupLists.map(list => (
+                                                            <div 
+                                                                key={list.id}
+                                                                onClick={() => toggleList(list.id)}
+                                                                className={`flex items-center gap-x-3 px-2 py-1.5 rounded-md cursor-pointer transition ml-1 ${selectedListIds.has(list.id) ? 'bg-indigo-50 text-indigo-900 font-bold' : 'hover:bg-neutral-100 text-neutral-600'}`}
+                                                            >
+                                                                <div className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 ${selectedListIds.has(list.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-neutral-300'}`}>
+                                                                    {selectedListIds.has(list.id) && <div className="h-1 w-1 bg-white rounded-full" />}
+                                                                </div>
+                                                                <span className="text-xs font-semibold truncate flex-1 text-left">{list.title}</span>
+                                                                <span className="text-[9px] opacity-60">({list.cards?.length || 0})</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
