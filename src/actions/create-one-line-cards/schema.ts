@@ -2,10 +2,10 @@ import { z } from "zod";
 
 export const OneLineSceneSchema = z.object({
     sceneNum: z.string(),
-    intExt: z.string(),
-    location: z.string(),
-    timeOfDay: z.string(),
-    description: z.string(),
+    intExt: z.string().optional(),
+    location: z.string().optional(),
+    timeOfDay: z.string().optional(),
+    description: z.string().optional(),
     listId: z.string().optional(),
     isOmitted: z.boolean().optional(),
 });
@@ -14,7 +14,7 @@ export const OneLineDaySchema = z.object({
     shootDay: z.string(),
     isSecondUnit: z.boolean(),
     isSplinterUnit: z.boolean().optional(),
-    date: z.string(),
+    date: z.string().optional(),
     shootTime: z.string().optional(),
     scenes: z.array(OneLineSceneSchema),
 });

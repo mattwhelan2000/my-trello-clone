@@ -267,6 +267,12 @@ export function OneLineScheduleDialog({ isOpen, onClose, boardId, boardTitle, bo
                 setLogs(result.data.logs);
             }
 
+            if (result?.validationErrors) {
+                setError(`Validation Error: ${JSON.stringify(result.validationErrors)}`);
+                setShowConsole(true);
+                return;
+            }
+
             if (result?.data?.error) {
                 setError(result.data.error);
                 setShowConsole(true);

@@ -205,7 +205,7 @@ export const createOneLineCards = actionClient
             cardsByList[listId].forEach((item, index) => {
                 const { day, scene } = item;
                 
-                const isNight = /NIGHT|DUSK|DAWN/.test(scene.timeOfDay.toUpperCase());
+                const isNight = /NIGHT|DUSK|DAWN/.test(scene.timeOfDay?.toUpperCase() || "");
                 const cardColor = isNight ? "#1e3a5f" : "#fef08a"; 
                 const fontColor = isNight ? "#ffffff" : "#1a1a1a";
 
