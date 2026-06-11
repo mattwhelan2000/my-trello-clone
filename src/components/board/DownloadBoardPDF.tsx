@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Download, FileText, CheckSquare, Square, Loader2, X, Calendar, Layers, Image as ImageIcon, File, Map } from "lucide-react";
+import { Download, FileText, CheckSquare, Square, Loader2, X, Calendar, Layers, Image as ImageIcon, File, Map, FolderArchive } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { PDFDocument } from "pdf-lib";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import { useToast } from "@/components/ui/Toast";
 import { formatImageUrl } from "@/lib/format-image-url";
 import { exportBoard } from "@/actions/export-board";
@@ -967,14 +969,112 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
         }
     };
 
+    const generateZIP = async () => {
+        setIsGenerating(true);
+        setGenerationStatus("Initializing ZIP...");
+        
+        try {
+            const zip = new JSZip();
+            const safeBoardTitle = boardTitle.replace(/[^a-z0-9_-]/gi, '_');
+            const boardFolder = zip.folder(safeBoardTitle);
+            if (!boardFolder) throw new Error("Could not create board folder");
+
+            const selectedLists = filteredFullLists.filter((l: any) => selectedListIds.has(l.id));
+            
+            // Loop through selected lists
+            for (let i = 0; i < selectedLists.length; i++) {
+                const list = selectedLists[i];
+                const listName = `LIST_${String(list.order).padStart(3, '0')}_${list.title.replace(/[^a-z0-9_-]/gi, '_')}`;
+                const listFolder = boardFolder.folder(listName);
+                if (!listFolder) continue;
+
+                setGenerationStatus(`Processing list: ${list.title}`);
+                setProgress({ current: i, total: selectedLists.length });
+                await new Promise(r => setTimeout(r, 10)); // Yield
+
+                const cards = list.cards || [];
+                for (let j = 0; j < cards.length; j++) {
+                    const card = cards[j];
+                    const hasSelectedLabel = selectedExportLabels.size === 0 || card.labels?.some((l: any) => selectedExportLabels.has(l.title));
+                    if (!hasSelectedLabel && selectedExportLabels.size > 0) continue;
+
+                    const cardName = `CARD_${String(card.order).padStart(3, '0')}_${card.title.replace(/[^a-z0-9_-]/gi, '_')}`;
+                    const cardFolder = listFolder.folder(cardName);
+                    if (!cardFolder) continue;
+
+                    // Create card.json
+                    const cardJson = JSON.stringify({
+                        id: card.id,
+                        title: card.title,
+                        description: card.description,
+                        order: card.order,
+                        dueDate: card.dueDate,
+                        labels: card.labels?.map((l: any) => ({ title: l.title, color: l.color })),
+                        checklists: card.checklists?.map((cl: any) => ({
+                            title: cl.title,
+                            items: cl.items?.map((item: any) => ({ title: item.title, isCompleted: item.isCompleted }))
+                        })),
+                    }, null, 2);
+                    
+                    cardFolder.file("card.json", cardJson);
+
+                    // Download Attachments
+                    if (card.attachments && card.attachments.length > 0) {
+                        for (let a = 0; a < card.attachments.length; a++) {
+                            const attach = card.attachments[a];
+                            const isImage = !!attach.url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp|bmp)$/);
+                            const isPDF = attach.url.toLowerCase().endsWith(".pdf");
+                            
+                            // Only include what the user selected in the UI options
+                            if ((isImage && !includeImages) || (isPDF && !includePDFs)) continue;
+
+                            try {
+                                const attachRes = await fetch(attach.url);
+                                if (!attachRes.ok) throw new Error(`Failed to fetch ${attach.url}`);
+                                const blob = await attachRes.blob();
+                                
+                                // Best effort filename
+                                let filename = attach.url.split('/').pop() || `attachment_${a}`;
+                                if (filename.includes('?')) filename = filename.split('?')[0];
+                                
+                                cardFolder.file(filename, blob);
+                            } catch (e) {
+                                console.warn(`Failed to download attachment for ${card.title}`, e);
+                            }
+                        }
+                    }
+                }
+            }
+
+            setGenerationStatus("Compressing ZIP file...");
+            await new Promise(r => setTimeout(r, 10)); // Yield
+            
+            const content = await zip.generateAsync({ type: "blob" }, (metadata) => {
+                setGenerationStatus(`Compressing: ${Math.round(metadata.percent)}%`);
+            });
+
+            let finalFilename = `${safeBoardTitle}-export.zip`;
+            saveAs(content, finalFilename);
+            
+            addToast("ZIP Downloaded Successfully", "success");
+            setIsOpen(false);
+        } catch (error) {
+            console.error("ZIP Generation Error:", error);
+            addToast("Failed to generate ZIP", "error");
+        } finally {
+            setIsGenerating(false);
+            setGenerationStatus("");
+        }
+    };
+
     return (
         <div className="relative">
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="bg-black/20 hover:bg-black/30 text-white rounded-md px-3 py-1.5 flex items-center gap-x-2 text-sm font-medium backdrop-blur-sm transition"
             >
-                <FileText className="h-4 w-4" />
-                Download PDF
+                <Download className="h-4 w-4" />
+                Export Board
             </button>
 
             {isOpen && (
@@ -1132,14 +1232,25 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                                     )}
                                 </div>
 
-                                <button
-                                    onClick={generatePDF}
-                                    disabled={isGenerating || isLoadingData || selectedListIds.size === 0}
-                                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-neutral-300 text-white rounded-md py-2.5 text-sm font-bold shadow-md shadow-indigo-100 transition flex items-center justify-center gap-x-2 cursor-pointer"
-                                >
-                                    <Download className="h-4 w-4" />
-                                    Download {selectedListIds.size} Lists as PDF
-                                </button>
+                                <div className="flex flex-col gap-y-2 pt-2 border-t border-neutral-200 mt-2">
+                                    <button
+                                        onClick={generatePDF}
+                                        disabled={isGenerating || isLoadingData || selectedListIds.size === 0}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-neutral-300 text-white rounded-md py-2.5 text-sm font-bold shadow-md shadow-indigo-100 transition flex items-center justify-center gap-x-2 cursor-pointer"
+                                    >
+                                        <FileText className="h-4 w-4" />
+                                        Download {selectedListIds.size} Lists as PDF
+                                    </button>
+
+                                    <button
+                                        onClick={generateZIP}
+                                        disabled={isGenerating || isLoadingData || selectedListIds.size === 0}
+                                        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-neutral-300 text-white rounded-md py-2.5 text-sm font-bold shadow-md shadow-emerald-100 transition flex items-center justify-center gap-x-2 cursor-pointer"
+                                    >
+                                        <FolderArchive className="h-4 w-4" />
+                                        Download {selectedListIds.size} Lists as ZIP
+                                    </button>
+                                </div>
                             </>
                         )}
                     </div>

@@ -24,8 +24,10 @@
     "@uiw/react-md-editor": "^4.0.11",
     "axios": "^1.13.5",
     "date-fns": "^4.1.0",
+    "file-saver": "^2.0.5",
     "googleapis": "^171.4.0",
     "jspdf": "^4.2.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.575.0",
     "next": "16.1.6",
     "next-remove-imports": "^1.0.12",
@@ -44,6 +46,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
     "@types/node": "^20",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
