@@ -44,6 +44,7 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
     // Options
     const [includeImages, setIncludeImages] = useState(true);
     const [includePDFs, setIncludePDFs] = useState(true);
+    const [includeOtherFiles, setIncludeOtherFiles] = useState(true);
 
     const [boardLabels, setBoardLabels] = useState<{ id: string; title: string; color: string }[]>([]);
     const [selectedExportLabels, setSelectedExportLabels] = useState<Set<string>>(new Set());
@@ -1026,15 +1027,29 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                             const isPDF = attach.url.toLowerCase().endsWith(".pdf");
                             
                             // Only include what the user selected in the UI options
-                            if ((isImage && !includeImages) || (isPDF && !includePDFs)) continue;
+                            const isOther = !isImage && !isPDF && !attach.url.includes("google.com/maps") && !attach.url.includes("maps.app.goo.gl");
+
+                            if (isImage && !includeImages) continue;
+                            if (isPDF && !includePDFs) continue;
+                            if (isOther && !includeOtherFiles) continue;
 
                             try {
-                                const attachRes = await fetch(attach.url);
+                                let formattedUrl = formatImageUrl(attach.url);
+                                let fetchUrl = formattedUrl;
+                                // If formatImageUrl didn't proxy it (e.g., standard UploadThing URL or generic link),
+                                // proxy it to bypass browser CORS restrictions.
+                                if (formattedUrl && formattedUrl.startsWith("http")) {
+                                    fetchUrl = `/api/proxy-image?url=${encodeURIComponent(formattedUrl)}`;
+                                }
+
+                                if (!fetchUrl) continue;
+
+                                const attachRes = await fetch(fetchUrl);
                                 if (!attachRes.ok) throw new Error(`Failed to fetch ${attach.url}`);
                                 const blob = await attachRes.blob();
                                 
                                 // Best effort filename
-                                let filename = attach.url.split('/').pop() || `attachment_${a}`;
+                                let filename = attach.title || attach.url.split('/').pop() || `attachment_${a}`;
                                 if (filename.includes('?')) filename = filename.split('?')[0];
                                 
                                 cardFolder.file(filename, blob);
@@ -1175,6 +1190,15 @@ export const DownloadBoardPDF = ({ boardId, boardTitle }: DownloadBoardPDFProps)
                                             className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-600 h-3.5 w-3.5"
                                         />
                                         <File className="h-3.5 w-3.5 text-neutral-400" /> Download & Merge PDFs
+                                    </label>
+                                    <label className="flex items-center gap-x-2 text-xs font-medium text-neutral-700 cursor-pointer mt-1">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={includeOtherFiles} 
+                                            onChange={(e) => setIncludeOtherFiles(e.target.checked)}
+                                            className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-600 h-3.5 w-3.5"
+                                        />
+                                        <Layers className="h-3.5 w-3.5 text-neutral-400" /> Download Other Files (ZIP only)
                                     </label>
                                     <p className="text-[9px] text-neutral-400 italic mt-1 pl-6">Google Maps links are always included as text links.</p>
                                 </div>
